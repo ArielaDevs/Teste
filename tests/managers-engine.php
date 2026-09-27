@@ -140,10 +140,22 @@ managersResetMemo();
 check('sees nothing at all', [team($megan), portalTicketAccess($c, $megan, $tAaron)], [[], null]);
 $c->prepare("UPDATE users SET is_active = 1 WHERE id = ?")->execute([$megan]);
 
-echo "\n8. A manager with no company, on a multi-company install\n";
-$c->prepare("UPDATE users SET tenant_id = NULL WHERE id = ?")->execute([$megan]);
+echo "\n8. No company means the Default company (the documented convention)\n";
+// Ed: somebody who has never filed people into companies must not have to do
+// anything extra for managers to work. $T1 is the Default company here.
+$dflt = getDefaultTenantId($c);
+$c->prepare("UPDATE users SET tenant_id = NULL WHERE id IN (?, ?)")->execute([$megan, $aaron]);
 managersResetMemo();
-check('sees nobody (fail closed)', team($megan), []);
+check('an unfiled manager still sees an unfiled report (both Default)', in_array('Aaron', team($megan), true), $dflt === $T1);
+$c->prepare("UPDATE tickets SET tenant_id = NULL WHERE id = ?")->execute([$tAaron]);
+managersResetMemo();
+check('...and their unrouted ticket (also Default)', (portalTicketAccess($c, $megan, $tAaron)['role'] ?? null), $dflt === $T1 ? 'manager' : null);
+// A manager in a real CLIENT company does not reach unfiled (Default) people.
+$c->prepare("UPDATE users SET tenant_id = ?, manager_id = ? WHERE id = ?")->execute([$T2, $finn, $cal]);
+$c->prepare("UPDATE users SET tenant_id = NULL WHERE id = ?")->execute([$cal]);
+$c->prepare("UPDATE users SET manager_id = ? WHERE id = ?")->execute([$finn, $cal]);
+setting('directory_depth', 'direct');
+check('a client-company manager does not see an unfiled report', in_array('Cal', team($finn), true), false);
 
 $c->rollBack();
 echo "\n$pass passed, $fail failed (all changes rolled back)\n";

@@ -26,6 +26,10 @@
  *    Verification has added the sensitivity and view columns, nobody is a
  *    manager, because a confidential ticket could not be told apart.
  *  - Same company only, both ways: the person must be in the manager's company
+ *    - where NO company means the Default company, the documented convention
+ *    for every row a company owns (Multi-Tenancy-Isolation). Somebody who has
+ *    never set up companies, or never filed these people, must not have to do
+ *    anything extra to make managers work (Ed) -
  *    AND so must the ticket (a ticket can be moved to another company).
  *  - A manager who has left sees nothing. Whether managers keep seeing the
  *    tickets of people who have left is a setting, on by default - an open
@@ -38,7 +42,7 @@
  *    System -> Managers warns about lines that match nobody.
  */
 
-require_once __DIR__ . '/tenancy.php';            // isMultiTenant()
+require_once __DIR__ . '/tenancy.php';            // isMultiTenant(), getDefaultTenantId()
 require_once __DIR__ . '/ticket_sensitivity.php'; // ticketSensitivityReady()
 require_once __DIR__ . '/ticket_views.php';       // ticketViewsReady()
 
@@ -113,6 +117,8 @@ function managerRow(PDO $conn, int $managerUserId): ?array
  * request. Empty when managers are off, the manager has left, or - on a
  * multi-company install - the manager belongs to no company.
  *
+ * ("No company" is read as the Default company, not as nowhere - see the header.)
+ *
  * @return int[]
  */
 function managerTeamUserIds(PDO $conn, int $managerUserId): array
@@ -125,13 +131,19 @@ function managerTeamUserIds(PDO $conn, int $managerUserId): array
 
     $settings = managersSettings($conn);
     $multi    = isMultiTenant($conn);
-    if ($multi && $m['tenant_id'] === null) return $memo[$managerUserId] = [];
 
     // Everyone a line could ever reach: same company, not the manager, and
     // (unless the setting keeps them) not people who have left.
     $base = "u.id <> ?";
     $baseArgs = [$managerUserId];
-    if ($multi) { $base .= " AND u.tenant_id = ?"; $baseArgs[] = (int)$m['tenant_id']; }
+    if ($multi) {
+        // The manager's company, with no company meaning Default - and for the
+        // Default company, people with no company count as its own.
+        $mt = managerCompany($conn, $m['tenant_id']);
+        if ($mt === getDefaultTenantId($conn)) { $base .= " AND (u.tenant_id = ? OR u.tenant_id IS NULL)"; }
+        else                                     { $base .= " AND u.tenant_id = ?"; }
+        $baseArgs[] = $mt;
+    }
     if ($settings['leavers'] !== '1') { $base .= " AND u.is_active = 1"; }
 
     $grants = $conn->prepare("SELECT grant_type, target_id, target_value, is_exclusion FROM manager_grants WHERE manager_user_id = ?");
@@ -218,6 +230,16 @@ function managerGrantMembers(PDO $conn, array $g, int $managerUserId, string $ba
     return [];
 }
 
+/**
+ * The company a row belongs to, where NO company (NULL) means the Default
+ * company - the convention every company-owned row follows. A ticket nobody has
+ * routed and a person nobody has filed are both Default's.
+ */
+function managerCompany(PDO $conn, $tenantId): int
+{
+    return ($tenantId === null || $tenantId === '') ? getDefaultTenantId($conn) : (int)$tenantId;
+}
+
 /** Does this portal user manage anybody? Decides whether "Team tickets" is shown. */
 function managerHasTeam(PDO $conn, int $userId): bool
 {
@@ -256,7 +278,7 @@ function portalTicketAccess(PDO $conn, int $userId, int $ticketId): ?array
     // The TICKET must be in the manager's company too - it can be moved.
     if (isMultiTenant($conn)) {
         $m = managerRow($conn, $userId);
-        if (!$m || (int)$t['tenant_id'] !== (int)$m['tenant_id']) return null;
+        if (!$m || managerCompany($conn, $t['tenant_id']) !== managerCompany($conn, $m['tenant_id'])) return null;
     }
 
     $s = managersSettings($conn);
