@@ -52,8 +52,9 @@ try {
     // Build the absolute feed URL from this request's host + this script's folder.
     // Components are returned too so the client can swap the host (e.g. replace
     // "localhost" with the laptop's LAN IP) and rebuild the URL/QR without a round-trip.
-    $https = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
-          || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    // requestIsHttps(): the one HTTPS rule (GH #152) - a proxy's X-Forwarded-Proto
+    // only counts when TRUST_PROXY_HTTPS says the proxy is ours.
+    $https = requestIsHttps();
     $scheme    = $https ? 'https' : 'http';
     $host      = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/api/calendar/get_feed_url.php')), '/');

@@ -109,6 +109,9 @@ function messagingPublicBaseUrl(PDO $conn): string
         }
     } catch (Exception $e) { /* table missing → derive from request */ }
 
+    // ⚠️ Deliberately NOT requestIsHttps() (GH #152): this is the address shown
+    // for the provider to call, and api/messaging/webhook.php rebuilds it the same
+    // way to check the provider's signature - the two must agree. See there.
     $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https' : 'http';
     $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? ($_SERVER['HTTP_HOST'] ?? 'localhost');

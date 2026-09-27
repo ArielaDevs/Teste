@@ -142,8 +142,9 @@ $tz     = date_default_timezone_get() ?: 'UTC';
 $host   = $_SERVER['HTTP_HOST'] ?? 'freeitsm';
 $domain = preg_replace('/[^a-zA-Z0-9.\-]/', '', $host) ?: 'freeitsm';
 $base   = defined('BASE_URL') ? rtrim(BASE_URL, '/') : '';
-$https  = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
-       || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+// requestIsHttps(): the one HTTPS rule (GH #152) - a proxy's X-Forwarded-Proto
+// only counts when TRUST_PROXY_HTTPS says the proxy is ours.
+$https  = requestIsHttps();
 
 $lines = icsHeader('FreeITSM — my scheduled work', $tz);
 

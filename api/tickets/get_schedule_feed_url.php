@@ -76,8 +76,9 @@ try {
         )->execute([$analystId, $token]);
     }
 
-    $https = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
-          || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    // requestIsHttps(): the one HTTPS rule (GH #152) - a proxy's X-Forwarded-Proto
+    // only counts when TRUST_PROXY_HTTPS says the proxy is ours.
+    $https = requestIsHttps();
     $scheme = $https ? 'https' : 'http';
     $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $dir    = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/api/tickets/x.php')), '/');

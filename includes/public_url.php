@@ -121,8 +121,14 @@ function publicBaseUrl(PDO $conn): string
     }
 
     if (!empty($_SERVER['HTTP_HOST'])) {
-        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-              || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        // The ONE answer to "is this request HTTPS?" (GH #152): it honours a
+        // proxy's X-Forwarded-Proto only when TRUST_PROXY_HTTPS says the proxy
+        // is ours, takes the first hop of a chained header, and counts port 443.
+        // This used to trust the header outright, so a client could choose the
+        // scheme of a link put in somebody else's inbox, and a sign-in link and
+        // an emailed link could disagree about the same site.
+        require_once __DIR__ . '/session_security.php';
+        $https = requestIsHttps();
         // The Host header is attacker-controllable and this value ends up in mail
         // sent to other people, so only characters a hostname may legally contain
         // survive. A link we put in somebody else's inbox is not somewhere to
