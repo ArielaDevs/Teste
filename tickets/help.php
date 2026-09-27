@@ -1107,6 +1107,12 @@ try {
                         lowers it, and the audit trail records who did. Requesters can make their ticket confidential, but never undo it.
                     </p>
                     <p>
+                        <strong>Who has looked.</strong> Opening a ticket is recorded: the ticket's <strong>Audit</strong> window lists
+                        who viewed it and how many times each day, service desk and portal alike (portal viewers are marked
+                        <em>(self-service portal)</em>). The person who raised the ticket is shown the portal viewers only, on
+                        the ticket itself, under <em>Who has seen this ticket</em>. Service-desk views are never shown to them.
+                    </p>
+                    <p>
                         Each automatic change is written to the ticket's audit trail with the reason, for example
                         <em>Confidential - arrived through the HR inbox mailbox</em>.
                     </p>

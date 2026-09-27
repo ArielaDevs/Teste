@@ -198,12 +198,21 @@ try {
         // Table may not exist on installs that haven't run db_verify yet
     }
 
+    // Who else has looked at this ticket in the portal - its requester's managers,
+    // once managers exist (discussion #62). Shown to the requester by default.
+    // Service-desk views are deliberately NOT included; see includes/ticket_views.php.
+    // null (not []) before Database Verification, so the page shows no panel
+    // rather than a reassurance it cannot yet back up.
+    require_once '../../includes/ticket_views.php';
+    $seenBy = ticketViewsReady($conn) ? ticketViewsForRequester($conn, (int)$ticketId, $userId) : null;
+
     echo json_encode([
         'success' => true,
         'ticket' => $ticket,
         'thread' => $thread,
         'notes' => $notes,
-        'recordings' => $recordings
+        'recordings' => $recordings,
+        'seen_by' => $seenBy
     ]);
 
 } catch (Exception $e) {

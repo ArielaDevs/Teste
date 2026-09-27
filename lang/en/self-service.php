@@ -308,6 +308,11 @@ return [
     ],
 
     'ticket' => [
+        // ── Who has seen this ticket (discussion #62, step 2) ────────────
+        'seen_title'              => 'Who has seen this ticket',
+        'seen_nobody'             => 'Nobody outside the service desk has looked at it.',
+        'seen_times'              => '{count} times',
+        'seen_help'               => 'Anyone other than you who opens this ticket in the portal - a manager, say - is listed here, with when they looked. The service desk is not listed: they see every ticket as part of their job.',
         // ── Confidential (discussion #62) ───────────────────────────────
         'confidential'            => 'Confidential',
         'confidential_hint'       => 'Kept from managers. The service desk still sees it.',
@@ -463,6 +468,8 @@ return [
         's5_li5'             => 'Any screen recordings, playing where you sent them — a video you attached to a later reply sits with that reply, not back at the start.',
         's5_li6'             => 'Notes the analyst chose to share with you (internal-only notes stay hidden).',
         's5_li7'             => 'The current status, priority, and assigned analyst.',
+        // Discussion #62, step 2
+        's5_li_seen'         => '<strong>Who has seen this ticket</strong> — anyone other than you who has opened it in the portal, such as a manager, with when they last looked. The service desk is not listed; looking at tickets is their job.',
         's5_p3'              => 'To reply or add information, use the reply box at the bottom of the conversation — you can attach files and record your screen from there too. Replying to the email notification you received works just as well; either way it lands on the same ticket.',
 
         // Training. Written to be readable by somebody whose portal has no

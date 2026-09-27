@@ -290,6 +290,7 @@ require __DIR__ . '/includes/header.php';
                 <li><?php echo t('self-service.help.s5_li5'); ?></li>
                 <li><?php echo t('self-service.help.s5_li6'); ?></li>
                 <li><?php echo t('self-service.help.s5_li7'); ?></li>
+                <li><?php echo t('self-service.help.s5_li_seen'); ?></li>
             </ul>
             <p><?php echo t('self-service.help.s5_p3'); ?></p>
         </div>

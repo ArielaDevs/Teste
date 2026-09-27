@@ -76,6 +76,19 @@ try {
     }
     unset($row);
 
+    // Views (discussion #62, step 2), merged into the same newest-first list so
+    // the Audit window - desktop and phone both read this endpoint - shows them
+    // without a change of its own. Service-desk views appear here and only here;
+    // the requester is shown managers' views alone (see includes/ticket_views.php).
+    require_once '../../includes/ticket_views.php';
+    $views = ticketViewsAsAuditRows($conn, (int)$ticketId);
+    if ($views) {
+        $audit = array_merge($audit, $views);
+        usort($audit, function ($a, $b) {
+            return strcmp((string)$b['created_datetime'], (string)$a['created_datetime']);
+        });
+    }
+
     echo json_encode([
         'success' => true,
         'audit' => $audit

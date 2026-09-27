@@ -150,6 +150,15 @@ $pageStyles = <<<'CSS'
     background: var(--danger-bg, #fdecea);
 }
 .tk-close-btn:disabled { opacity: .55; cursor: progress; }
+/* Who has seen this ticket (discussion #62, step 2). Quiet when nobody has;
+   it is information, not an alarm. */
+.tk-seen { margin: 12px 24px 0; flex-shrink: 0; padding: 8px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px;
+    background: var(--surface-2, #f7f9fa); font-size: 12px; color: var(--text-muted, #666); }
+.tk-seen-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text, #333); margin-bottom: 2px; }
+.tk-seen-icon { width: 14px; height: 14px; flex-shrink: 0; }
+.tk-seen-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.tk-seen-list li { padding: 2px 0; }
+.tk-seen-list strong { color: var(--text, #333); font-weight: 600; }
 /* Confidential (discussion #62) - danger tones from the theme. */
 .tk-lock { width: 12px; height: 12px; vertical-align: -1px; margin-right: 4px; flex-shrink: 0; }
 .tk-item-subject .tk-lock { color: var(--danger-text, #b3261e); }
@@ -573,6 +582,7 @@ let ssTickets = [];
               +     '<span>' + esc(window.t('self-service.ticket.created', { date: fullDate(t.created_datetime) })) + '</span>'
               +   '</div>'
               + '</div>'
+              + seenByHtml(d.seen_by)
               + '<div class="tk-thread" id="tkThread">' + (msgs || '<div class="loading-state">' + esc(window.t('self-service.ticket.no_conversation')) + '</div>') + '</div>'
               + composerHtml(t);
 
@@ -649,6 +659,28 @@ let ssTickets = [];
         // three layers of markup-building string concatenation to get there
         // would be worse than one variable beside them.
         let ssCurrentTicketId = 0;
+
+        // ── Who has seen this ticket (discussion #62, step 2) ─────────────
+        // Shown by default, not behind a button: if someone other than the
+        // requester can read their ticket, the requester is owed knowing when
+        // they did. Portal viewers only - the service desk is deliberately left
+        // out (see includes/ticket_views.php). null = not tracked yet on this
+        // install (Database Verification not run), so no panel at all rather
+        // than a reassurance nothing is backing up.
+        function seenByHtml(seen) {
+            if (!Array.isArray(seen)) return '';
+            const icon = '<svg class="tk-seen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            const body = seen.length === 0
+                ? '<span class="tk-seen-none">' + esc(window.t('self-service.ticket.seen_nobody')) + '</span>'
+                : '<ul class="tk-seen-list">' + seen.map(v =>
+                      '<li><strong>' + esc(v.name) + '</strong> <span>' + esc(fullDate(v.last))
+                    + (v.count > 1 ? ' &middot; ' + esc(window.t('self-service.ticket.seen_times', { count: v.count })) : '')
+                    + '</span></li>').join('') + '</ul>';
+            return '<div class="tk-seen" title="' + esc(window.t('self-service.ticket.seen_help')) + '">'
+                 +   '<div class="tk-seen-title">' + icon + esc(window.t('self-service.ticket.seen_title')) + '</div>'
+                 +   body
+                 + '</div>';
+        }
 
         // ── Confidential (discussion #62) ─────────────────────────────────
         // A badge when the ticket is confidential; otherwise a quiet button to

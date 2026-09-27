@@ -312,6 +312,12 @@ try {
         // Table may not exist on installs that haven't run db_verify yet
     }
 
+    // Record the view (discussion #62, step 2) - after every check above has
+    // passed, so a refused request is never counted as someone having looked.
+    // One row per analyst per day; it cannot fail the request.
+    require_once '../../includes/ticket_views.php';
+    ticketViewRecord($conn, (int)$email['ticket_id'], 'analyst', (int)$_SESSION['analyst_id']);
+
     echo json_encode([
         'success' => true,
         'email' => $email,

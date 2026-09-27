@@ -1363,6 +1363,22 @@ CREATE TABLE IF NOT EXISTS `ticket_audit` (
     CONSTRAINT `fk_ticket_audit_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Who has looked at a ticket (discussion #62, step 2): one row per viewer per UTC
+-- day. Separate from ticket_audit, whose actor can only be an analyst.
+CREATE TABLE IF NOT EXISTS `ticket_views` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `ticket_id`             INT NOT NULL,
+    `viewer_type`           VARCHAR(10) NOT NULL,   -- 'analyst' or 'user' (portal)
+    `viewer_id`             INT NOT NULL,
+    `view_date`             DATE NOT NULL,
+    `first_viewed_datetime` DATETIME NOT NULL,
+    `last_viewed_datetime`  DATETIME NOT NULL,
+    `view_count`            INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_ticket_views_day` (`ticket_id`, `viewer_type`, `viewer_id`, `view_date`),
+    KEY `ix_ticket_views_ticket` (`ticket_id`, `last_viewed_datetime`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `ticket_notes` (
     `id`                INT NOT NULL AUTO_INCREMENT,
     `ticket_id`         INT NOT NULL,
