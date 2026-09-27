@@ -204,7 +204,7 @@ try {
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
-    <link rel="stylesheet" href="../assets/css/self-service.css?v=20">
+    <link rel="stylesheet" href="../assets/css/self-service.css?v=21">
 <?php if ($ssAppearance['background_pattern'] !== ''): ?>
     <!-- Only fetched when a pattern is actually in use. -->
     <link rel="stylesheet" href="../assets/css/self-service-patterns.css?v=4">
@@ -279,6 +279,12 @@ if ($ssLogoOnPage) {
          * there is no moment where the drawer exists but cannot be opened.
          */
         ?>
+        <?php /* ONE right-hand group - bell, phone menu button, account - so the
+                 bar keeps its three parts (brand | nav | this) and
+                 `space-between` still centres the nav. The bell as a fourth item
+                 either floated mid-gap or, pushed right with an auto margin,
+                 dragged the nav to the left. */ ?>
+        <div class="portal-right">
         <?php
         /*
          * The bell (discussion #62) - the SAME bell as the analyst app
@@ -316,6 +322,7 @@ if ($ssLogoOnPage) {
                 aria-label="<?php echo htmlspecialchars(t('self-service.nav.menu')); ?>"
                 aria-expanded="false" aria-controls="portalNav">&#9776;</button>
         <?php include __DIR__ . '/user-menu.php'; ?>
+        </div>
     </div>
     <div class="ss-nav-overlay" onclick="ssToggleNav()"></div>
     <script>

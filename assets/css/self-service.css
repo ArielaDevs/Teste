@@ -109,10 +109,11 @@ body.ss-page-logo { --ss-chrome: 124px; }            /* 48 + 76 */
 .portal-nav { display: flex; align-items: center; gap: 8px; margin-left: 40px; }
 .portal-nav .nav-btn { min-width: 104px; justify-content: center; }
 .portal-user { display: flex; align-items: center; position: relative; }
-/* The notification bell (includes/notification_bell.php) sits beside the account
-   menu. The bar is `space-between`, so without this it became another item to
-   spread out and landed halfway across the gap. */
-.portal-header .nb-wrap { margin-left: auto; margin-right: 10px; }
+/* The right-hand group: notification bell (includes/notification_bell.php),
+   the phone menu button and the account menu, together - so the bar stays
+   brand | nav | this, and the nav stays centred. */
+.portal-right { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.portal-right .nb-wrap { margin-right: 6px; }
 /* Phone-only control; the @media block near the bottom of this file reveals it. */
 .ss-nav-btn, .ss-nav-overlay { display: none; }
 
