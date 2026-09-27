@@ -104,6 +104,16 @@ function getSystemAreas() {
             'desc'     => 'system.landing.portal_profile_desc',
             'keywords' => 'system.landing.portal_profile_keywords',
         ],
+        // Portal managers (discussion #62): who in the portal may see whose
+        // tickets. With the other portal screens, because it decides what an end
+        // user meets.
+        [
+            'icon'     => 'managers',
+            'url'      => 'managers/',
+            'title'    => 'system.landing.managers_title',
+            'desc'     => 'system.landing.managers_desc',
+            'keywords' => 'system.landing.managers_keywords',
+        ],
         [
             'icon'     => 'search',
             'url'      => 'search/',
@@ -251,6 +261,8 @@ function getSystemAreas() {
  */
 function systemAreaIcon($key) {
     $icons = [
+        // One person above two: a reporting line (portal managers, #62).
+        'managers' => '<circle cx="12" cy="5" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="18" r="2.5"></circle><path d="M12 7.5v4"></path><path d="M6 15.5v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"></path>',
         'status_portal' => '<path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"></path><path d="M16 9a4 4 0 0 1 0 6"></path><path d="M19 6.5a8 8 0 0 1 0 11"></path>',
         // A person with a pencil - "what they may edit about themselves".
         // A browser window with a brush: appearance plus behaviour, which is

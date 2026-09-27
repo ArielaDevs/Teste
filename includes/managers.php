@@ -130,21 +130,7 @@ function managerTeamUserIds(PDO $conn, int $managerUserId): array
     if (!$m) return $memo[$managerUserId] = [];
 
     $settings = managersSettings($conn);
-    $multi    = isMultiTenant($conn);
-
-    // Everyone a line could ever reach: same company, not the manager, and
-    // (unless the setting keeps them) not people who have left.
-    $base = "u.id <> ?";
-    $baseArgs = [$managerUserId];
-    if ($multi) {
-        // The manager's company, with no company meaning Default - and for the
-        // Default company, people with no company count as its own.
-        $mt = managerCompany($conn, $m['tenant_id']);
-        if ($mt === getDefaultTenantId($conn)) { $base .= " AND (u.tenant_id = ? OR u.tenant_id IS NULL)"; }
-        else                                     { $base .= " AND u.tenant_id = ?"; }
-        $baseArgs[] = $mt;
-    }
-    if ($settings['leavers'] !== '1') { $base .= " AND u.is_active = 1"; }
+    [$base, $baseArgs] = managerReachSql($conn, $m);
 
     $grants = $conn->prepare("SELECT grant_type, target_id, target_value, is_exclusion FROM manager_grants WHERE manager_user_id = ?");
     $grants->execute([$managerUserId]);
@@ -228,6 +214,31 @@ function managerGrantMembers(PDO $conn, array $g, int $managerUserId, string $ba
             return array_keys($found);
     }
     return [];
+}
+
+/**
+ * Everyone a line could ever reach for this manager, as an SQL condition on
+ * `users u`: same company (no company = Default), not the manager themselves,
+ * and - unless the setting keeps them - not people who have left. The ONE
+ * definition; the team, and System -> Managers' warnings, both use it.
+ *
+ * @param array $m the manager's row (id, tenant_id) from managerRow()
+ * @return array{0:string, 1:array}
+ */
+function managerReachSql(PDO $conn, array $m): array
+{
+    $base = "u.id <> ?";
+    $args = [(int)$m['id']];
+    if (isMultiTenant($conn)) {
+        // The manager's company, with no company meaning Default - and for the
+        // Default company, people with no company count as its own.
+        $mt = managerCompany($conn, $m['tenant_id']);
+        if ($mt === getDefaultTenantId($conn)) { $base .= " AND (u.tenant_id = ? OR u.tenant_id IS NULL)"; }
+        else                                     { $base .= " AND u.tenant_id = ?"; }
+        $args[] = $mt;
+    }
+    if (managersSettings($conn)['leavers'] !== '1') { $base .= " AND u.is_active = 1"; }
+    return [$base, $args];
 }
 
 /**
