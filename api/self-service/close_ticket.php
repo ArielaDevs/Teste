@@ -47,8 +47,20 @@ if (!$ticketId) {
 try {
     $conn = connectToDatabase();
 
-    if (!selfServicePortalSettings($conn)['allow_self_close']) {
-        echo json_encode(['success' => false, 'error' => 'Closing your own ticket is not available on this service desk.']);
+    // Who is asking: the requester, or one of their managers (#62) - the SAME rule
+    // as the ticket page. Each has its own switch: allow_self_close for the
+    // requester, managers_can_close for a manager.
+    require_once __DIR__ . '/../../includes/managers.php';
+    $access = portalTicketAccess($conn, $userId, $ticketId);
+    if (!$access) {
+        echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+        exit;
+    }
+    $asManager = $access['role'] === 'manager';
+    if ($asManager ? !$access['can_close'] : !selfServicePortalSettings($conn)['allow_self_close']) {
+        echo json_encode(['success' => false, 'error' => $asManager
+            ? 'Managers cannot close tickets on this service desk.'
+            : 'Closing your own ticket is not available on this service desk.']);
         exit;
     }
 
@@ -59,9 +71,9 @@ try {
         "SELECT t.id, t.status_id, ts.is_closed
            FROM tickets t
       LEFT JOIN ticket_statuses ts ON ts.id = t.status_id
-          WHERE t.id = ? AND t.user_id = ? AND t.deleted_datetime IS NULL"
+          WHERE t.id = ? AND t.deleted_datetime IS NULL"
     );
-    $st->execute([$ticketId, $userId]);
+    $st->execute([$ticketId]);
     $ticket = $st->fetch(PDO::FETCH_ASSOC);
     if (!$ticket) {
         echo json_encode(['success' => false, 'error' => 'Ticket not found']);
@@ -90,16 +102,19 @@ try {
     // The requester's own words reach the closure email through the same
     // [ticket_closed_message] code an analyst's closing note uses, so an install
     // that already prints that code needs no change to show this.
+    // A manager is named AS a manager, so neither the closure email nor the trail
+    // says the requester closed a ticket their manager closed.
+    $closedBy = $asManager ? $name . ' (manager)' : $name;
     $message = $reason !== ''
-        ? $name . ' closed this from the portal: ' . $reason
-        : $name . ' closed this from the portal — no longer needed.';
+        ? $closedBy . ' closed this from the portal: ' . $reason
+        : $closedBy . ' closed this from the portal — no longer needed.';
 
     TicketsService::updateTicket(
         $conn,
         // 🔴 A REQUESTER, NOT AN ANALYST. actorId is 0 and the audit row stores
         // NULL, so the trail does not claim a member of staff closed a ticket
         // they never touched.
-        ActorContext::fromPortalUser($name),
+        ActorContext::fromPortalUser($closedBy),
         $ticketId,
         ['status' => $closed['name'], 'closed_message' => $message],
         true    // write the audit: this is the only record that it happened
@@ -117,8 +132,8 @@ try {
     try {
         $conn->prepare(
             "INSERT INTO ticket_audit (ticket_id, analyst_id, field_name, old_value, new_value, created_datetime)
-             VALUES (?, NULL, 'Closed by requester', NULL, ?, UTC_TIMESTAMP())"
-        )->execute([$ticketId, $message]);
+             VALUES (?, NULL, ?, NULL, ?, UTC_TIMESTAMP())"
+        )->execute([$ticketId, $asManager ? 'Closed by manager' : 'Closed by requester', $message]);
     } catch (Throwable $e) {
         // ⚠️ Logged, never swallowed silently: the ticket is already closed, so
         // this failing costs the REASON rather than the action - but a catch

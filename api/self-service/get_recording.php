@@ -61,15 +61,19 @@ try {
     } elseif ($ssUserId) {
         $owns = false;
         if ($rec['ticket_id']) {
-            $check = $conn->prepare("SELECT user_id FROM tickets WHERE id = ?");
-            $check->execute([(int)$rec['ticket_id']]);
-            $owns = ((int)$check->fetchColumn() === (int)$ssUserId);
+            // The SAME rule as the ticket page (includes/managers.php): its
+            // requester, or one of their managers - never through a confidential
+            // stub, and never on a ticket in the trash (#62).
+            require_once __DIR__ . '/../../includes/managers.php';
+            $access = portalTicketAccess($conn, (int)$ssUserId, (int)$rec['ticket_id']);
+            $owns = $access && !$access['stub'];
         } elseif ((int)$rec['recorded_by_user_id'] === (int)$ssUserId) {
             $owns = true; // pending recording uploaded by this user
         }
         if (!$owns) {
-            http_response_code(403);
-            exit('Forbidden');
+            // Not found, never forbidden: a refusal must not confirm it exists.
+            http_response_code(404);
+            exit('Not found');
         }
     }
 

@@ -82,6 +82,10 @@ $portalNav = [
     // prominent thing on the page they land on.
     'dashboard'   => ['href' => 'index.php',       'label' => t('self-service.nav.dashboard')],
     'tickets'     => ['href' => 'tickets.php',     'label' => t('self-service.nav.tickets')],
+    // ⚠️ SHOWN ONLY TO A MANAGER - someone who manages at least one person
+    // (discussion #62). The page and every endpoint behind it re-check through
+    // portalTicketAccess(); a hidden tab is not a permission.
+    'team_tickets' => ['href' => 'tickets.php?view=team', 'label' => t('self-service.nav.team_tickets'), 'cap' => 'is_manager'],
     // Named after the module it surfaces, so customers and analysts use one word.
     'help_centre' => ['href' => 'help-centre.php', 'label' => t('self-service.nav.help_centre')],
     // ⚠️ SHOWN ONLY TO SOMEBODY WHO ACTUALLY HAS TRAINING. On an install that
@@ -112,6 +116,14 @@ $portalNav = [
  * has never opened is mid-migration.
  */
 $portalNavCap = function (string $cap) use ($ss_user_id) {
+    if ($cap === 'is_manager') {
+        try {
+            require_once __DIR__ . '/../../includes/managers.php';
+            return managerHasTeam(connectToDatabase(), (int)$ss_user_id);
+        } catch (Throwable $e) {
+            return false;   // fails closed and quietly, like the others
+        }
+    }
     if ($cap === 'has_equipment') {
         try {
             $conn = connectToDatabase();

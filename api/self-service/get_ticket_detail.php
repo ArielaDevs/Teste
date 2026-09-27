@@ -7,6 +7,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/portal_visibility.php';
+require_once '../../includes/managers.php';   // portalTicketAccess() - who may see this ticket (#62)
 
 header('Content-Type: application/json');
 
@@ -30,7 +31,19 @@ try {
     require_once '../../includes/ticket_sensitivity.php';
     $sensCol = ticketSensitivityReady($conn) ? 't.sensitivity' : "'normal' AS sensitivity";
 
-    // Fetch ticket - validate ownership
+    // May this portal user see this ticket at all, and as whom? The ONE rule every
+    // portal endpoint asks (includes/managers.php): the person who raised it, or -
+    // since discussion #62 - one of their managers. A miss reads exactly like a
+    // ticket that does not exist.
+    $access = portalTicketAccess($conn, $userId, $ticketId);
+    if (!$access) {
+        echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+        exit;
+    }
+    $isRequester = $access['role'] === 'requester';
+    $requesterId = (int)$access['ticket']['user_id'];
+
+    // Fetch the ticket (access is settled above)
     $ticketStmt = $conn->prepare(
         "SELECT t.id, t.ticket_number, t.subject,
                 ts.name AS status, ts.colour AS status_colour,
@@ -46,13 +59,54 @@ try {
          LEFT JOIN ticket_statuses ts ON ts.id = t.status_id
          LEFT JOIN ticket_priorities tp ON tp.id = t.priority_id
          LEFT JOIN departments d ON t.department_id = d.id
-         WHERE t.id = ? AND t.user_id = ? AND t.deleted_datetime IS NULL"
+         WHERE t.id = ? AND t.deleted_datetime IS NULL"
     );
-    $ticketStmt->execute([$ticketId, $userId]);
+    $ticketStmt->execute([$ticketId]);
     $ticket = $ticketStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$ticket) {
         echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+        exit;
+    }
+
+    // What this viewer may do, said by the server so the page never guesses.
+    $viewer = [
+        'role'      => $access['role'],
+        'can_reply' => $access['can_reply'],
+        'can_close' => $access['can_close'],
+        'stub'      => $access['stub'],
+    ];
+    if (!$isRequester) {
+        // A manager is told whose ticket this is - the page says so up front.
+        $rn = $conn->prepare("SELECT COALESCE(NULLIF(display_name, ''), email) FROM users WHERE id = ?");
+        $rn->execute([$requesterId]);
+        $viewer['requester_name'] = (string)$rn->fetchColumn();
+
+        // Recorded AFTER every check above, so a refusal never counts as a look,
+        // and shown to the requester under "Who has seen this ticket" (step 2).
+        require_once '../../includes/ticket_views.php';
+        ticketViewRecord($conn, $ticketId, 'user', $userId);
+    }
+
+    // A confidential ticket shown to a manager as a STUB: that it exists, and
+    // nothing of what it says - not the subject, not a word of the thread.
+    if ($access['stub']) {
+        echo json_encode([
+            'success' => true,
+            'ticket'  => [
+                'id'               => (int)$ticket['id'],
+                'ticket_number'    => $ticket['ticket_number'],
+                'subject'          => '',
+                'status'           => $ticket['status'],
+                'status_colour'    => $ticket['status_colour'],
+                'is_closed'        => $ticket['is_closed'],
+                'created_datetime' => $ticket['created_datetime'],
+                'sensitivity'      => 'confidential',
+            ],
+            'thread' => [], 'notes' => [], 'recordings' => [],
+            'viewer' => $viewer,
+            'seen_by' => null,
+        ]);
         exit;
     }
 
@@ -62,8 +116,10 @@ try {
     // mailbox", which portal_visibility.php treats as the opposite of ''
     // ("we don't know their address"). Casting it to '' here would fail the
     // policy open and show them every forward on their ticket.
+    // ⚠️ The TICKET'S requester, not the viewer: a manager sees exactly what the
+    // requester would see of their own ticket, and never more (#62).
     $reqStmt = $conn->prepare("SELECT email FROM users WHERE id = ?");
-    $reqStmt->execute([$userId]);
+    $reqStmt->execute([$requesterId]);
     $reqEmailRaw    = $reqStmt->fetchColumn();
     $requesterEmail = ($reqEmailRaw === false || $reqEmailRaw === null) ? null : (string)$reqEmailRaw;
     $policy = portalThirdPartyPolicy($conn);
@@ -204,7 +260,9 @@ try {
     // null (not []) before Database Verification, so the page shows no panel
     // rather than a reassurance it cannot yet back up.
     require_once '../../includes/ticket_views.php';
-    $seenBy = ticketViewsReady($conn) ? ticketViewsForRequester($conn, (int)$ticketId, $userId) : null;
+    // 🔴 To the REQUESTER only. A manager must not see who else has looked,
+    // nor find their own name listed as if they were the requester (#62).
+    $seenBy = ($isRequester && ticketViewsReady($conn)) ? ticketViewsForRequester($conn, (int)$ticketId, $requesterId) : null;
 
     echo json_encode([
         'success' => true,
@@ -212,7 +270,8 @@ try {
         'thread' => $thread,
         'notes' => $notes,
         'recordings' => $recordings,
-        'seen_by' => $seenBy
+        'seen_by' => $seenBy,
+        'viewer' => $viewer
     ]);
 
 } catch (Exception $e) {

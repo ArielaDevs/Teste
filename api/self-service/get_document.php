@@ -61,7 +61,7 @@ try {
     // is_internal = 0 condition lives HERE, in the same join that establishes
     // ownership, so an internal note's file can never be served by this route.
     $stmt = $conn->prepare(
-        "SELECT d.id, d.kind, d.title, d.storage_key, d.original_name, d.external_url
+        "SELECT d.id, d.kind, d.title, d.storage_key, d.original_name, d.external_url, t.id AS ticket_id
            FROM documents d
            JOIN document_links dl ON dl.document_id = d.id
                                  AND dl.parent_type = 'ticket_note'
@@ -70,12 +70,20 @@ try {
            JOIN tickets t         ON t.id = n.ticket_id
           WHERE d.id = ?
             AND d.deleted_datetime IS NULL
-            AND t.user_id = ?
-            AND t.deleted_datetime IS NULL
-          LIMIT 1"
+            AND t.deleted_datetime IS NULL"
     );
-    $stmt->execute([$documentId, $userId]);
-    $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute([$documentId]);
+
+    // Served if ANY ticket it is shared on is one this person may see - by the
+    // SAME rule as the ticket page (includes/managers.php), and never through a
+    // confidential stub (#62). Every row is checked, not just the first: one
+    // document can be linked to notes on several tickets.
+    require_once __DIR__ . '/../../includes/managers.php';
+    $doc = false;
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $access = portalTicketAccess($conn, $userId, (int)$row['ticket_id']);
+        if ($access && !$access['stub']) { $doc = $row; break; }
+    }
 
     if (!$doc) {
         http_response_code(404);

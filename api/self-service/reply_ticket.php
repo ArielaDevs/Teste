@@ -76,9 +76,18 @@ try {
                 u.email AS requester_email
            FROM tickets t
            LEFT JOIN users u ON u.id = t.user_id
-          WHERE t.id = ? AND t.user_id = ? AND t.deleted_datetime IS NULL"
+          WHERE t.id = ? AND t.deleted_datetime IS NULL"
     );
-    $ticketStmt->execute([$ticketId, $userId]);
+    // Who may reply: the requester, or one of their managers when managers are
+    // allowed to (#62) - the SAME rule as the ticket page. A manager who may only
+    // look, or who sees a confidential stub, is told "not found" like anyone else.
+    require_once __DIR__ . '/../../includes/managers.php';
+    $access = portalTicketAccess($conn, $userId, $ticketId);
+    if (!$access || !$access['can_reply']) {
+        echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+        exit;
+    }
+    $ticketStmt->execute([$ticketId]);
     $ticket = $ticketStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$ticket) {

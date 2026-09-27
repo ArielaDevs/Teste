@@ -39,17 +39,28 @@ try {
     // deleted. A miss is a 404 either way, so a wrong id and someone else's id
     // are indistinguishable from outside.
     $stmt = $conn->prepare(
-        "SELECT ea.filename, ea.content_type, ea.file_path, ea.file_size,
+        "SELECT ea.filename, ea.content_type, ea.file_path, ea.file_size, t.id AS ticket_id,
                 e.channel, e.direction, e.from_address, e.to_recipients, e.cc_recipients,
                 u.email AS requester_email
          FROM email_attachments ea
          JOIN emails e  ON e.id = ea.email_id
          JOIN tickets t ON t.id = e.ticket_id
          JOIN users u   ON u.id = t.user_id
-         WHERE ea.id = ? AND t.user_id = ? AND t.deleted_datetime IS NULL"
+         WHERE ea.id = ? AND t.deleted_datetime IS NULL"
     );
-    $stmt->execute([$attachmentId, $userId]);
+    $stmt->execute([$attachmentId]);
     $attachment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Who may have it: the SAME rule as the ticket page (includes/managers.php) -
+    // its requester, or one of their managers - and never from a confidential
+    // stub, which shows that a ticket exists and nothing it contains (#62).
+    // The privacy check below still measures against the TICKET'S requester
+    // (requester_email above), so a manager gets no file the requester would not.
+    require_once __DIR__ . '/../../includes/managers.php';
+    $access = $attachment ? portalTicketAccess($conn, $userId, (int)$attachment['ticket_id']) : null;
+    if (!$access || $access['stub']) {
+        $attachment = false;
+    }
 
     if (!$attachment) {
         http_response_code(404);

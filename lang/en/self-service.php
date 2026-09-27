@@ -63,6 +63,7 @@ return [
     'nav' => [
         'dashboard'   => 'Dashboard',
         'tickets'     => 'My Tickets',
+        'team_tickets' => 'Team tickets',   // shown only to managers (discussion #62)
         'help_centre' => 'Knowledge',
         'equipment'   => 'My equipment',
         'training'    => 'Training',
@@ -296,6 +297,10 @@ return [
     'tickets' => [
         'title'         => 'Self-Service Portal — My Tickets',
         'heading'       => 'My Tickets',
+        // Managers (discussion #62)
+        'team_heading'  => 'My team\'s tickets',
+        'team_none'     => 'Nobody you manage has a ticket you can see.',
+        'stub_subject'  => 'Confidential ticket',
         'filter_open'   => 'Open',
         'filter_closed' => 'Closed',
         'filter_all'    => 'All',
@@ -308,6 +313,14 @@ return [
     ],
 
     'ticket' => [
+        // ── Seen as a manager (discussion #62, step 3) ───────────────────
+        'mgr_banner'              => '{name}\'s ticket. You can see it because you manage them.',
+        'mgr_can_view'            => 'You can read it, but not reply or close it.',
+        'mgr_can_reply'           => 'You can read it and reply.',
+        'mgr_can_close'           => 'You can read it and close it.',
+        'mgr_can_both'            => 'You can read it, reply and close it.',
+        'stub_title'              => 'Confidential ticket',
+        'stub_body'               => 'This ticket is confidential. Its details are kept from managers.',
         // ── Who has seen this ticket (discussion #62, step 2) ────────────
         'seen_title'              => 'Who has seen this ticket',
         'seen_nobody'             => 'Nobody outside the service desk has looked at it.',

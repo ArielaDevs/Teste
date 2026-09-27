@@ -18,7 +18,12 @@ $bodyClass    = 'portal-app';
 // the compose screen uses. Pairs with includes/record-modal.php below.
 $needsRecorder = true;
 
-$pageData = ['ticketId' => (int)($_GET['id'] ?? 0)];
+// Which list: the person's own tickets, or - for a manager - their team's
+// (discussion #62). Whether they really manage anybody is the endpoint's answer
+// (get_team_tickets.php), not this parameter's.
+$ssView = (($_GET['view'] ?? '') === 'team') ? 'team' : 'mine';
+if ($ssView === 'team') $activeNav = 'team_tickets';
+$pageData = ['ticketId' => (int)($_GET['id'] ?? 0), 'view' => $ssView];
 
 $pageStyles = <<<'CSS'
 /* Two panes filling the viewport under the 48px header, each scrolling its own
@@ -150,6 +155,14 @@ $pageStyles = <<<'CSS'
     background: var(--danger-bg, #fdecea);
 }
 .tk-close-btn:disabled { opacity: .55; cursor: progress; }
+/* Managers (discussion #62, step 3): whose ticket this is, and a stub. */
+.tk-mgr-banner { flex-shrink: 0; padding: 10px 24px; font-size: 13px; background: var(--info-bg, #e3f2fd);
+    color: var(--info-text, #0d47a1); border-bottom: 1px solid var(--info-border, #90caf9); }
+.tk-stub { margin: 40px auto; max-width: 440px; text-align: center; color: var(--text-muted, #666); padding: 0 24px; }
+.tk-stub .tk-lock { width: 28px; height: 28px; color: var(--danger-text, #b3261e); margin: 0 0 8px; }
+.tk-stub h1 { font-size: 18px; margin: 0 0 8px; color: var(--text, #333); }
+.tk-stub-meta { font-size: 12px; color: var(--text-faint, #999); }
+.tk-item-subject.is-stub { font-style: italic; color: var(--text-muted, #666); }
 /* Who has seen this ticket (discussion #62, step 2). Quiet when nobody has;
    it is information, not an alarm. */
 .tk-seen { margin: 12px 24px 0; flex-shrink: 0; padding: 8px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px;
@@ -357,7 +370,12 @@ let ssTickets = [];
 
         async function loadTickets() {
             try {
-                const r = await fetch('../api/self-service/get_tickets.php');
+                // A manager's team view reads a different list; everything after
+                // this - the reading pane, the files, replying - is the same page,
+                // and every endpoint behind it decides for itself (#62).
+                const r = await fetch(window.PAGE.view === 'team'
+                    ? '../api/self-service/get_team_tickets.php'
+                    : '../api/self-service/get_tickets.php');
                 const d = await r.json();
                 ssTickets = d.success ? (d.tickets || []) : [];
                 renderFilterOptions();
@@ -419,7 +437,8 @@ let ssTickets = [];
             const list = visibleTickets();
 
             if (!list.length) {
-                host.innerHTML = '<div class="loading-state">' + esc(window.t('self-service.tickets.none')) + '</div>';
+                host.innerHTML = '<div class="loading-state">' + esc(window.t(window.PAGE.view === 'team'
+                    ? 'self-service.tickets.team_none' : 'self-service.tickets.none')) + '</div>';
                 return;
             }
 
@@ -428,11 +447,13 @@ let ssTickets = [];
                 return '<button type="button" class="tk-item' + (ssSelected == t.id ? ' selected' : '') + '" onclick="selectTicket(' + t.id + ')">'
                      +   '<div class="tk-item-top">'
                      +     '<span class="tk-dot" style="background:' + esc(c) + '"></span>'
-                     +     '<span class="tk-item-subject">' + (t.sensitivity === 'confidential' ? SS_LOCK_ICON : '') + esc(t.subject || '') + '</span>'
+                     +     '<span class="tk-item-subject' + (t.stub ? ' is-stub' : '') + '">' + (t.sensitivity === 'confidential' ? SS_LOCK_ICON : '')
+                     +       esc(t.stub ? window.t('self-service.tickets.stub_subject') : (t.subject || '')) + '</span>'
                      +     '<span class="tk-item-date">' + esc(shortDate(t.updated_datetime || t.created_datetime)) + '</span>'
                      +   '</div>'
                      +   (t.preview ? '<div class="tk-item-preview">' + esc(stripTags(t.preview)) + '</div>' : '')
-                     +   '<div class="tk-item-meta">' + esc(t.ticket_number || '') + ' &middot; ' + esc(t.status || '') + '</div>'
+                     +   '<div class="tk-item-meta">' + (t.requester_name ? '<strong>' + esc(t.requester_name) + '</strong> &middot; ' : '')
+                     +     esc(t.ticket_number || '') + ' &middot; ' + esc(t.status || '') + '</div>'
                      + '</button>';
             }).join('');
         }
@@ -497,10 +518,10 @@ let ssTickets = [];
                     // nothing to go back FROM, so pushing would only litter the
                     // history with one entry per ticket read.
                     if (wantsReveal && ssPhone.matches && !(history.state && history.state.ssReading)) {
-                        window.history.pushState({ ticketId: id, ssReading: true }, '', 'tickets.php?id=' + id);
+                        window.history.pushState({ ticketId: id, ssReading: true }, '', ssTicketUrl(id));
                     } else {
                         window.history.replaceState(
-                            { ticketId: id, ssReading: wantsReveal && ssPhone.matches }, '', 'tickets.php?id=' + id);
+                            { ticketId: id, ssReading: wantsReveal && ssPhone.matches }, '', ssTicketUrl(id));
                     }
                 }
             } catch (e) { /* not fatal */ }
@@ -525,6 +546,21 @@ let ssTickets = [];
             const t = d.ticket;
             const pane = document.getElementById('tkRead');
             const c = t.status_colour || '#0078d4';
+            // What this viewer may do, as the SERVER says - the requester, or a
+            // manager with whatever System -> Managers allows (#62).
+            ssViewer = d.viewer || { role: 'requester', can_reply: true, can_close: true, stub: false };
+
+            if (ssViewer.stub) {
+                ssCurrentTicketId = Number(t.id) || 0;
+                pane.innerHTML = managerBannerHtml()
+                  + '<div class="tk-stub">' + SS_LOCK_ICON
+                  +   '<h1>' + esc(window.t('self-service.ticket.stub_title')) + '</h1>'
+                  +   '<p>' + esc(window.t('self-service.ticket.stub_body')) + '</p>'
+                  +   '<p class="tk-stub-meta">' + esc(t.ticket_number || '') + ' &middot; ' + esc(t.status || '')
+                  +     ' &middot; ' + esc(window.t('self-service.ticket.created', { date: fullDate(t.created_datetime) })) + '</p>'
+                  + '</div>';
+                return;
+            }
 
             // Screen recordings, bucketed by the message they were recorded with.
             // A recording with no email_id came with the ticket's OPENING message
@@ -571,7 +607,8 @@ let ssTickets = [];
             }).join('');
 
             pane.innerHTML =
-                '<div class="tk-read-head">'
+                managerBannerHtml()
+              + '<div class="tk-read-head">'
               +   '<h1 class="tk-read-subject">' + esc(t.subject || '') + '</h1>'
               +   '<div class="tk-read-meta">'
               +     '<span class="tk-num">' + esc(t.ticket_number || '') + '</span>'
@@ -584,7 +621,7 @@ let ssTickets = [];
               + '</div>'
               + seenByHtml(d.seen_by)
               + '<div class="tk-thread" id="tkThread">' + (msgs || '<div class="loading-state">' + esc(window.t('self-service.ticket.no_conversation')) + '</div>') + '</div>'
-              + composerHtml(t);
+              + (ssViewer.can_reply ? composerHtml(t) : (ssViewer.can_close ? '<div class="tk-composer"><div class="tk-composer-actions">' + closeButtonHtml(t) + '</div></div>' : ''));
 
             ssCurrentTicketId = Number(t.id) || 0;
             wireComposer();
@@ -660,6 +697,26 @@ let ssTickets = [];
         // would be worse than one variable beside them.
         let ssCurrentTicketId = 0;
 
+        // ── Managers (discussion #62, step 3) ─────────────────────────────
+        let ssViewer = { role: 'requester', can_reply: true, can_close: true, stub: false };
+
+        function ssTicketUrl(id) {
+            return 'tickets.php?' + (window.PAGE.view === 'team' ? 'view=team&' : '') + 'id=' + id;
+        }
+
+        // Said up front on a team ticket: whose it is, and what a manager may do
+        // here - signposted, so nobody wonders why there is no reply box.
+        function managerBannerHtml() {
+            if (ssViewer.role !== 'manager') return '';
+            const can = ssViewer.can_reply && ssViewer.can_close ? 'mgr_can_both'
+                      : ssViewer.can_reply ? 'mgr_can_reply'
+                      : ssViewer.can_close ? 'mgr_can_close' : 'mgr_can_view';
+            return '<div class="tk-mgr-banner">'
+                 +   '<strong>' + esc(window.t('self-service.ticket.mgr_banner', { name: ssViewer.requester_name || '' })) + '</strong> '
+                 +   (ssViewer.stub ? '' : esc(window.t('self-service.ticket.' + can)))
+                 + '</div>';
+        }
+
         // ── Who has seen this ticket (discussion #62, step 2) ─────────────
         // Shown by default, not behind a button: if someone other than the
         // requester can read their ticket, the requester is owed knowing when
@@ -689,6 +746,9 @@ let ssTickets = [];
         const SS_LOCK_ICON = '<svg class="tk-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 
         function confidentialHtml(t) {
+            // Only the requester can mark their ticket confidential; a manager just
+            // sees whether it is (#62).
+            if (ssViewer.role === 'manager' && t.sensitivity !== 'confidential') return '';
             if (t.sensitivity === 'confidential') {
                 return '<span class="tk-confidential" title="' + esc(window.t('self-service.ticket.confidential_hint')) + '">'
                      + SS_LOCK_ICON + esc(window.t('self-service.ticket.confidential')) + '</span>';
@@ -743,7 +803,10 @@ let ssTickets = [];
          * person asking — a button that is not on the page is not a rule.
          */
         function closeButtonHtml(t) {
-            if (!(window.SS_PORTAL && window.SS_PORTAL.allow_self_close)) return '';
+            // A requester needs the portal's self-close switch; a manager, the
+            // managers' one - which the server has already folded into can_close.
+            if (ssViewer.role === 'manager' ? !ssViewer.can_close
+                                            : !(window.SS_PORTAL && window.SS_PORTAL.allow_self_close)) return '';
             if (Number(t.is_closed) === 1) return '';
             return '<button type="button" class="btn tk-close-btn" id="ssSelfClose" title="'
                  + esc(window.t('self-service.ticket.self_close_hint')) + '">'
@@ -1013,7 +1076,7 @@ require_once __DIR__ . '/includes/header.php';
     <div class="tk-shell">
         <div class="tk-list">
             <div class="tk-list-head">
-                <h2><?php echo htmlspecialchars(t('self-service.tickets.heading')); ?></h2>
+                <h2><?php echo htmlspecialchars(t($ssView === 'team' ? 'self-service.tickets.team_heading' : 'self-service.tickets.heading')); ?></h2>
                 <!-- Populated from the statuses actually on this person's tickets,
                      so the list never offers a filter that would come back empty. -->
                 <select class="tk-filter" id="tkFilter" aria-label="<?php echo htmlspecialchars(t('self-service.tickets.filter_label')); ?>"></select>
