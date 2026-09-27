@@ -130,56 +130,63 @@ function managerAccessRender(int $managerId, string $backUrl): void
         /* ── "Why can they see this person?" - the same visual language as the
            Sign-in conflict explanation (system/analysts/index.php): a head with
            a round icon, a picture, an info box, then numbered ways out. ─── */
-        #maWhy .modal-content { max-width: 640px; padding: 22px 24px 16px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        #maWhy .modal-content { max-width: 820px; padding: 18px 22px 14px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
         #maWhy .modal-actions { display: flex; justify-content: flex-end; padding: 0; border: 0; }
-        .mw-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+        .mw-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
         .mw-head-icon { flex: 0 0 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
             background: var(--info-bg, #e3f2fd); color: var(--info-text, #0d47a1); border: 1px solid var(--info-border, #90caf9); }
         .mw-head-icon svg { width: 22px; height: 22px; }
         .mw-head h3 { margin: 0 0 4px; font-size: 19px; color: var(--text, #333); }
         .mw-head p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-muted, #666); }
-        .mw-tree { background: var(--surface-2, #f7f9fa); border: 1px solid var(--border-soft, #eee); border-radius: 10px; padding: 16px 12px 14px; margin-bottom: 16px; }
-        .mw-tree-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint, #999); text-align: center; margin-bottom: 10px; }
-        .mw-person { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .mw-avatar { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 16px; background: var(--accent, #546e7a); color: var(--on-accent, #fff); }
+        /* The picture, LEFT TO RIGHT (Ed: "use less vertical space"): the manager,
+           a bar down to one card per reason stacked in the middle, a bar joining
+           them again, the person. A grid, so each connector cell sits on the same
+           row as its card and the lines meet whatever the cards' heights. */
+        .mw-tree { background: var(--surface-2, #f7f9fa); border: 1px solid var(--border-soft, #eee); border-radius: 10px; padding: 10px 14px 12px; margin-bottom: 12px; }
+        .mw-tree-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint, #999); text-align: center; margin-bottom: 8px; }
+        .mw-grid { display: grid; grid-template-columns: 110px 14px 14px minmax(0, 1fr) 14px 14px 110px; align-items: stretch; }
+        .mw-person { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; grid-row: 1 / -1; text-align: center; }
+        .mw-person.them { grid-column: 7; }
+        .mw-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 15px; background: var(--accent, #546e7a); color: var(--on-accent, #fff); }
         .mw-avatar.them { background: var(--surface, #fff); color: var(--accent, #546e7a); border: 2px solid var(--accent, #546e7a); }
-        .mw-person-name { font-weight: 600; font-size: 14px; color: var(--text, #333); text-align: center; }
-        .mw-person-sub { font-size: 12px; color: var(--text-muted, #666); margin-top: -4px; }
-        .mw-stem { width: 2px; height: 16px; margin: 6px auto 0; background: var(--border, #ccc); }
-        .mw-stem.up { margin: 0 auto 6px; }
-        /* Branches down from the manager, one per reason... */
-        .mw-branches { display: flex; justify-content: center; }
-        .mw-branch { position: relative; flex: 1 1 0; max-width: 190px; padding: 16px 6px 0; display: flex; justify-content: center; }
-        .mw-branch::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--border, #ccc); }
-        .mw-branch:first-child::before { left: 50%; }
-        .mw-branch:last-child::before { right: 50%; }
-        .mw-branch:only-child::before { display: none; }
-        .mw-branch::after { content: ''; position: absolute; top: 0; left: calc(50% - 1px); width: 2px; height: 16px; background: var(--border, #ccc); }
-        /* ...and joining again on the way down to the person. */
-        .mw-join .mw-branch { padding: 0; height: 16px; }
-        .mw-join .mw-branch::before { top: auto; bottom: 0; }
-        .mw-join .mw-branch::after { top: 0; height: 16px; }
-        .mw-reason { width: 100%; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-top: 3px solid var(--mw-tone, var(--accent, #0078d4));
-            border-radius: 8px; padding: 10px 10px 9px; text-align: center; box-sizing: border-box; }
+        .mw-person-name { font-weight: 600; font-size: 13px; color: var(--text, #333); overflow-wrap: anywhere; }
+        .mw-person-sub { font-size: 12px; color: var(--text-muted, #666); margin-top: -3px; }
+        /* The stems: from a person to the bar, spanning every row, line at mid-height. */
+        .mw-stem { position: relative; grid-row: 1 / -1; }
+        .mw-stem::after { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: var(--border, #ccc); }
+        /* The connectors, one per row: a piece of the vertical bar plus a tick to the card. */
+        .mw-conn { position: relative; }
+        .mw-conn::after { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: var(--border, #ccc); }
+        .mw-conn::before { content: ''; position: absolute; top: 0; bottom: 0; width: 2px; background: var(--border, #ccc); }
+        .mw-conn.l::before { left: 0; }
+        .mw-conn.r::before { right: 0; }
+        .mw-conn.first::before { top: 50%; }
+        .mw-conn.last::before  { bottom: 50%; }
+        .mw-conn.only::before  { display: none; }
+        .mw-cell { padding: 3px 0; }
+        .mw-reason { background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-left: 3px solid var(--mw-tone, var(--accent, #0078d4));
+            border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; box-sizing: border-box; height: 100%; }
         .mw-kind { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 600;
             background: var(--mw-tone-bg, var(--accent-soft, #e8f4fd)); color: var(--mw-tone, var(--accent, #0078d4)); }
         .mw-kind svg { width: 13px; height: 13px; flex: 0 0 13px; }
-        .mw-reason-name { font-weight: 600; font-size: 13px; color: var(--text, #333); margin-top: 7px; overflow-wrap: anywhere; }
-        .mw-reason-sub { font-size: 12px; color: var(--text-muted, #666); margin-top: 2px; overflow-wrap: anywhere; }
+        .mw-reason-name { font-weight: 600; font-size: 13px; color: var(--text, #333); overflow-wrap: anywhere; }
+        .mw-reason-sub { font-size: 12px; color: var(--text-muted, #666); overflow-wrap: anywhere; }
         .mw-reason.directory, .mw-reason.reports { --mw-tone: var(--accent, #0078d4);        --mw-tone-bg: var(--accent-soft, #e8f4fd); }
         .mw-reason.department { --mw-tone: var(--success-text, #2e7d32); --mw-tone-bg: var(--success-bg, #e8f5e9); }
         .mw-reason.group      { --mw-tone: var(--info-text, #0d47a1);    --mw-tone-bg: var(--info-bg, #e3f2fd); }
         .mw-reason.user       { --mw-tone: var(--text, #333);            --mw-tone-bg: var(--surface-2, #f0f0f0); }
         .mw-reason.everyone   { --mw-tone: var(--warning-text, #e65100); --mw-tone-bg: var(--warning-bg, #fff3e0); }
-        .mw-box { border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+        /* The info boxes share a row. */
+        .mw-boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .mw-box { border-radius: 8px; padding: 10px 12px; margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
         .mw-box svg { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 1px; }
         .mw-box strong { display: block; margin-bottom: 2px; }
         .mw-box.info { background: var(--info-bg, #e3f2fd); color: var(--info-text, #0d47a1); border: 1px solid var(--info-border, #90caf9); }
         .mw-box.warn { background: var(--warning-bg, #fff3e0); color: var(--warning-text, #e65100); border: 1px solid var(--warning-border, #ffcc80); }
         .mw-fix-title { font-size: 13px; font-weight: 600; color: var(--text, #333); margin: 0 0 4px; }
-        .mw-fix-note { font-size: 12px; color: var(--text-muted, #666); margin: 0 0 8px; }
-        .mw-fix { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border-soft, #eee); border-radius: 8px; margin-bottom: 8px; background: var(--surface, #fff); }
+        .mw-fix-note { font-size: 12px; color: var(--text-muted, #666); margin: 0 0 6px; }
+        .mw-fix { display: flex; gap: 12px; align-items: center; padding: 7px 12px; border: 1px solid var(--border-soft, #eee); border-radius: 8px; margin-bottom: 6px; background: var(--surface, #fff); }
         .mw-fix-num { flex: 0 0 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
             background: var(--success-bg, #e8f5e9); color: var(--success-text, #2e7d32); border: 1px solid var(--success-border, #a5d6a7); }
         .mw-fix-text { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text-muted, #666); }
@@ -187,7 +194,10 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .mw-fix .btn { flex: 0 0 auto; padding: 6px 14px; font-size: 13px; text-decoration: none; }
         .mw-gone { text-align: center; padding: 20px 10px; font-size: 14px; color: var(--success-text, #2e7d32); }
         @media (max-width: 560px) {
-            .mw-branches { flex-wrap: wrap; }
+            /* A phone has no room across: the grid collapses to one column. */
+            .mw-grid { grid-template-columns: 1fr; }
+            .mw-person, .mw-person.them { grid-row: auto; grid-column: auto; }
+            .mw-stem, .mw-conn { display: none; }
             .mw-fix { flex-wrap: wrap; }
             .mw-fix .btn { margin-left: 38px; }
         }
@@ -548,11 +558,11 @@ function managerAccessRender(int $managerId, string $backUrl): void
             } else if (r.kind === 'user')       { name = T.why_named; }
             else if (r.kind === 'everyone')     { name = S.manager.company ? fmt(T.why_everyone_in, { company: S.manager.company }) : T.why_everyone_all; }
             else                                { name = r.name || (r.kind === 'group' ? T.line_gone_group : ''); }
-            return '<div class="mw-branch"><div class="mw-reason ' + r.kind + '">'
+            return '<div class="mw-reason ' + r.kind + '">'
                  + '<span class="mw-kind">' + svg(ICON[r.kind] || '') + esc(T['why_kind_' + r.kind] || r.kind) + '</span>'
                  + '<div class="mw-reason-name">' + esc(name) + '</div>'
                  + (sub ? '<div class="mw-reason-sub">' + esc(sub) + '</div>' : '')
-                 + '</div></div>';
+                 + '</div>';
         }
 
         function fixRow(n, title, body, button) {
@@ -573,23 +583,27 @@ function managerAccessRender(int $managerId, string $backUrl): void
             const n = W.reasons.length;
             h += '<p>' + esc(n === 1 ? fmt(T.why_lead_one, P) : fmt(T.why_lead, Object.assign({ count: n }, P))) + '</p></div></div>';
 
-            // The picture: manager → each reason → the person.
-            const branches = W.reasons.map(r => reasonCard(r, W)).join('');
+            // The picture, left to right: manager | stem | bar | reasons | bar | stem | person.
+            const pos = i => n === 1 ? ' only' : (i === 0 ? ' first' : (i === n - 1 ? ' last' : ''));
+            let cells = '<div class="mw-person" style="grid-column:1"><div class="mw-avatar">' + esc(initials(mName)) + '</div><div class="mw-person-name">' + esc(mName) + '</div></div>'
+                      + '<div class="mw-stem" style="grid-column:2"></div>'
+                      + '<div class="mw-stem" style="grid-column:6"></div>'
+                      + '<div class="mw-person them"><div class="mw-avatar them">' + esc(initials(pName)) + '</div><div class="mw-person-name">' + esc(pName) + '</div>'
+                      + (W.person.department ? '<div class="mw-person-sub">' + esc(W.person.department) + '</div>' : '') + '</div>';
+            W.reasons.forEach((r, i) => {
+                const row = 'grid-row:' + (i + 1);
+                cells += '<div class="mw-conn l' + pos(i) + '" style="grid-column:3;' + row + '"></div>'
+                       + '<div class="mw-cell" style="grid-column:4;' + row + '">' + reasonCard(r, W) + '</div>'
+                       + '<div class="mw-conn r' + pos(i) + '" style="grid-column:5;' + row + '"></div>';
+            });
             h += '<div class="mw-tree"><div class="mw-tree-label">' + esc(T.why_tree_label) + '</div>'
-               + '<div class="mw-person"><div class="mw-avatar">' + esc(initials(mName)) + '</div><div class="mw-person-name">' + esc(mName) + '</div></div>'
-               + '<div class="mw-stem"></div>'
-               + '<div class="mw-branches">' + branches + '</div>'
-               + '<div class="mw-branches mw-join">' + W.reasons.map(() => '<div class="mw-branch"></div>').join('') + '</div>'
-               + '<div class="mw-stem up"></div>'
-               + '<div class="mw-person"><div class="mw-avatar them">' + esc(initials(pName)) + '</div><div class="mw-person-name">' + esc(pName) + '</div>'
-               + (W.person.department ? '<div class="mw-person-sub">' + esc(W.person.department) + '</div>' : '') + '</div>'
-               + '</div>';
+               + '<div class="mw-grid" style="grid-template-rows:repeat(' + n + ', auto)">' + cells + '</div></div>';
 
             // What that means.
             const st = W.settings;
             const does = [fmt(T.why_can_read, P), st.can_reply ? T.why_can_reply : T.why_cannot_reply,
                           st.can_close ? T.why_can_close : T.why_cannot_close, T['why_conf_' + st.confidential]].join(' ');
-            h += '<div class="mw-box info">' + svg('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>')
+            h += '<div class="mw-boxes"><div class="mw-box info">' + svg('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>')
                + '<div><strong>' + esc(fmt(T.why_box_title, P)) + '</strong>' + esc(does) + '</div></div>';
             if (!st.enabled) {
                 h += '<div class="mw-box warn">' + svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>')
@@ -599,6 +613,8 @@ function managerAccessRender(int $managerId, string $backUrl): void
                 h += '<div class="mw-box warn">' + svg('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>')
                    + '<div>' + esc(fmt(T.why_person_left, P)) + '</div></div>';
             }
+
+            h += '</div>';   // .mw-boxes
 
             // The ways out: one per reason, then Exclude.
             h += '<p class="mw-fix-title">' + esc(fmt(T.why_fix_title, P)) + '</p>';
