@@ -315,6 +315,18 @@ function getHelpTopics() {
                      . ' phone mobile department employee id manager email edit read-only greyed out'
                      . ' gdpr article 16 rectification carddav address book write back customers update themselves',
         ],
+        'feature-bingo' => [
+            'hero' => 'Feature Bingo',
+            'sub'  => 'One card for everything FreeITSM can do, a star for each one set up here, and an explainer of why the rest are worth a look.',
+            'sections' => [
+                ['id' => 'overview',   'label' => 'What it is'],
+                ['id' => 'cards',      'label' => 'Reading a card'],
+                ['id' => 'not-for-us', 'label' => 'Not for us'],
+                ['id' => 'developers', 'label' => 'For developers: adding a card'],
+            ],
+            'terms' => 'feature bingo features stars setup checklist getting started adoption what can it do'
+                     . ' not for us dismiss tier essential recommended extra category explore configured',
+        ],
         // Portal managers (discussion #62).
         'managers' => [
             'hero' => 'Managers',

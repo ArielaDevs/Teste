@@ -3300,6 +3300,13 @@ $translationNamespaces = ['common', 'tickets'];
             // Auto-switch to mailboxes tab if OAuth success
             <?php if ($oauthSuccess && $oauthMailboxId): ?>
             switchTab('mailboxes');
+            <?php else: ?>
+            // A link can name the tab: settings/#sla opens SLA (Feature Bingo's
+            // "Take me there" uses this). Only a tab that exists and is shown
+            // to this analyst - anything else leaves the page as it opens.
+            const wantTab = decodeURIComponent((location.hash || '').slice(1));
+            const wantBtn = wantTab && document.querySelector('.tab[data-tab="' + CSS.escape(wantTab) + '"]');
+            if (wantBtn && wantBtn.offsetParent !== null && document.getElementById(wantTab + '-tab')) switchTab(wantTab);
             <?php endif; ?>
         });
 

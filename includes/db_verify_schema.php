@@ -2624,6 +2624,13 @@ return [
 
     // The self-service portal's bell (discussion #62) - `notifications` for portal
     // users. A sibling table rather than a column: see database/freeitsm.sql.
+    // Feature Bingo: cards marked "Not for us" (the cards are code).
+    'feature_bingo_dismissed' => [
+        'card_id'                 => 'VARCHAR(100) NOT NULL',
+        'dismissed_by_analyst_id' => 'INT NULL',
+        'dismissed_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+
     'portal_notifications' => [
         'id'               => 'INT NOT NULL AUTO_INCREMENT',
         'user_id'          => 'INT NOT NULL',

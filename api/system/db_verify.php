@@ -98,6 +98,8 @@ $primaryKeys = [
     // all, so verification could not create them on a fresh install and
     // reported "Key column 'id' doesn't exist in table" twice, every run.
     'knowledge_gap_tickets'         => 'ticket_id',
+    // Feature Bingo's "Not for us" list: one row per card, keyed on the card.
+    'feature_bingo_dismissed'       => 'card_id',
     'knowledge_gap_cluster_tickets' => ['cluster_id', 'ticket_id'],
 ];
 

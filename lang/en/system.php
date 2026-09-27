@@ -132,6 +132,10 @@ return [
         'self_service_keywords' => 'self service portal branding logo colour color background pattern customer close ticket assets equipment',        'portal_profile_title'     => 'Portal profile',
         'portal_profile_desc'      => 'Which of their own contact details people may change in the self-service portal, and whether a change reaches your address book.',
         'portal_profile_keywords'  => 'self-service portal profile my account contact details job title office phone mobile edit own details gdpr article 16 rectification carddav address book write back customers',
+        // Feature Bingo
+        'bingo_title'              => 'Feature Bingo',
+        'bingo_desc'               => 'Everything FreeITSM can do, one card each - with a star for every one you have set up, and why the rest are worth a look.',
+        'bingo_keywords'           => 'feature bingo features checklist setup getting started what can it do adoption explore stars configured not configured recommended essential',
         // Portal managers (discussion #62)
         'managers_title'           => 'Managers',
         'managers_desc'            => 'Let people in the self-service portal see the tickets of the people they manage.',
@@ -1859,6 +1863,42 @@ return [
     ],
 
     // ── System → Self-service portal ────────────────────────────────────
+    // System -> Feature Bingo
+    'bingo' => [
+        'heading'           => 'Feature Bingo',
+        'intro'             => 'Most people use a fraction of what they have. Every card is something FreeITSM can do, and its star lights once it is set up here. Open one to see what it is, why it is worth doing, and where to set it up. Anything you will never use: mark it Not for us and it leaves the score.',
+        'needs_verify'      => 'Run System → Database Verification to be able to mark cards Not for us. The stars work already.',
+        'stars_of'          => '{lit} of {total} stars',
+        'percent'           => '{pct}% of the features that apply to you',
+        'dismissed_count'   => '{n} not for us',
+        'search'            => 'Search features',
+        'all_modules'       => 'All modules',
+        'all_categories'    => 'All categories',
+        'all_tiers'         => 'All tiers',
+        'tier_essential'    => 'Essential',
+        'tier_recommended'  => 'Recommended',
+        'tier_extra'        => 'Extra',
+        'state_counted'     => 'Everything that counts',
+        'state_unlit'       => 'Not set up yet',
+        'state_lit'         => 'Set up',
+        'state_dismissed'   => 'Not for us',
+        'state_all'         => 'Everything, including Not for us',
+        'state_is_lit'      => 'Set up',
+        'state_is_unlit'    => 'Not set up yet',
+        'state_is_dismissed'=> 'Not for us',
+        'showing'           => '{n} shown',
+        'group_count'       => '{lit} of {total}',
+        'none_match'        => 'No cards match.',
+        'what'              => 'What it is',
+        'why'               => 'Why it is worth it',
+        'lights_when'       => 'The star lights when:',
+        'take_me_there'     => 'Take me there',
+        'not_for_us'        => 'Not for us',
+        'put_back'          => 'Put it back',
+        'module_not_for_us' => 'Not for us: all of {module}',
+        'module_put_back'   => 'Put back all of {module}',
+    ],
+
     // System -> Managers (discussion #62)
     'managers' => [
         'heading'          => 'Managers',

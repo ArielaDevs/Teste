@@ -19,6 +19,15 @@
 /** @return array<int,array<string,string>> The ordered list of system areas. */
 function getSystemAreas() {
     return [
+        // Feature Bingo: every feature, a star for each one set up. First,
+        // because it is where to start.
+        [
+            'icon'     => 'feature_bingo',
+            'url'      => 'feature-bingo/',
+            'title'    => 'system.landing.bingo_title',
+            'desc'     => 'system.landing.bingo_desc',
+            'keywords' => 'system.landing.bingo_keywords',
+        ],
         [
             'icon'     => 'encryption',
             'url'      => 'encryption/',
@@ -261,6 +270,8 @@ function getSystemAreas() {
  */
 function systemAreaIcon($key) {
     $icons = [
+        // A star: Feature Bingo.
+        'feature_bingo' => '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>',
         // One person above two: a reporting line (portal managers, #62).
         'managers' => '<circle cx="12" cy="5" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="18" r="2.5"></circle><path d="M12 7.5v4"></path><path d="M6 15.5v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"></path>',
         'status_portal' => '<path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"></path><path d="M16 9a4 4 0 0 1 0 6"></path><path d="M19 6.5a8 8 0 0 1 0 11"></path>',

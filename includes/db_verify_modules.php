@@ -31,6 +31,12 @@ $DB_VERIFY_TABLE_OVERRIDES = [
     // swallow directory_sync's tables if that prefix rule ever loosened.
     'documents'      => 'system',
     'document_links' => 'system',
+    // Feature Bingo's "Not for us" list - administered in System.
+    'feature_bingo_dismissed' => 'system',
+    // The self-service portal's people and their bell sit with the requesters
+    // (`users` => tickets), not in "other" (#62).
+    'manager_grants'       => 'tickets',
+    'portal_notifications' => 'tickets',
 ];
 
 /**

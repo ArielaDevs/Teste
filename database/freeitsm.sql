@@ -355,6 +355,16 @@ CREATE TABLE IF NOT EXISTS `notifications` (
 -- column on that one: its analyst_id is NOT NULL with a foreign key to analysts,
 -- and one table keyed two ways would let an analyst and a portal user with the
 -- same id read each other's bell. NotificationsService serves both.
+-- Feature Bingo (System -> Feature Bingo): the cards an administrator has marked
+-- "Not for us". The cards themselves are code (includes/feature_bingo/cards/);
+-- only this choice is data.
+CREATE TABLE IF NOT EXISTS `feature_bingo_dismissed` (
+    `card_id`                 VARCHAR(100) NOT NULL,
+    `dismissed_by_analyst_id` INT NULL,
+    `dismissed_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`card_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `portal_notifications` (
     `id`                INT NOT NULL AUTO_INCREMENT,
     `user_id`           INT NOT NULL,
