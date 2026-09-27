@@ -37,27 +37,46 @@ function managerAccessRender(int $managerId, string $backUrl): void
     foreach ($keys as $k) $T[$k] = t('tickets.manager_access.' . $k);
     ?>
     <style>
+        /* THREE FULL-HEIGHT PANELS (Ed, after using it): find → what gives them
+           access → who they can see, left to right. Each panel scrolls on its
+           own, so adding a line never shoves the rest of the page down, and the
+           page itself does not scroll at all on a desktop. Stacked on a phone. */
         body { display: flex; flex-direction: column; background: var(--app-bg, #f5f5f5); }
-        .ma-scroll { flex: 1; min-height: 0; overflow: auto; }
-        .ma-wrap { padding: 20px 24px 40px; }
-        .ma-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 16px; flex-wrap: wrap; }
-        .ma-back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted, #666); text-decoration: none; font-size: 13px; margin-bottom: 8px; }
+        .ma-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .ma-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 14px 24px 18px; box-sizing: border-box; }
+        .ma-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
+        .ma-back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted, #666); text-decoration: none; font-size: 13px; margin-bottom: 4px; }
         .ma-back:hover { color: var(--accent, #0078d4); }
         .ma-name { font-size: 22px; font-weight: 600; margin: 0; color: var(--text, #333); }
-        .ma-sub { color: var(--text-muted, #666); font-size: 13px; margin-top: 4px; }
+        .ma-sub { color: var(--text-muted, #666); font-size: 13px; margin-top: 2px; }
         .ma-stat { background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-left: 4px solid var(--accent, #0078d4);
-                   border-radius: 8px; padding: 12px 18px; min-width: 200px; }
-        .ma-stat-label { font-size: 12px; color: var(--text-muted, #666); text-transform: uppercase; letter-spacing: .04em; }
-        .ma-stat-num { font-size: 26px; font-weight: 600; color: var(--text, #333); margin-top: 2px; }
-        .ma-banner { border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; border: 1px solid; }
+                   border-radius: 8px; padding: 8px 16px; min-width: 200px; }
+        .ma-stat[hidden] { display: none; }
+        .ma-stat-label { font-size: 11px; color: var(--text-muted, #666); text-transform: uppercase; letter-spacing: .04em; }
+        .ma-stat-num { font-size: 22px; font-weight: 600; color: var(--text, #333); }
+        .ma-banner { border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; font-size: 13px; border: 1px solid; }
         .ma-banner.info { background: var(--info-bg, #e8f4fd); border-color: var(--info-border, #b6d7f2); color: var(--info-text, #0b4f85); }
         .ma-banner.warn { background: var(--warning-bg, #fff4ce); border-color: var(--warning-border, #f0d78c); color: var(--warning-text, #6b5900); }
         .ma-banner a { color: inherit; font-weight: 600; }
-        .ma-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
-        .ma-card { background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; margin-bottom: 16px; }
-        .ma-card-head { padding: 12px 16px; border-bottom: 1px solid var(--border-soft, #eee); font-weight: 600; font-size: 14px; color: var(--text, #333); }
-        .ma-card-head small { display: block; font-weight: 400; color: var(--text-muted, #666); margin-top: 2px; font-size: 12px; }
+        .ma-grid { flex: 1; min-height: 0; display: grid; gap: 16px;
+                   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(260px, .7fr); }
+        /* Read-only: no picker, so two panels. */
+        .ma-grid.no-add { grid-template-columns: minmax(0, 1fr) minmax(260px, .6fr); }
+        /* ⚠️ display:grid / display:flex BEAT the [hidden] attribute - say it again. */
+        .ma-grid[hidden], .ma-card[hidden] { display: none; }
+        .ma-card { background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px;
+                   display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .ma-card-head { padding: 12px 16px; border-bottom: 1px solid var(--border-soft, #eee); font-weight: 600; font-size: 14px; color: var(--text, #333);
+                        display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; }
+        .ma-step { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%;
+                   background: var(--accent-soft, #e8f4fd); color: var(--accent, #0078d4); font-size: 11px; font-weight: 700; margin-right: 8px; }
         .ma-card-body { padding: 12px 16px; }
+        /* The part of a panel that scrolls. Everything else in it stays put. */
+        .ma-fill { flex: 1; min-height: 0; overflow: auto; }
+        .ma-fixed { padding: 12px 16px 0; flex-shrink: 0; }
+        .ma-fixed[hidden] { display: none; }
+        .ma-foot { padding: 8px 16px; border-top: 1px solid var(--border-soft, #eee); flex-shrink: 0; }
+        .ma-foot:empty { display: none; }
         .ma-sec { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, #666); margin: 14px 0 6px; }
         .ma-sec:first-child { margin-top: 0; }
         .ma-sec small { text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -75,12 +94,12 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .ma-btn.primary { background: var(--accent, #0078d4); border-color: var(--accent, #0078d4); color: var(--on-accent, #fff); }
         .ma-btn.primary:hover { background: var(--accent-hover, #106ebe); }
         .ma-btn:disabled { opacity: .5; cursor: default; }
-        .ma-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-soft, #eee); padding: 0 16px; }
-        .ma-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px; font-size: 13px; color: var(--text-muted, #666); cursor: pointer; }
+        .ma-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-soft, #eee); padding: 0 12px; flex-shrink: 0; overflow-x: auto; }
+        .ma-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 10px; font-size: 13px; color: var(--text-muted, #666); cursor: pointer; white-space: nowrap; }
         .ma-tab.active { color: var(--accent, #0078d4); border-bottom-color: var(--accent, #0078d4); font-weight: 600; }
         .ma-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 4px; font-size: 13px;
                      background: var(--surface, #fff); color: var(--text, #333); }
-        .ma-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .ma-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .ma-table td { padding: 8px 6px; border-bottom: 1px solid var(--border-soft, #eee); vertical-align: middle; color: var(--text, #333); }
         .ma-table td.acts { text-align: right; white-space: nowrap; }
         .ma-table td.acts .ma-btn + .ma-btn { margin-left: 6px; }
@@ -89,26 +108,28 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .ma-state.added { color: var(--success-text, #107c10); }
         .ma-state.excluded { color: var(--danger-text, #b3261e); }
         .ma-flag { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: var(--warning-bg, #fff4ce); color: var(--warning-text, #6b5900); margin-left: 6px; }
-        .ma-pager { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--text-muted, #666); }
+        .ma-pager { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-muted, #666); }
         .ma-pager .ma-btn + .ma-btn { margin-left: 6px; }
-        .ma-option { border: 1px solid var(--border-soft, #eee); border-radius: 6px; padding: 12px; margin-bottom: 10px; display: flex; gap: 12px; align-items: center; }
+        .ma-option { border: 1px solid var(--border-soft, #eee); border-radius: 6px; padding: 12px; margin-bottom: 10px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .ma-option select { padding: 6px 8px; border: 1px solid var(--border, #ccc); border-radius: 4px; background: var(--surface, #fff); color: var(--text, #333); font-size: 13px; }
-        .ma-team { list-style: none; margin: 8px 0 0; padding: 0; max-height: 60vh; overflow: auto; }
+        .ma-team { list-style: none; margin: 0; padding: 0; }
         .ma-team li { padding: 7px 2px; border-bottom: 1px solid var(--border-soft, #eee); font-size: 13px; color: var(--text, #333); }
         .ma-team li .ma-muted { display: block; }
-        .ma-team-side { position: sticky; top: 0; }
-        @media (max-width: 960px) {
-            .ma-grid { grid-template-columns: 1fr; }
-            .ma-team-side { position: static; }
-            .ma-wrap { padding: 16px; }
+        /* Tablet and phone: one column, the page scrolls, panels take their height. */
+        @media (max-width: 1100px) {
+            .ma-scroll { display: block; overflow: auto; }
+            .ma-wrap { display: block; padding: 16px; }
+            .ma-grid, .ma-grid.no-add { display: block; }
+            .ma-card { margin-bottom: 16px; overflow: visible; }
+            .ma-fill { overflow: visible; }
         }
     </style>
 
     <div class="ma-scroll">
     <div class="ma-wrap">
-        <a class="ma-back" href="<?php echo htmlspecialchars($backUrl); ?>">&larr; <?php echo htmlspecialchars($T['back']); ?></a>
         <div class="ma-top">
             <div>
+                <a class="ma-back" href="<?php echo htmlspecialchars($backUrl); ?>">&larr; <?php echo htmlspecialchars($T['back']); ?></a>
                 <h1 class="ma-name" id="maName"><?php echo htmlspecialchars($T['page_title']); ?></h1>
                 <div class="ma-sub" id="maSub"></div>
             </div>
@@ -120,39 +141,36 @@ function managerAccessRender(int $managerId, string $backUrl): void
         <div id="maBanners"></div>
 
         <div class="ma-grid" id="maGrid" hidden>
-            <div>
-                <div class="ma-card">
-                    <div class="ma-card-head"><?php echo htmlspecialchars($T['sources_heading']); ?></div>
-                    <div class="ma-card-body" id="maSources"></div>
+            <?php /* 1. Find people to add. Tabs, search and pager stay put; only the results scroll. */ ?>
+            <div class="ma-card" id="maAddCard" hidden>
+                <div class="ma-card-head"><span><span class="ma-step">1</span><?php echo htmlspecialchars($T['add_heading']); ?></span></div>
+                <div class="ma-tabs" role="tablist">
+                    <button type="button" class="ma-tab active" data-kind="user"><?php echo htmlspecialchars($T['tab_people']); ?></button>
+                    <button type="button" class="ma-tab" data-kind="group"><?php echo htmlspecialchars($T['tab_groups']); ?></button>
+                    <button type="button" class="ma-tab" data-kind="department"><?php echo htmlspecialchars($T['tab_departments']); ?></button>
+                    <button type="button" class="ma-tab" data-kind="other"><?php echo htmlspecialchars($T['tab_other']); ?></button>
                 </div>
-
-                <div class="ma-card" id="maAddCard" hidden>
-                    <div class="ma-card-head"><?php echo htmlspecialchars($T['add_heading']); ?></div>
-                    <div class="ma-tabs" role="tablist">
-                        <button type="button" class="ma-tab active" data-kind="user"><?php echo htmlspecialchars($T['tab_people']); ?></button>
-                        <button type="button" class="ma-tab" data-kind="group"><?php echo htmlspecialchars($T['tab_groups']); ?></button>
-                        <button type="button" class="ma-tab" data-kind="department"><?php echo htmlspecialchars($T['tab_departments']); ?></button>
-                        <button type="button" class="ma-tab" data-kind="other"><?php echo htmlspecialchars($T['tab_other']); ?></button>
-                    </div>
-                    <div class="ma-card-body">
-                        <div id="maSearchPane">
-                            <input type="search" class="ma-search" id="maQ" autocomplete="off">
-                            <div id="maResults"></div>
-                        </div>
-                        <div id="maOtherPane" hidden></div>
-                    </div>
+                <div class="ma-fixed" id="maSearchBar"><input type="search" class="ma-search" id="maQ" autocomplete="off"></div>
+                <div class="ma-card-body ma-fill" id="maResultsScroll">
+                    <div id="maResults"></div>
+                    <div id="maOtherPane" hidden></div>
                 </div>
+                <div class="ma-foot" id="maPager"></div>
             </div>
 
-            <div class="ma-team-side">
-                <div class="ma-card">
-                    <div class="ma-card-head"><?php echo htmlspecialchars($T['team_heading']); ?></div>
-                    <div class="ma-card-body">
-                        <input type="search" class="ma-search" id="maTeamFilter" placeholder="<?php echo htmlspecialchars($T['team_filter']); ?>" autocomplete="off">
-                        <ul class="ma-team" id="maTeam"></ul>
-                        <div class="ma-muted" id="maTeamMore" style="margin-top:8px;"></div>
-                    </div>
-                </div>
+            <?php /* 2. What gives them access. */ ?>
+            <div class="ma-card">
+                <div class="ma-card-head"><span><span class="ma-step" id="maStep2">2</span><?php echo htmlspecialchars($T['sources_heading']); ?></span></div>
+                <div class="ma-card-body ma-fill" id="maSources"></div>
+            </div>
+
+            <?php /* 3. The result: who they can see. */ ?>
+            <div class="ma-card">
+                <div class="ma-card-head"><span><span class="ma-step" id="maStep3">3</span><?php echo htmlspecialchars($T['team_heading']); ?></span>
+                    <span class="ma-chip" id="maTeamCount"></span></div>
+                <div class="ma-fixed"><input type="search" class="ma-search" id="maTeamFilter" placeholder="<?php echo htmlspecialchars($T['team_filter']); ?>" autocomplete="off"></div>
+                <div class="ma-card-body ma-fill"><ul class="ma-team" id="maTeam"></ul></div>
+                <div class="ma-foot ma-muted" id="maTeamMore"></div>
             </div>
         </div>
     </div>
@@ -178,6 +196,7 @@ function managerAccessRender(int $managerId, string $backUrl): void
 
         let S = null;                  // the manager's state from the server
         let kind = 'user', page = 1, timer = null, seq = 0;
+        let lastSearch = null;         // the results on screen, kept so a write can re-mark them in place
 
         async function call(params, body) {
             const r = body
@@ -232,6 +251,11 @@ function managerAccessRender(int $managerId, string $backUrl): void
             $('maStatNum').textContent = people(S.team_total);
             $('maGrid').hidden = false;
             $('maAddCard').hidden = !S.can_edit;
+            // Read-only: no picker, so two panels, numbered from 1.
+            $('maGrid').classList.toggle('no-add', !S.can_edit);
+            $('maStep2').textContent = S.can_edit ? '2' : '1';
+            $('maStep3').textContent = S.can_edit ? '3' : '2';
+            $('maTeamCount').textContent = people(S.team_total);
 
             // Where access comes from: the Manager field, then lines, then exclusions.
             let h = '';
@@ -251,7 +275,11 @@ function managerAccessRender(int $managerId, string $backUrl): void
             $('maSources').innerHTML = h;
 
             paintTeam();
-            if (S.can_edit) { if (kind === 'other') paintOther(); else search(); }
+            // After a write, redraw the results we already have with their new
+            // Added / Excluded marks - never fetch them again. A refetch replaced
+            // the list under the pointer and lost its scroll position (Ed: "things
+            // jump about the page as you add/remove things").
+            if (S.can_edit) { if (kind === 'other') paintOther(); else if (lastSearch) renderResults(lastSearch); else search(); }
         }
 
         function paintTeam() {
@@ -277,8 +305,14 @@ function managerAccessRender(int $managerId, string $backUrl): void
             $('maQ').placeholder = ph;
             const d = await call({ action: 'search', kind: kind, q: $('maQ').value.trim(), page: page });
             if (mine !== seq) return;                       // a newer search has started
-            if (!d.success) { $('maResults').innerHTML = '<div class="ma-empty">' + esc(d.error || '') + '</div>'; return; }
-            if (!d.rows.length) { $('maResults').innerHTML = '<div class="ma-empty" style="margin-top:10px;">' + esc(T.no_results) + '</div>'; return; }
+            lastSearch = d.success ? d : null;
+            $('maResultsScroll').scrollTop = 0;             // a NEW list starts at the top
+            if (!d.success) { $('maResults').innerHTML = '<div class="ma-empty">' + esc(d.error || '') + '</div>'; $('maPager').innerHTML = ''; return; }
+            renderResults(d);
+        }
+
+        function renderResults(d) {
+            if (!d.rows.length) { $('maResults').innerHTML = '<div class="ma-empty">' + esc(T.no_results) + '</div>'; $('maPager').innerHTML = ''; return; }
             const rows = d.rows.map((r, i) => {
                 let main;
                 if (kind === 'user') {
@@ -298,8 +332,8 @@ function managerAccessRender(int $managerId, string $backUrl): void
                 return '<tr><td>' + main + '</td><td>' + count + '</td><td class="acts">' + acts + '</td></tr>';
             }).join('');
             const pages = Math.max(1, Math.ceil(d.total / d.per_page));
-            $('maResults').innerHTML = '<table class="ma-table"><tbody>' + rows + '</tbody></table>'
-                + '<div class="ma-pager"><span>' + esc(fmt(T.page_of, { page: d.page, pages: pages, total: d.total })) + '</span><span>'
+            $('maResults').innerHTML = '<table class="ma-table"><tbody>' + rows + '</tbody></table>';
+            $('maPager').innerHTML = '<div class="ma-pager"><span>' + esc(fmt(T.page_of, { page: d.page, pages: pages, total: d.total })) + '</span><span>'
                 + '<button type="button" class="ma-btn" data-page="' + (d.page - 1) + '"' + (d.page <= 1 ? ' disabled' : '') + '>' + esc(T.prev) + '</button>'
                 + '<button type="button" class="ma-btn" data-page="' + (d.page + 1) + '"' + (d.page >= pages ? ' disabled' : '') + '>' + esc(T.next) + '</button>'
                 + '</span></div>';
@@ -335,8 +369,11 @@ function managerAccessRender(int $managerId, string $backUrl): void
             if (t.classList.contains('ma-tab')) {
                 document.querySelectorAll('.ma-tab').forEach(x => x.classList.toggle('active', x === t));
                 kind = t.dataset.kind; page = 1;
-                $('maSearchPane').hidden = kind === 'other';
+                $('maSearchBar').hidden = kind === 'other';
+                $('maResults').hidden = kind === 'other';
                 $('maOtherPane').hidden = kind !== 'other';
+                $('maPager').innerHTML = '';
+                lastSearch = null;
                 if (kind === 'other') paintOther(); else { $('maQ').value = ''; $('maResults').innerHTML = ''; search(); }
                 return;
             }
