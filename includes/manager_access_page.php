@@ -24,7 +24,7 @@ function managerAccessRender(int $managerId, string $backUrl): void
     $keys = [
         'page_title', 'back', 'intro', 'off_banner', 'left_banner', 'needs_verify', 'readonly',
         'can_see_label', 'people', 'people_one', 'sources_heading', 'directory_direct', 'directory_all',
-        'directory_note', 'directory_off', 'directory_label', 'lines_search', 'tab_empty', 'lines_heading', 'lines_none', 'excl_heading', 'excl_desc',
+        'directory_note', 'directory_off', 'directory_label', 'lines_search', 'tab_empty', 'why_title', 'why_lead_one', 'why_lead', 'why_tree_label', 'why_kind_directory', 'why_kind_reports', 'why_kind_user', 'why_kind_group', 'why_kind_department', 'why_kind_everyone', 'why_direct', 'why_via', 'why_named', 'why_everyone_in', 'why_everyone_all', 'why_box_title', 'why_can_read', 'why_can_reply', 'why_cannot_reply', 'why_can_close', 'why_cannot_close', 'why_conf_none', 'why_conf_stub', 'why_conf_all', 'why_off', 'why_person_left', 'why_fix_title', 'why_fix_many', 'why_fix_line', 'why_fix_line_user', 'why_fix_line_group', 'why_fix_line_dept', 'why_fix_line_everyone', 'why_fix_line_reports', 'why_fix_dir', 'why_fix_dir_body', 'why_fix_dir_via', 'why_fix_excl', 'why_fix_excl_body', 'why_readonly', 'why_gone', 'open', 'lines_heading', 'lines_none', 'excl_heading', 'excl_desc',
         'excl_none', 'line_everyone', 'line_user', 'line_group', 'line_department', 'line_reports',
         'line_reports_all', 'line_gone_user', 'line_gone_group', 'line_meta', 'line_meta_nobody',
         'dept_empty', 'remove', 'add_heading', 'tab_people', 'tab_groups', 'tab_departments', 'tab_other',
@@ -119,8 +119,78 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .ma-option { border: 1px solid var(--border-soft, #eee); border-radius: 6px; padding: 12px; margin-bottom: 10px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .ma-option select { padding: 6px 8px; border: 1px solid var(--border, #ccc); border-radius: 4px; background: var(--surface, #fff); color: var(--text, #333); font-size: 13px; }
         .ma-team { list-style: none; margin: 0; padding: 0; }
-        .ma-team li { padding: 7px 2px; border-bottom: 1px solid var(--border-soft, #eee); font-size: 13px; color: var(--text, #333); }
-        .ma-team li .ma-muted { display: block; }
+        .ma-team li { padding: 7px 8px; margin: 0 -8px; border-bottom: 1px solid var(--border-soft, #eee); font-size: 13px; color: var(--text, #333);
+                      cursor: pointer; border-radius: 4px; }
+        .ma-team li:hover, .ma-team li:focus-visible { background: var(--surface-hover, #f3f3f3); outline: none; }
+        .ma-team li.ma-empty { cursor: default; }
+        .ma-team li.ma-empty:hover { background: none; }
+        /* Always two lines, so every row is the same height (Ed). */
+        .ma-team li .ma-muted { display: block; min-height: 1.3em; }
+
+        /* ── "Why can they see this person?" - the same visual language as the
+           Sign-in conflict explanation (system/analysts/index.php): a head with
+           a round icon, a picture, an info box, then numbered ways out. ─── */
+        #maWhy .modal-content { max-width: 640px; padding: 22px 24px 16px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        #maWhy .modal-actions { display: flex; justify-content: flex-end; padding: 0; border: 0; }
+        .mw-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+        .mw-head-icon { flex: 0 0 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: var(--info-bg, #e3f2fd); color: var(--info-text, #0d47a1); border: 1px solid var(--info-border, #90caf9); }
+        .mw-head-icon svg { width: 22px; height: 22px; }
+        .mw-head h3 { margin: 0 0 4px; font-size: 19px; color: var(--text, #333); }
+        .mw-head p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-muted, #666); }
+        .mw-tree { background: var(--surface-2, #f7f9fa); border: 1px solid var(--border-soft, #eee); border-radius: 10px; padding: 16px 12px 14px; margin-bottom: 16px; }
+        .mw-tree-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint, #999); text-align: center; margin-bottom: 10px; }
+        .mw-person { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .mw-avatar { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 16px; background: var(--accent, #546e7a); color: var(--on-accent, #fff); }
+        .mw-avatar.them { background: var(--surface, #fff); color: var(--accent, #546e7a); border: 2px solid var(--accent, #546e7a); }
+        .mw-person-name { font-weight: 600; font-size: 14px; color: var(--text, #333); text-align: center; }
+        .mw-person-sub { font-size: 12px; color: var(--text-muted, #666); margin-top: -4px; }
+        .mw-stem { width: 2px; height: 16px; margin: 6px auto 0; background: var(--border, #ccc); }
+        .mw-stem.up { margin: 0 auto 6px; }
+        /* Branches down from the manager, one per reason... */
+        .mw-branches { display: flex; justify-content: center; }
+        .mw-branch { position: relative; flex: 1 1 0; max-width: 190px; padding: 16px 6px 0; display: flex; justify-content: center; }
+        .mw-branch::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--border, #ccc); }
+        .mw-branch:first-child::before { left: 50%; }
+        .mw-branch:last-child::before { right: 50%; }
+        .mw-branch:only-child::before { display: none; }
+        .mw-branch::after { content: ''; position: absolute; top: 0; left: calc(50% - 1px); width: 2px; height: 16px; background: var(--border, #ccc); }
+        /* ...and joining again on the way down to the person. */
+        .mw-join .mw-branch { padding: 0; height: 16px; }
+        .mw-join .mw-branch::before { top: auto; bottom: 0; }
+        .mw-join .mw-branch::after { top: 0; height: 16px; }
+        .mw-reason { width: 100%; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-top: 3px solid var(--mw-tone, var(--accent, #0078d4));
+            border-radius: 8px; padding: 10px 10px 9px; text-align: center; box-sizing: border-box; }
+        .mw-kind { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 600;
+            background: var(--mw-tone-bg, var(--accent-soft, #e8f4fd)); color: var(--mw-tone, var(--accent, #0078d4)); }
+        .mw-kind svg { width: 13px; height: 13px; flex: 0 0 13px; }
+        .mw-reason-name { font-weight: 600; font-size: 13px; color: var(--text, #333); margin-top: 7px; overflow-wrap: anywhere; }
+        .mw-reason-sub { font-size: 12px; color: var(--text-muted, #666); margin-top: 2px; overflow-wrap: anywhere; }
+        .mw-reason.directory, .mw-reason.reports { --mw-tone: var(--accent, #0078d4);        --mw-tone-bg: var(--accent-soft, #e8f4fd); }
+        .mw-reason.department { --mw-tone: var(--success-text, #2e7d32); --mw-tone-bg: var(--success-bg, #e8f5e9); }
+        .mw-reason.group      { --mw-tone: var(--info-text, #0d47a1);    --mw-tone-bg: var(--info-bg, #e3f2fd); }
+        .mw-reason.user       { --mw-tone: var(--text, #333);            --mw-tone-bg: var(--surface-2, #f0f0f0); }
+        .mw-reason.everyone   { --mw-tone: var(--warning-text, #e65100); --mw-tone-bg: var(--warning-bg, #fff3e0); }
+        .mw-box { border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+        .mw-box svg { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 1px; }
+        .mw-box strong { display: block; margin-bottom: 2px; }
+        .mw-box.info { background: var(--info-bg, #e3f2fd); color: var(--info-text, #0d47a1); border: 1px solid var(--info-border, #90caf9); }
+        .mw-box.warn { background: var(--warning-bg, #fff3e0); color: var(--warning-text, #e65100); border: 1px solid var(--warning-border, #ffcc80); }
+        .mw-fix-title { font-size: 13px; font-weight: 600; color: var(--text, #333); margin: 0 0 4px; }
+        .mw-fix-note { font-size: 12px; color: var(--text-muted, #666); margin: 0 0 8px; }
+        .mw-fix { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border-soft, #eee); border-radius: 8px; margin-bottom: 8px; background: var(--surface, #fff); }
+        .mw-fix-num { flex: 0 0 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+            background: var(--success-bg, #e8f5e9); color: var(--success-text, #2e7d32); border: 1px solid var(--success-border, #a5d6a7); }
+        .mw-fix-text { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text-muted, #666); }
+        .mw-fix-text strong { display: block; color: var(--text, #333); }
+        .mw-fix .btn { flex: 0 0 auto; padding: 6px 14px; font-size: 13px; text-decoration: none; }
+        .mw-gone { text-align: center; padding: 20px 10px; font-size: 14px; color: var(--success-text, #2e7d32); }
+        @media (max-width: 560px) {
+            .mw-branches { flex-wrap: wrap; }
+            .mw-fix { flex-wrap: wrap; }
+            .mw-fix .btn { margin-left: 38px; }
+        }
         /* Tablet and phone: one column, the page scrolls, panels take their height. */
         @media (max-width: 1100px) {
             .ma-scroll { display: block; overflow: auto; }
@@ -191,6 +261,16 @@ function managerAccessRender(int $managerId, string $backUrl): void
             </div>
         </div>
     </div>
+    </div>
+
+    <?php /* Why can this manager see this person? Filled by openWhy(). */ ?>
+    <div class="modal" id="maWhy" role="dialog" aria-modal="true" aria-labelledby="mwTitle">
+        <div class="modal-content">
+            <div id="mwBody"></div>
+            <div class="modal-actions" style="margin-top: 16px;">
+                <button type="button" class="btn btn-secondary" id="mwClose"><?php echo htmlspecialchars(t('common.close')); ?></button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -331,8 +411,8 @@ function managerAccessRender(int $managerId, string $backUrl): void
             const q = $('maTeamFilter').value.trim().toLowerCase();
             const list = S.team.filter(p => !q || (p.name || '').toLowerCase().includes(q) || (p.department || '').toLowerCase().includes(q));
             $('maTeam').innerHTML = list.length
-                ? list.map(p => '<li>' + esc(p.name) + (p.is_active ? '' : '<span class="ma-flag">' + esc(T.flag_left) + '</span>')
-                    + (p.department ? '<span class="ma-muted">' + esc(p.department) + '</span>' : '') + '</li>').join('')
+                ? list.map(p => '<li tabindex="0" data-person="' + p.id + '">' + esc(p.name) + (p.is_active ? '' : '<span class="ma-flag">' + esc(T.flag_left) + '</span>')
+                    + '<span class="ma-muted">' + (p.department ? esc(p.department) : '&nbsp;') + '</span></li>').join('')
                 : '<li class="ma-empty">' + esc(T.team_none) + '</li>';
             $('maTeamMore').textContent = S.team_total > S.team.length ? fmt(T.team_more, { shown: S.team.length, total: S.team_total }) : '';
         }
@@ -441,6 +521,140 @@ function managerAccessRender(int $managerId, string $backUrl): void
         $('maQ').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { page = 1; search(); }, 250); });
         $('maTeamFilter').addEventListener('input', paintTeam);
         $('maLineQ').addEventListener('input', paintSources);
+
+        // ── Why can they see this person? ───────────────────────────────────
+        // Click a name in "Who they can see". The server lists every reason
+        // (manager_access.php?action=why); this draws them the way the Sign-in
+        // conflict explanation draws a clash: the manager on top, a branch per
+        // reason, joining again at the person - then what the manager can do,
+        // and one numbered way out per reason, plus Exclude, which beats them all.
+        const ICON = {
+            directory:  '<path d="M12 3v6M6 15v-3h12v3"/><circle cx="12" cy="3" r="1"/><rect x="3" y="15" width="6" height="5" rx="1"/><rect x="15" y="15" width="6" height="5" rx="1"/>',
+            reports:    '<path d="M12 3v6M6 15v-3h12v3"/><circle cx="12" cy="3" r="1"/><rect x="3" y="15" width="6" height="5" rx="1"/><rect x="15" y="15" width="6" height="5" rx="1"/>',
+            user:       '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+            group:      '<circle cx="9" cy="8" r="3.5"/><path d="M2 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M22 20v-1a5 5 0 0 0-4-4.9"/>',
+            department: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
+            everyone:   '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+        };
+        const svg = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
+        const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+        let whyPerson = null;
+
+        function reasonCard(r, W) {
+            let name = '', sub = '';
+            if (r.kind === 'directory' || r.kind === 'reports') {
+                name = r.via.length ? fmt(T.why_via, { names: r.via.join(' → ') }) : T.why_direct;
+                sub  = r.kind === 'directory' ? '' : (r.all ? T.line_reports_all : T.line_reports);
+            } else if (r.kind === 'user')       { name = T.why_named; }
+            else if (r.kind === 'everyone')     { name = S.manager.company ? fmt(T.why_everyone_in, { company: S.manager.company }) : T.why_everyone_all; }
+            else                                { name = r.name || (r.kind === 'group' ? T.line_gone_group : ''); }
+            return '<div class="mw-branch"><div class="mw-reason ' + r.kind + '">'
+                 + '<span class="mw-kind">' + svg(ICON[r.kind] || '') + esc(T['why_kind_' + r.kind] || r.kind) + '</span>'
+                 + '<div class="mw-reason-name">' + esc(name) + '</div>'
+                 + (sub ? '<div class="mw-reason-sub">' + esc(sub) + '</div>' : '')
+                 + '</div></div>';
+        }
+
+        function fixRow(n, title, body, button) {
+            return '<div class="mw-fix"><div class="mw-fix-num">' + n + '</div>'
+                 + '<div class="mw-fix-text"><strong>' + esc(title) + '</strong>' + esc(body) + '</div>' + (button || '') + '</div>';
+        }
+
+        function paintWhy(W) {
+            const mName = S.manager.name, pName = W.person.name;
+            const P = { manager: mName, person: pName };
+            let h = '<div class="mw-head"><div class="mw-head-icon">'
+                  + svg('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>') + '</div>'
+                  + '<div><h3 id="mwTitle">' + esc(fmt(T.why_title, P)) + '</h3>';
+            if (!W.on_team || !W.reasons.length) {
+                $('mwBody').innerHTML = h + '</div></div><div class="mw-gone">' + esc(fmt(T.why_gone, P)) + '</div>';
+                return;
+            }
+            const n = W.reasons.length;
+            h += '<p>' + esc(n === 1 ? fmt(T.why_lead_one, P) : fmt(T.why_lead, Object.assign({ count: n }, P))) + '</p></div></div>';
+
+            // The picture: manager → each reason → the person.
+            const branches = W.reasons.map(r => reasonCard(r, W)).join('');
+            h += '<div class="mw-tree"><div class="mw-tree-label">' + esc(T.why_tree_label) + '</div>'
+               + '<div class="mw-person"><div class="mw-avatar">' + esc(initials(mName)) + '</div><div class="mw-person-name">' + esc(mName) + '</div></div>'
+               + '<div class="mw-stem"></div>'
+               + '<div class="mw-branches">' + branches + '</div>'
+               + '<div class="mw-branches mw-join">' + W.reasons.map(() => '<div class="mw-branch"></div>').join('') + '</div>'
+               + '<div class="mw-stem up"></div>'
+               + '<div class="mw-person"><div class="mw-avatar them">' + esc(initials(pName)) + '</div><div class="mw-person-name">' + esc(pName) + '</div>'
+               + (W.person.department ? '<div class="mw-person-sub">' + esc(W.person.department) + '</div>' : '') + '</div>'
+               + '</div>';
+
+            // What that means.
+            const st = W.settings;
+            const does = [fmt(T.why_can_read, P), st.can_reply ? T.why_can_reply : T.why_cannot_reply,
+                          st.can_close ? T.why_can_close : T.why_cannot_close, T['why_conf_' + st.confidential]].join(' ');
+            h += '<div class="mw-box info">' + svg('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>')
+               + '<div><strong>' + esc(fmt(T.why_box_title, P)) + '</strong>' + esc(does) + '</div></div>';
+            if (!st.enabled) {
+                h += '<div class="mw-box warn">' + svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>')
+                   + '<div>' + esc(T.why_off) + '</div></div>';
+            }
+            if (!W.person.is_active) {
+                h += '<div class="mw-box warn">' + svg('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>')
+                   + '<div>' + esc(fmt(T.why_person_left, P)) + '</div></div>';
+            }
+
+            // The ways out: one per reason, then Exclude.
+            h += '<p class="mw-fix-title">' + esc(fmt(T.why_fix_title, P)) + '</p>';
+            h += '<p class="mw-fix-note">' + esc(S.can_edit ? (n > 1 ? T.why_fix_many : '') : T.why_readonly) + '</p>';
+            let i = 0;
+            W.reasons.forEach(r => {
+                i++;
+                if (r.kind === 'directory') {
+                    // Changed on the person, not here - so a link, whoever may edit lines.
+                    h += fixRow(i, fmt(T.why_fix_dir, P), r.via.length ? T.why_fix_dir_via : T.why_fix_dir_body,
+                        '<a class="btn btn-secondary" href="users.php?user_id=' + encodeURIComponent(W.person.id) + '">' + esc(T.open) + '</a>');
+                    return;
+                }
+                const line = S.lines.find(l => l.id === r.line_id);
+                const label = line ? (line._name ?? lineLabel(line)) : '';
+                const body = { user: fmt(T.why_fix_line_user, P), group: T.why_fix_line_group, everyone: T.why_fix_line_everyone,
+                               reports: T.why_fix_line_reports, department: fmt(T.why_fix_line_dept, { name: r.name }) }[r.kind] || '';
+                h += fixRow(i, fmt(T.why_fix_line, { label: label || lineLabel({ grant_type: r.kind, target_value: r.name, label: r.name }) }), body,
+                    S.can_edit ? '<button type="button" class="btn btn-secondary" data-why-remove="' + r.line_id + '">' + esc(T.remove) + '</button>' : '');
+            });
+            h += fixRow(i + 1, fmt(T.why_fix_excl, P), T.why_fix_excl_body,
+                S.can_edit ? '<button type="button" class="btn btn-primary" data-why-exclude="' + W.person.id + '">' + esc(T.exclude) + '</button>' : '');
+            $('mwBody').innerHTML = h;
+        }
+
+        async function openWhy(personId) {
+            whyPerson = personId;
+            const d = await call({ action: 'why', person: personId });
+            if (!d.success) { toast(d.error || T.load_failed, 'error'); return; }
+            paintWhy(d);
+            $('maWhy').classList.add('active');
+        }
+        function closeWhy() { $('maWhy').classList.remove('active'); whyPerson = null; }
+
+        $('maTeam').addEventListener('click', e => {
+            const li = e.target.closest('li[data-person]');
+            if (li) openWhy(Number(li.dataset.person));
+        });
+        $('maTeam').addEventListener('keydown', e => {
+            const li = e.target.closest('li[data-person]');
+            if (li && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openWhy(Number(li.dataset.person)); }
+        });
+        // Acting from the modal: make the change, then show the answer again -
+        // one reason fewer, or "no longer on the team".
+        $('maWhy').addEventListener('click', async e => {
+            if (e.target.id === 'maWhy') { closeWhy(); return; }
+            const b = e.target.closest('button');
+            if (!b) return;
+            if (b.id === 'mwClose') { closeWhy(); return; }
+            const pid = whyPerson;
+            if (b.dataset.whyRemove)  { b.disabled = true; await write({ action: 'remove', line_id: Number(b.dataset.whyRemove) }); }
+            else if (b.dataset.whyExclude) { b.disabled = true; await write({ action: 'add', grant_type: 'user', target_id: pid, is_exclusion: true }); }
+            else return;
+            if (pid) { const d = await call({ action: 'why', person: pid }); if (d.success) paintWhy(d); }
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('maWhy').classList.contains('active')) closeWhy(); });
 
         (async function () {
             try {

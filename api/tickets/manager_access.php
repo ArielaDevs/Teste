@@ -165,6 +165,76 @@ try {
     if (!maReady($conn)) maFail('Run System -> Database Verification first');
     [$base, $baseArgs] = managerReachSql($conn, $m);
 
+    // Why can this manager see this person? Every reason, so the page can explain
+    // it and offer the way to stop each one. Worked out as if managers were on,
+    // like the rest of the page.
+    if (!$isPost && $action === 'why') {
+        $pid = (int)($in['person'] ?? 0);
+        $pst = $conn->prepare(
+            "SELECT u.id, COALESCE(NULLIF(u.display_name, ''), NULLIF(u.email, ''), u.username) AS name,
+                    u.department, u.job_title, u.is_active
+               FROM users u WHERE $base AND u.id = ?"
+        );
+        $pst->execute(array_merge($baseArgs, [$pid]));
+        $p = $pst->fetch(PDO::FETCH_ASSOC);
+        if (!$p) maFail('Person not found');
+
+        $settings = managersSettings($conn);
+        $onTeam = in_array($pid, managerTeamPreviewIds($conn, (int)$m['id']), true);
+
+        // The reporting line from the person up to the manager, as names -
+        // walked the same bounded way the engine walks down it.
+        $chain = function () use ($conn, $pid, $m): array {
+            $up = $conn->prepare("SELECT manager_id, COALESCE(NULLIF(display_name, ''), NULLIF(email, ''), username) AS name FROM users WHERE id = ?");
+            $path = []; $seen = [];
+            $up->execute([$pid]);
+            $cur = (int)($up->fetch(PDO::FETCH_ASSOC)['manager_id'] ?? 0);
+            for ($i = 0; $i < 25 && $cur && !isset($seen[$cur]); $i++) {
+                if ($cur === (int)$m['id']) return $path;      // names in between; [] = reports directly
+                $seen[$cur] = true;
+                $up->execute([$cur]);
+                $r = $up->fetch(PDO::FETCH_ASSOC);
+                if (!$r) break;
+                $path[] = $r['name'];
+                $cur = (int)$r['manager_id'];
+            }
+            return ['__none__'];
+        };
+
+        $reasons = [];
+        if ($settings['directory'] === '1') {
+            $c = $chain();
+            if ($c !== ['__none__'] && ($settings['directory_depth'] === 'all' || !$c)) {
+                $reasons[] = ['kind' => 'directory', 'via' => $c];
+            }
+        }
+        $g = $conn->prepare(
+            "SELECT g.id, g.grant_type, g.target_id, g.target_value, kg.name AS group_name
+               FROM manager_grants g
+          LEFT JOIN knowledge_user_groups kg ON g.grant_type = 'group' AND kg.id = g.target_id
+              WHERE g.manager_user_id = ? AND g.is_exclusion = 0"
+        );
+        $g->execute([(int)$m['id']]);
+        foreach ($g->fetchAll(PDO::FETCH_ASSOC) as $line) {
+            if (!in_array($pid, managerGrantMembers($conn, $line, (int)$m['id'], $base, $baseArgs), true)) continue;
+            $r = ['kind' => $line['grant_type'], 'line_id' => (int)$line['id'],
+                  'name' => $line['grant_type'] === 'group' ? $line['group_name'] : $line['target_value']];
+            if ($line['grant_type'] === 'reports') { $c = $chain(); $r['via'] = $c === ['__none__'] ? [] : $c; $r['all'] = $line['target_value'] === 'all'; }
+            $reasons[] = $r;
+        }
+
+        echo json_encode([
+            'success'  => true,
+            'person'   => ['id' => (int)$p['id'], 'name' => $p['name'], 'department' => $p['department'],
+                           'job_title' => $p['job_title'], 'is_active' => (int)$p['is_active'] === 1],
+            'on_team'  => $onTeam,
+            'reasons'  => $onTeam ? $reasons : [],
+            'settings' => ['enabled' => $settings['enabled'] === '1', 'confidential' => $settings['confidential'],
+                           'can_reply' => $settings['can_reply'] === '1', 'can_close' => $settings['can_close'] === '1'],
+        ]);
+        exit;
+    }
+
     if (!$isPost && $action === 'search') {
         $kind = (string)($in['kind'] ?? 'user');
         $q    = trim((string)($in['q'] ?? ''));
