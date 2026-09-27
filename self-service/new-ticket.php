@@ -1065,6 +1065,17 @@ require __DIR__ . '/includes/header.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php /* Discussion #62: the requester's own Confidential tick. It can only
+                         make a ticket confidential, never the reverse - a department or
+                         mailbox set to confidential makes it so whatever is ticked here.
+                         ⚠️ Kept HIGH in this panel, above equipment and attachments: the
+                         panel scrolls, and at the bottom it sat below the fold, which is
+                         the last place for something a person in a difficult situation
+                         needs to notice. */ ?>
+                <div class="form-group confidential-choice">
+                    <label class="confidential-label"><input type="checkbox" id="confidential"> <?php echo htmlspecialchars(t('self-service.new_ticket.confidential')); ?></label>
+                    <div class="field-hint"><?php echo htmlspecialchars(t('self-service.new_ticket.confidential_hint')); ?></div>
+                </div>
                 <?php /* Equipment (discussion #57). Hidden entirely unless the user
                          actually holds something — an empty dropdown is a question the
                          requester can't answer and shouldn't be asked. Populated from
@@ -1088,14 +1099,6 @@ require __DIR__ . '/includes/header.php';
                     <button type="button" class="record-toggle" id="recordToggle" onclick="ScreenRecorder.open()">
                         <span class="rec-dot"></span> <?php echo htmlspecialchars(t('self-service.recorder.button')); ?>
                     </button>
-                </div>
-
-                <?php /* Discussion #62: the requester's own Confidential tick. It can only
-                         make a ticket confidential, never the reverse - a department or
-                         mailbox set to confidential makes it so whatever is ticked here. */ ?>
-                <div class="form-group confidential-choice">
-                    <label class="confidential-label"><input type="checkbox" id="confidential"> <?php echo htmlspecialchars(t('self-service.new_ticket.confidential')); ?></label>
-                    <div class="field-hint"><?php echo htmlspecialchars(t('self-service.new_ticket.confidential_hint')); ?></div>
                 </div>
 
                         <div class="form-actions">
