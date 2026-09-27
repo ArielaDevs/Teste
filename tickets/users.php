@@ -8,7 +8,8 @@ require_once '../includes/functions.php';
 require_once '../includes/i18n.php';
 require_once '../includes/theme.php';
 require_once '../includes/timezone.php';
-require_once '../includes/users.php';   // USER_PERSON_FIELDS — emitted to JS below
+require_once '../includes/users.php';
+require_once '../includes/person_editor.php';   // the shared person editor
 I18n::initFromSession();
 Tz::init();
 
@@ -157,47 +158,7 @@ $translationNamespaces = ['common', 'tickets'];
             flex-direction: column;
         }
 
-        /* inbox.css has NO :disabled rule for form controls anywhere, so a
-           disabled input inherits the browser default — which against this dark
-           theme is very nearly indistinguishable from an editable one. The note
-           above the fields explains why they are locked, but the fields
-           themselves have to LOOK locked or the note reads as a mistake.
-
-           Scoped to this modal rather than added app-wide: a global :disabled
-           rule would change the look of every other settings screen in the same
-           commit, and that is a separate decision from this one. */
-        #userModal input:disabled,
-        #userModal select:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            background-color: var(--surface-3, #f8f8f8);
-        }
-
-        /* Shown above the person fields when a directory owns them.
-           Tinted and bar-marked so the eye lands on it BEFORE the reader tries
-           to type into a locked field and wonders what is broken — the first
-           version was neutral grey and simply disappeared.
-
-           🔑 Accent blue, NOT the amber warning palette, and that is a
-           consistency point rather than taste: `asset-management/users.php`
-           already spends amber (#fff4ce) on the note that says a LEAVER IS
-           STILL HOLDING EQUIPMENT — a thing you must act on. This note says
-           the opposite: nothing is wrong, these details simply belong to the
-           directory. Giving it the same colour would make "somebody else
-           maintains this" shout as loudly as "you have kit to recover".
-
-           `--accent-soft` is a real token in both themes (#e8f4fd / #1d3346).
-           ⚠️ `--info-bg` is NOT — it does not exist in theme.css. */
-        .user-managed-note {
-            background-color: var(--accent-soft, #e8f4fd);
-            border: 1px solid var(--border, #e0e0e0);
-            border-left: 3px solid var(--accent, #0078d4);
-            border-radius: 4px;
-            padding: 10px 12px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: var(--text, #333);
-        }
+        /* The person editor's styles live with it now: includes/person_editor.php. */
 
         .info-label {
             font-size: 12px;
@@ -520,111 +481,8 @@ $translationNamespaces = ['common', 'tickets'];
         </div>
     </div>
 
-    <!-- User Modal -->
-    <div class="modal" id="userModal">
-        <div class="modal-content" style="max-width: 560px;">
-            <div class="modal-header" id="userModalTitle"><?php echo htmlspecialchars(t('tickets.users.modal.add_title')); ?></div>
-            <form id="userForm" autocomplete="off">
-                <div class="modal-body">
-                <input type="hidden" id="userId">
-
-                <div class="form-group">
-                    <label for="userEmail"><?php echo htmlspecialchars(t('tickets.users.modal.email')); ?></label>
-                    <?php /* No longer required: staff who sign in through a directory may have
-                             no mailbox at all (GitHub #47), and the sign-in name identifies them. */ ?>
-                    <input type="email" id="userEmail" autocomplete="off" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.email_placeholder')); ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="userDisplayName"><?php echo htmlspecialchars(t('tickets.users.modal.display_name')); ?></label>
-                    <input type="text" id="userDisplayName" autocomplete="off" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.display_name_placeholder')); ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="userPreferredName"><?php echo htmlspecialchars(t('tickets.users.modal.preferred_name')); ?></label>
-                    <input type="text" id="userPreferredName" autocomplete="off" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.preferred_name_placeholder')); ?>">
-                </div>
-
-                <?php /* The person, as opposed to the login. These columns have existed
-                         since directory sync slice 1 and were written by nothing but a
-                         sync and api/tickets/save_user.php — which has always accepted
-                         them, complete with the managed-record refusal below. The form
-                         was the missing half, so on any install without a directory they
-                         were permanently blank with no way to type into them.
-
-                         Stacked rather than paired into `.form-row`: that class is a flex
-                         row app-wide and does NOT stack inside a modal on a phone (the
-                         `.modal-content .form-row` rule at mobile.css:223 sets a GRID
-                         property, which is inert on a flex container). The modal body
-                         already scrolls with a sticky footer, so height costs nothing. */ ?>
-                <div id="userManagedNote" class="user-managed-note" hidden>
-                    <?php echo htmlspecialchars(t('tickets.users.modal.managed_note')); ?>
-                </div>
-
-                <div class="form-group">
-                    <label for="userJobTitle"><?php echo htmlspecialchars(t('tickets.users.modal.job_title')); ?></label>
-                    <input type="text" id="userJobTitle" autocomplete="off" maxlength="150" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.job_title_placeholder')); ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="userDepartment"><?php echo htmlspecialchars(t('tickets.users.modal.department')); ?></label>
-                    <input type="text" id="userDepartment" autocomplete="off" maxlength="150" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.department_placeholder')); ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="userOffice"><?php echo htmlspecialchars(t('tickets.users.modal.office')); ?></label>
-                    <input type="text" id="userOffice" autocomplete="off" maxlength="150" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.office_placeholder')); ?>">
-                    <small style="color: var(--text-muted, #666); display: block; margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.users.modal.office_help')); ?></small>
-                </div>
-
-                <div class="form-group">
-                    <label for="userPhone"><?php echo htmlspecialchars(t('tickets.users.modal.phone')); ?></label>
-                    <input type="tel" id="userPhone" autocomplete="off" maxlength="50" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.phone_placeholder')); ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="userMobile"><?php echo htmlspecialchars(t('tickets.users.modal.mobile')); ?></label>
-                    <input type="tel" id="userMobile" autocomplete="off" maxlength="50" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.mobile_placeholder')); ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="userEmployeeId"><?php echo htmlspecialchars(t('tickets.users.modal.employee_id')); ?></label>
-                    <input type="text" id="userEmployeeId" autocomplete="off" maxlength="64" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.employee_id_placeholder')); ?>">
-                    <small style="color: var(--text-muted, #666); display: block; margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.users.modal.employee_id_help')); ?></small>
-                </div>
-
-                <?php /* Manager is a plain select over the list this page has already
-                         loaded, which activeTenantFilter() has already scoped — so you
-                         can only ever pick somebody you are allowed to see. The server
-                         still guards the reporting line against loops (userManagerIsSafe)
-                         and against a manager that does not exist. */ ?>
-                <div class="form-group">
-                    <label for="userManager"><?php echo htmlspecialchars(t('tickets.users.modal.manager')); ?></label>
-                    <select id="userManager"></select>
-                    <small style="color: var(--text-muted, #666); display: block; margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.users.modal.manager_help')); ?></small>
-                </div>
-
-                <!-- Multi-tenancy: only shown when more than one company exists (populated by JS). -->
-                <div class="form-group" id="userCompanyGroup" style="display: none;">
-                    <label for="userCompany"><?php echo htmlspecialchars(t('tickets.users.modal.company')); ?></label>
-                    <select id="userCompany"></select>
-                    <small style="color: var(--text-muted, #666); display: block; margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.users.modal.company_help')); ?></small>
-                </div>
-
-                <div class="form-group">
-                    <label for="userPassword"><?php echo htmlspecialchars(t('tickets.users.modal.password')); ?></label>
-                    <input type="password" id="userPassword" autocomplete="new-password" placeholder="<?php echo htmlspecialchars(t('tickets.users.modal.password_placeholder')); ?>" minlength="8">
-                    <small style="color: var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.users.modal.password_help')); ?></small>
-                </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
-                    <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(t('common.save')); ?></button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <?php /* The person editor - shared with Assets -> Users (discussion #62). */ ?>
+    <?php personEditorRender(); ?>
 
     <!-- Group Modal -->
     <div class="modal" id="groupModal">
@@ -676,53 +534,6 @@ $translationNamespaces = ['common', 'tickets'];
         // picker stays hidden) on a single-company install.
         let userCompanies = [];
 
-        // ---- The person, as opposed to the login ------------------------------
-        // Payload key -> field id. The KEYS come from USER_PERSON_FIELDS in
-        // includes/users.php, emitted by PHP rather than retyped here.
-        //
-        // ⚠️ That file says in as many words that this list must not be
-        // duplicated across writers, and it is already duplicated once —
-        // asset-management/users.php hardcodes the same seven names twice in its
-        // own JS. Adding a third hand-written copy is the exact drift it warns
-        // about, so this one is generated: add a field to the PHP constant and
-        // this map grows with it. The element ids are per-page and genuinely
-        // local, so only those are written out by hand.
-        const USER_PERSON_FIELD_ELS = {
-            job_title:   'userJobTitle',
-            department:  'userDepartment',
-            office:      'userOffice',
-            phone:       'userPhone',
-            mobile:      'userMobile',
-            employee_id: 'userEmployeeId',
-            manager_id:  'userManager',
-        };
-        // Server-side list is the authority on WHICH fields exist; the map above
-        // only says where each one is drawn. A field added to the constant with
-        // no input on this form is skipped rather than crashing the modal.
-        const USER_PERSON_FIELDS = <?php echo json_encode(array_values(USER_PERSON_FIELDS)); ?>;
-        const USER_PERSON_FIELD_IDS = Object.fromEntries(
-            USER_PERSON_FIELDS
-                .filter(f => USER_PERSON_FIELD_ELS[f] && document.getElementById(USER_PERSON_FIELD_ELS[f]))
-                .map(f => [f, USER_PERSON_FIELD_ELS[f]])
-        );
-
-        // WHICH of the person fields are owned by a directory for the person
-        // currently open in the modal. These are shown read-only and left OUT of
-        // the payload entirely; everything else stays editable.
-        //
-        // 🔴 An ARRAY, not a boolean, and it comes from the server. It was a
-        // boolean until CardDAV shipped, on the assumption that a managed record
-        // means all seven fields are somebody else's — true of LDAP, false of an
-        // address book, which has nowhere to keep a payroll number or a reporting
-        // line. Under the boolean those two were greyed out on a contact and
-        // refused on save, for data no import would ever supply.
-        //
-        // ⚠️ Not cosmetic. save_user.php refuses the whole save if a managed
-        // record's request so much as MENTIONS one of the keys IT considers owned
-        // — deliberately, because accepting an edit the next sync would revert is
-        // worse than saying no. Both ends resolve the list through
-        // userDirectoryOwnedFields(), so they cannot drift apart.
-        let editingOwnedFields = [];
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -747,91 +558,6 @@ $translationNamespaces = ['common', 'tickets'];
             }
         }
 
-        // The hide-unless-more-than-one idiom: at N=1 multi-tenancy is invisible.
-        //
-        // The blank option means different things in the two modes, so it says so:
-        // on a NEW person it means "work it out from their email address" (the
-        // payload omits the field and the server infers), while on an EXISTING one
-        // it means "no company", a deliberate choice that is sent and stored.
-        function populateUserCompanies(selectedTenantId, isNew) {
-            const group  = document.getElementById('userCompanyGroup');
-            const select = document.getElementById('userCompany');
-
-            if (userCompanies.length < 2) { group.style.display = 'none'; select.innerHTML = ''; return; }
-
-            const blankLabel = isNew
-                ? t('tickets.users.modal.company_auto')
-                : t('tickets.users.modal.company_none');
-            let html = `<option value="">${escapeHtml(blankLabel)}</option>`;
-            userCompanies.forEach(c => {
-                // Hide retired companies unless this person is already filed there.
-                if (!c.is_active && c.id != selectedTenantId) return;
-                html += `<option value="${c.id}">${escapeHtml(c.name)}</option>`;
-            });
-            select.innerHTML = html;
-            select.value = (selectedTenantId === null || selectedTenantId === undefined) ? '' : String(selectedTenantId);
-            group.style.display = '';
-        }
-
-        // The manager picker, over the list this page has already loaded.
-        //
-        // That list is what activeTenantFilter() allowed through, so the options
-        // are exactly the people this analyst may see — no extra scoping needed,
-        // and no way to file someone under a manager in another company by using
-        // the dropdown. `excludeId` drops the person being edited: the server
-        // refuses a self-reference, and offering it only to reject it is worse
-        // than not offering it.
-        function populateUserManagers(selectedManagerId, excludeId) {
-            const select = document.getElementById('userManager');
-            let html = `<option value="">${escapeHtml(t('tickets.users.modal.manager_none'))}</option>`;
-            users
-                .filter(u => String(u.id) !== String(excludeId ?? ''))
-                .forEach(u => {
-                    const label = u.display_name || u.email || u.username || t('tickets.users.unknown_name');
-                    html += `<option value="${u.id}">${escapeHtml(label)}</option>`;
-                });
-            select.innerHTML = html;
-            // ⚠️ Set AFTER the options exist, and only if the option is actually
-            // there. A manager outside this analyst's companies has no option, so
-            // assigning the value silently selects nothing — which would then be
-            // posted back as "no manager" and quietly clear a real reporting line.
-            // Absent means leave it alone: see the payload builder.
-            const wanted = (selectedManagerId === null || selectedManagerId === undefined) ? '' : String(selectedManagerId);
-            select.dataset.unresolved = '';
-            if (wanted === '') {
-                select.value = '';
-            } else if (select.querySelector(`option[value="${CSS.escape(wanted)}"]`)) {
-                select.value = wanted;
-            } else {
-                select.value = '';
-                select.dataset.unresolved = wanted;
-            }
-        }
-
-        // Fill, or read-only, the person fields. Split out because the managed
-        // case has to touch every one of them and the modal has two entry paths.
-        function applyUserPersonFields(user, ownedFields) {
-            // Anything not an array means "no directory owns anything here" — a new
-            // person, or a server that did not send the list. Falling back to empty
-            // keeps the form editable rather than mysteriously locked; the API is
-            // the guard, and it refuses independently.
-            editingOwnedFields = Array.isArray(ownedFields) ? ownedFields : [];
-            Object.entries(USER_PERSON_FIELD_IDS).forEach(([key, elId]) => {
-                const el = document.getElementById(elId);
-                if (!el) return;
-                if (key !== 'manager_id') el.value = user?.[key] || '';
-                // `disabled` rather than `readonly`: read-only still looks typeable
-                // and still submits, and the point is that this field is somebody
-                // else's to change.
-                el.disabled = editingOwnedFields.includes(key);
-            });
-            // The note explains why fields are greyed out, so it belongs with the
-            // greying and not with is_managed: a CardDAV contact is managed but has
-            // two fields still editable, and a note on a form with nothing disabled
-            // would be explaining something that is not on screen.
-            const note = document.getElementById('userManagedNote');
-            if (note) note.hidden = editingOwnedFields.length === 0;
-        }
 
         /** "Baikal (address book)" - a source by name and by what kind it is. */
         function userSourceLabel(name, protocol) {
@@ -1127,136 +853,17 @@ $translationNamespaces = ['common', 'tickets'];
             return fmtDate(date);
         }
 
-        // Open the create/edit modal. Pass an id to edit; omit to create.
+        // Create/edit a person: the ONE shared editor (includes/person_editor.php),
+        // also opened from Assets -> Users. This page only says what to do after a
+        // save - refresh its list and reselect the person.
         function openUserModal(userId) {
-            const modal = document.getElementById('userModal');
-            const title = document.getElementById('userModalTitle');
-            const idField = document.getElementById('userId');
-            const emailField = document.getElementById('userEmail');
-            const displayField = document.getElementById('userDisplayName');
-            const preferredField = document.getElementById('userPreferredName');
-            const passwordField = document.getElementById('userPassword');
-
-            if (userId) {
-                const user = users.find(u => u.id == userId);
-                title.textContent = t('tickets.users.modal.edit_title');
-                idField.value = userId;
-                emailField.value = user?.email || '';
-                displayField.value = user?.display_name || '';
-                preferredField.value = user?.preferred_name || '';
-                populateUserCompanies(user?.tenant_id ?? null, false);
-                // Order matters: applyUserPersonFields() sets `disabled` on the
-                // select too, and rebuilding its options below does not clear that.
-                applyUserPersonFields(user, user?.managed_fields);
-                populateUserManagers(user?.manager_id ?? null, userId);
-            } else {
-                title.textContent = t('tickets.users.modal.add_title');
-                idField.value = '';
-                emailField.value = '';
-                displayField.value = '';
-                preferredField.value = '';
-                // New person: no company chosen. Leaving it blank lets the server
-                // work one out from their email domain.
-                populateUserCompanies(null, true);
-                // A brand-new person is never directory-owned: a sync adopts an
-                // existing record, it does not arrive through this form.
-                applyUserPersonFields(null, []);
-                populateUserManagers(null, null);
-            }
-            passwordField.value = '';
-            modal.classList.add('active');
-            emailField.focus();
+            PersonEditor.open(userId || null, {
+                onSaved: async function (savedId) {
+                    await loadUsers(document.getElementById('userSearch').value);
+                    if (savedId) selectUser(savedId);
+                }
+            });
         }
-
-        function closeUserModal() {
-            document.getElementById('userModal').classList.remove('active');
-        }
-
-        document.getElementById('userForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const id = document.getElementById('userId').value;
-            const payload = {
-                id: id || null,
-                email: document.getElementById('userEmail').value.trim(),
-                display_name: document.getElementById('userDisplayName').value.trim(),
-                preferred_name: document.getElementById('userPreferredName').value.trim(),
-                password: document.getElementById('userPassword').value
-            };
-
-            // The person fields.
-            //
-            // ⚠️ A directory-owned field is omitted rather than sent and refused:
-            // save_user.php rejects the entire save if a managed record's body
-            // mentions one, so posting it would turn "I changed the company" into
-            // an error about a job title. Omitted PER FIELD, not wholesale — on a
-            // CardDAV contact the employee ID and manager are ours, and skipping
-            // them with the rest is what made them unfillable.
-            //
-            // ⚠️ And `manager_id` is omitted when the current value could not be
-            // resolved to an option — a manager in a company this analyst cannot
-            // see. Sending the select's empty value there would read as "no
-            // manager" and wipe a reporting line the analyst was never shown.
-            {
-                const managerSelect = document.getElementById('userManager');
-                Object.entries(USER_PERSON_FIELD_IDS).forEach(([key, elId]) => {
-                    if (key === 'manager_id') return;
-                    if (editingOwnedFields.includes(key)) return;
-                    payload[key] = document.getElementById(elId).value.trim();
-                });
-                if (!editingOwnedFields.includes('manager_id') && !managerSelect.dataset.unresolved) {
-                    payload.manager_id = managerSelect.value || null;
-                }
-            }
-
-            // Only send a company when the picker is actually in play; otherwise a
-            // single-company install would post an empty string on every save and
-            // clear the company it can't even see. On a NEW person, a blank choice
-            // is omitted entirely so the server infers it from their email domain.
-            if (userCompanies.length >= 2) {
-                const companyValue = document.getElementById('userCompany').value;
-                if (companyValue || id) {
-                    payload.tenant_id = companyValue || null;
-                }
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}save_user.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await response.json();
-                if (!data.success) {
-                    showToast(data.error || 'Save failed', 'error');
-                    return;
-                }
-                // 🔴 The address book is a SEPARATE outcome from the save, and it
-                // must be said out loud. The record here is written either way, so
-                // reporting only `success` would show "Saved" after a push that
-                // failed, silently — the analyst would believe the contact card
-                // had been updated and never find out it had not. That silence is
-                // exactly what the whole write-back design exists to avoid, and
-                // leaving this out was the last inch of it undone.
-                const ab = data.address_book;
-                if (ab && ab.ok && ab.changed && ab.changed.length) {
-                    showToast(t('tickets.users.modal.ab_written'), 'success');
-                } else if (ab && ab.conflict) {
-                    // Not an error the analyst caused, and not one they can retry
-                    // their way out of — so it stays on screen rather than
-                    // flashing past, and says what to do.
-                    showToast(ab.error || t('tickets.users.modal.ab_conflict'), 'warning', 12000);
-                } else if (ab && !ab.ok) {
-                    showToast(t('tickets.users.modal.ab_failed', { error: ab.error || '' }), 'error', 12000);
-                }
-
-                const savedId = data.id;
-                closeUserModal();
-                await loadUsers(document.getElementById('userSearch').value);
-                if (savedId) selectUser(savedId);
-            } catch (err) {
-                showToast('Save failed: ' + err.message, 'error');
-            }
-        });
 
         async function deleteUser(userId) {
             const user = users.find(u => u.id == userId);

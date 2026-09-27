@@ -2096,6 +2096,10 @@ return [
             'password_placeholder'       => 'Leave blank for passwordless account',
             'password_help'              => 'Optional. If blank, the user can set their own password later via the self-service portal.',
             'confirm_delete'             => 'Delete user "{name}"? This cannot be undone.',
+            // The shared person editor (includes/person_editor.php, discussion #62)
+            'saved'                      => 'Saved',
+            'need_name_or_email'         => 'Enter a name or an email address.',
+            'load_failed'                => 'This person could not be loaded.',
 
             // The person, as opposed to the login. Every one of these is a field a
             // directory owns when there is one, so all of them grey out together

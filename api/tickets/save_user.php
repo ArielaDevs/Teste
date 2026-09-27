@@ -18,7 +18,11 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
-requireModuleAccessJson('tickets');
+// Either module: the one shared person editor (includes/person_editor.php) is
+// opened from Tickets -> Users AND Assets -> Users. Tickets-only locked out every
+// analyst who has Assets but not Tickets, on a screen that offered them Edit.
+// Who may edit a given person is still decided below, by analystCanAccessUser().
+requireAnyModuleAccessJson(['tickets', 'assets']);
 
 $data = json_decode(file_get_contents('php://input'), true);
 if (!$data) {
