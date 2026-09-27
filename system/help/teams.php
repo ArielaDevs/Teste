@@ -128,7 +128,7 @@ require __DIR__ . '/_top.php';
     <div class="help-table"><table>
         <tr><th>The analyst's teams</th><th>What happens</th></tr>
         <tr><td>One team sets a method, or several teams set the <em>same</em> one</td><td>They sign in that way, and move automatically if you change the team's method.</td></tr>
-        <tr><td>Their teams set <em>different</em> methods</td><td><strong>Nothing changes</strong> — they keep signing in the way they did. The team list shows <em>N disagree</em>, and their row on System &rarr; Analysts shows <em>Teams disagree</em>, until you choose one on their record.</td></tr>
+        <tr><td>Their teams set <em>different</em> methods</td><td><strong>Nothing changes</strong> — they keep signing in the way they did. The team list shows <em>N sign-in conflicts</em>, and their row on System &rarr; Analysts shows a <em>Sign-in conflict</em> badge — click it for an explanation — until you choose one on their record.</td></tr>
         <tr><td>None of their teams sets a method</td><td>They keep what they had.</td></tr>
     </table></div>
     <div class="help-note warn"><strong>Moving someone between teams can change how they sign in.</strong> So can switching a team off, deleting it, or changing its method. After each of those saves, a message says how many analysts changed. Before you put a team on a single sign-on provider, make sure its members' email addresses match their accounts at that provider.</div>

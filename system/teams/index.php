@@ -382,7 +382,7 @@ $translationNamespaces = ['common', 'tickets'];
                 chip = `<span class="status-badge" style="background:#e3f2fd;color:#1565c0;margin-left:8px;">${escapeHtml(team.auth_provider_name || '')}</span>`;
             }
             if (team.signin_conflicts > 0) {
-                chip += `<span class="status-badge" style="background:#fff3e0;color:#e65100;margin-left:8px;" title="${escapeHtml(t('tickets.settings.team_signin.summary_conflict', { count: team.signin_conflicts }))}">${escapeHtml(t('tickets.settings.team_signin.badge_team_conflicts', { count: team.signin_conflicts }))}</span>`;
+                chip += `<span class="status-badge" style="background:var(--warning-bg,#fff3e0);color:var(--warning-text,#e65100);margin-left:8px;" title="${escapeHtml(t('tickets.settings.team_signin.summary_conflict', { count: team.signin_conflicts }))}">${escapeHtml(team.signin_conflicts === 1 ? t('tickets.settings.team_signin.badge_team_conflict_one') : t('tickets.settings.team_signin.badge_team_conflicts', { count: team.signin_conflicts }))}</span>`;
             }
             return chip;
         }

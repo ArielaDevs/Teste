@@ -95,6 +95,68 @@ $translationNamespaces = ['common', 'tickets'];
         .settings-scroll .action-btn.delete:hover { background: var(--danger-bg, #fdf3f3); border-color: var(--danger-accent, #d13438); color: var(--danger-text, #a00); }
         .settings-scroll .action-btn svg { width: 16px; height: 16px; }
 
+        /* ── Sign-in conflict (GH #41) ─────────────────────────────────────────
+           The badge in the list is a button; the modal draws the analyst, a line to
+           each of their teams, and each team's method, then what happens now and
+           the ways out. Theme variables only, so it follows light and dark. */
+        .signin-conflict-badge {
+            display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;
+            padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+            background: var(--warning-bg, #fff3e0); color: var(--warning-text, #e65100);
+            border: 1px solid var(--warning-border, #ffcc80); cursor: pointer; font-family: inherit;
+        }
+        .signin-conflict-badge:hover, .signin-conflict-badge:focus-visible { filter: brightness(0.96); outline: 2px solid var(--warning-border, #ffcc80); outline-offset: 1px; }
+        .signin-conflict-badge svg { width: 12px; height: 12px; }
+
+        #signinConflictModal .modal-content { max-width: 600px; padding-bottom: 0; }
+        .sc-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+        .sc-head-icon { flex: 0 0 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: var(--warning-bg, #fff3e0); color: var(--warning-text, #e65100); border: 1px solid var(--warning-border, #ffcc80); }
+        .sc-head-icon svg { width: 22px; height: 22px; }
+        .sc-head h3 { margin: 0 0 4px; font-size: 19px; color: var(--text, #333); }
+        .sc-head p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-muted, #666); }
+
+        /* The picture: analyst on top, a branch down to each team. */
+        .sc-tree { background: var(--surface-2, #f7f9fa); border: 1px solid var(--border-soft, #eee); border-radius: 10px; padding: 16px 12px 14px; margin-bottom: 16px; }
+        .sc-tree-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint, #999); text-align: center; margin-bottom: 10px; }
+        .sc-person { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .sc-avatar { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 16px; background: var(--accent, #546e7a); color: var(--on-accent, #fff); }
+        .sc-person-name { font-weight: 600; font-size: 14px; color: var(--text, #333); }
+        .sc-stem { width: 2px; height: 16px; margin: 6px auto 0; background: var(--border, #ccc); }
+        .sc-branches { display: flex; justify-content: center; }
+        .sc-branch { position: relative; flex: 1 1 0; max-width: 200px; padding: 16px 6px 0; display: flex; justify-content: center; }
+        /* Org-chart connectors: each branch draws its share of the rail plus a drop. */
+        .sc-branch::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--border, #ccc); }
+        .sc-branch:first-child::before { left: 50%; }
+        .sc-branch:last-child::before { right: 50%; }
+        .sc-branch:only-child::before { display: none; }
+        .sc-branch::after { content: ''; position: absolute; top: 0; left: calc(50% - 1px); width: 2px; height: 16px; background: var(--border, #ccc); }
+        .sc-team { width: 100%; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-top: 3px solid var(--sc-tone, var(--border, #ccc));
+            border-radius: 8px; padding: 10px 10px 12px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+        .sc-team-name { font-weight: 600; font-size: 13px; color: var(--text, #333); margin-bottom: 8px; overflow-wrap: anywhere; }
+        .sc-method { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 600;
+            background: var(--sc-tone-bg, var(--surface-2, #f0f0f0)); color: var(--sc-tone, var(--text, #333)); }
+        .sc-method svg { width: 13px; height: 13px; flex: 0 0 13px; }
+        .sc-vs { text-align: center; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--warning-text, #e65100); }
+
+        .sc-box { border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+        .sc-box svg { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 1px; }
+        .sc-box strong { display: block; margin-bottom: 2px; }
+        .sc-box.info { background: var(--info-bg, #e3f2fd); color: var(--info-text, #0d47a1); border: 1px solid var(--info-border, #90caf9); }
+
+        .sc-fix-title { font-size: 13px; font-weight: 600; color: var(--text, #333); margin: 0 0 8px; }
+        .sc-fix { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border-soft, #eee); border-radius: 8px; margin-bottom: 8px; background: var(--surface, #fff); }
+        .sc-fix-num { flex: 0 0 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+            background: var(--success-bg, #e8f5e9); color: var(--success-text, #2e7d32); border: 1px solid var(--success-border, #a5d6a7); }
+        .sc-fix-text { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text-muted, #666); }
+        .sc-fix-text strong { display: block; color: var(--text, #333); }
+        .sc-fix .btn { flex: 0 0 auto; padding: 6px 14px; font-size: 13px; }
+        @media (max-width: 520px) {
+            .sc-fix { flex-wrap: wrap; }
+            .sc-fix .btn { margin-left: 38px; }
+        }
+
         /* Canonical settings-modal overrides (match tickets/settings). */
         .modal-content { padding: 20px 20px 0; max-width: 500px; }
         .modal-header { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: var(--text, #333); padding: 0; border-bottom: none; }
@@ -292,6 +354,56 @@ $translationNamespaces = ['common', 'tickets'];
     </div>
 
     <!-- Team Assignment Modal (analyst → teams) -->
+    <!-- Sign-in conflict explanation (GH #41) - filled in by openSigninConflict() -->
+    <div class="modal" id="signinConflictModal" role="dialog" aria-modal="true" aria-labelledby="scTitle">
+        <div class="modal-content">
+            <div class="sc-head">
+                <div class="sc-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+                <div>
+                    <h3 id="scTitle"><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_title')); ?></h3>
+                    <p id="scLead"></p>
+                </div>
+            </div>
+
+            <div class="sc-tree">
+                <div class="sc-tree-label" id="scTreeLabel"></div>
+                <div class="sc-person">
+                    <div class="sc-avatar" id="scAvatar"></div>
+                    <div class="sc-person-name" id="scName"></div>
+                </div>
+                <div class="sc-stem"></div>
+                <div class="sc-branches" id="scBranches"></div>
+                <div class="sc-vs" id="scVs"></div>
+            </div>
+
+            <div class="sc-box info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <div><strong><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_until_title')); ?></strong><span id="scUntil"></span></div>
+            </div>
+
+            <p class="sc-fix-title"><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_fix_title')); ?></p>
+            <div class="sc-fix">
+                <div class="sc-fix-num">1</div>
+                <div class="sc-fix-text"><strong id="scFixOwn"></strong><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_fix_own_body')); ?></div>
+                <button type="button" class="btn btn-primary" id="scBtnEdit"><?php echo htmlspecialchars(t('common.edit')); ?></button>
+            </div>
+            <div class="sc-fix">
+                <div class="sc-fix-num">2</div>
+                <div class="sc-fix-text"><strong><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_fix_teams_title')); ?></strong><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_fix_teams_body')); ?></div>
+                <a class="btn btn-secondary" href="../teams/"><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_btn_teams')); ?></a>
+            </div>
+            <div class="sc-fix">
+                <div class="sc-fix-num">3</div>
+                <div class="sc-fix-text"><strong><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_fix_member_title')); ?></strong><span id="scFixMember"></span></div>
+                <button type="button" class="btn btn-secondary" id="scBtnChange"><?php echo htmlspecialchars(t('tickets.settings.team_signin.cx_btn_change')); ?></button>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 16px;">
+                <button type="button" class="btn btn-secondary" onclick="closeSigninConflict()"><?php echo htmlspecialchars(t('common.close')); ?></button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="teamAssignmentModal">
         <div class="modal-content">
             <div class="modal-header" id="teamAssignmentTitle"><?php echo htmlspecialchars(t('tickets.settings.modals.team_assignment.title')); ?></div>
@@ -491,7 +603,64 @@ $translationNamespaces = ['common', 'tickets'];
 
         function signinConflictChip(a) {
             if (!a.auth_follow_team || !a.team_signin || a.team_signin.status !== 'conflict') return '';
-            return `<span class="status-badge" style="background:#fff3e0; color:#e65100; margin-left:6px;">${escapeHtml(t('tickets.settings.team_signin.badge_conflict'))}</span>`;
+            return `<button type="button" class="signin-conflict-badge" onclick="openSigninConflict(${Number(a.id)})" title="${escapeHtml(t('tickets.settings.team_signin.badge_tooltip'))}">`
+                 + `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+                 + `${escapeHtml(t('tickets.settings.team_signin.badge_conflict'))}</button>`;
+        }
+
+        // One colour per sign-in METHOD, not per team - so when three teams split two
+        // ways, the two that agree visibly match. Module accents, so they follow the theme.
+        const SC_TONES = [
+            ['var(--kb-accent, #1565c0)',  'var(--kb-accent-soft, #e3f2fd)'],
+            ['var(--cm-accent, #6a1b9a)',  'var(--cm-accent-soft, #f3e5f5)'],
+            ['var(--tsk-accent, #00838f)', 'var(--tsk-accent-soft, #e0f7fa)'],
+            ['var(--con-accent, #ad1457)', 'var(--con-accent-soft, #fce4ec)'],
+        ];
+        const SC_ICON_KEY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+        const SC_ICON_SSO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
+
+        function scInitials(name) {
+            const parts = String(name || '?').trim().split(/\s+/);
+            return ((parts[0] || '')[0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+        }
+
+        function openSigninConflict(id) {
+            const a = analysts.find(x => Number(x.id) === Number(id));
+            if (!a || !a.team_signin) return;
+            const name = a.full_name || a.username;
+            const methods = a.team_signin.teams;
+            const methodName = m => m.key === 0 ? t('tickets.settings.team_signin.local') : m.label;
+
+            document.getElementById('scLead').textContent = t('tickets.settings.team_signin.cx_lead', { name: name });
+            document.getElementById('scTreeLabel').textContent = t('tickets.settings.team_signin.cx_teams', { name: name });
+            document.getElementById('scAvatar').textContent = scInitials(name);
+            document.getElementById('scName').textContent = name;
+
+            const toneOf = {};
+            let next = 0;
+            document.getElementById('scBranches').innerHTML = methods.map(m => {
+                if (!(m.key in toneOf)) toneOf[m.key] = SC_TONES[next++ % SC_TONES.length];
+                const [tone, bg] = toneOf[m.key];
+                return `<div class="sc-branch"><div class="sc-team" style="--sc-tone:${tone}; --sc-tone-bg:${bg};">
+                            <div class="sc-team-name">${escapeHtml(m.team_name)}</div>
+                            <span class="sc-method">${m.key === 0 ? SC_ICON_KEY : SC_ICON_SSO}${escapeHtml(methodName(m))}</span>
+                        </div></div>`;
+            }).join('');
+            // "Google ≠ Local password" under the picture, one entry per distinct method.
+            const distinct = [...new Map(methods.map(m => [m.key, methodName(m)])).values()];
+            document.getElementById('scVs').textContent = distinct.join('  ≠  ');
+
+            document.getElementById('scUntil').textContent = t('tickets.settings.team_signin.cx_until_body', { name: name, current: signinMethodName(a.auth_provider_id) });
+            document.getElementById('scFixOwn').textContent = t('tickets.settings.team_signin.cx_fix_own_title', { name: name });
+            document.getElementById('scFixMember').textContent = t('tickets.settings.team_signin.cx_fix_member_body', { name: name });
+
+            document.getElementById('scBtnEdit').onclick = () => { closeSigninConflict(); openAnalystModal(a); };
+            document.getElementById('scBtnChange').onclick = () => { closeSigninConflict(); openTeamAssignment('analyst', a.id, name); };
+            document.getElementById('signinConflictModal').classList.add('active');
+        }
+
+        function closeSigninConflict() {
+            document.getElementById('signinConflictModal').classList.remove('active');
         }
 
         // Under the select: where Follow team gets its answer, or why it has none.
@@ -527,8 +696,8 @@ $translationNamespaces = ['common', 'tickets'];
                 }
             }
             note.textContent = text;
-            note.style.background = warn ? '#fff3e0' : 'var(--bg-subtle, #f5f7f8)';
-            note.style.color = warn ? '#e65100' : 'var(--text-muted, #555)';
+            note.style.background = warn ? 'var(--warning-bg, #fff3e0)' : 'var(--surface-2, #f5f7f8)';
+            note.style.color = warn ? 'var(--warning-text, #e65100)' : 'var(--text-muted, #555)';
             note.style.display = 'block';
         }
 
