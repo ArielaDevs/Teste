@@ -45,8 +45,10 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .ma-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; }
         .ma-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 14px 24px 18px; box-sizing: border-box; }
         .ma-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
-        .ma-back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted, #666); text-decoration: none; font-size: 13px; margin-bottom: 4px; }
-        .ma-back:hover { color: var(--accent, #0078d4); }
+        /* Back is a button (Ed) - still a link underneath, so it opens in a new tab and works without script. */
+        .ma-back { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; margin-bottom: 8px; font-size: 13px; text-decoration: none;
+                   color: var(--text, #333); background: var(--surface, #fff); border: 1px solid var(--border, #ccc); border-radius: 4px; }
+        .ma-back:hover { background: var(--surface-hover, #f3f3f3); border-color: var(--accent, #0078d4); }
         .ma-name { font-size: 22px; font-weight: 600; margin: 0; color: var(--text, #333); }
         .ma-sub { color: var(--text-muted, #666); font-size: 13px; margin-top: 2px; }
         .ma-stat { background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-left: 4px solid var(--accent, #0078d4);
