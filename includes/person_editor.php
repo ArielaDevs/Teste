@@ -66,6 +66,8 @@ function personEditorRender(): void
         'company_auto'       => $m('company_auto'),
         'company_none'       => $m('company_none'),
         'manager_none'       => $m('manager_none'),
+        'manager_search'     => $m('manager_search'),
+        'manager_hidden'     => $m('manager_hidden'),
         'ab_written'         => $m('ab_written'),
         'ab_conflict'        => $m('ab_conflict'),
         'ab_failed'          => $m('ab_failed'),
@@ -92,6 +94,22 @@ function personEditorRender(): void
             color: var(--text, #333);
         }
         #personEditor .pe-help { color: var(--text-muted, #666); display: block; margin-top: 4px; }
+        /* Manager type-ahead: searched on the server a few rows at a time,
+           because on a large organisation a <select> of everyone is thousands
+           of options (and was a full list download every time it opened). */
+        #personEditor .pe-mgr { position: relative; }
+        #personEditor .pe-mgr-row { display: flex; gap: 6px; }
+        #personEditor .pe-mgr-row input { flex: 1; min-width: 0; }
+        #personEditor .pe-mgr-clear { border: 1px solid var(--border, #ccc); background: var(--surface, #fff); color: var(--text-muted, #666);
+            border-radius: 4px; padding: 0 10px; cursor: pointer; font-size: 16px; line-height: 1; }
+        #personEditor .pe-mgr-clear[hidden] { display: none; }
+        #personEditor .pe-mgr-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin: 2px 0 0; padding: 0; list-style: none;
+            background: var(--surface, #fff); border: 1px solid var(--border, #ccc); border-radius: 4px; box-shadow: 0 4px 12px var(--shadow, rgba(0,0,0,.15));
+            max-height: 220px; overflow: auto; }
+        #personEditor .pe-mgr-list[hidden] { display: none; }
+        #personEditor .pe-mgr-list li { padding: 7px 10px; cursor: pointer; font-size: 13px; color: var(--text, #333); }
+        #personEditor .pe-mgr-list li small { display: block; color: var(--text-muted, #666); }
+        #personEditor .pe-mgr-list li.active, #personEditor .pe-mgr-list li:hover { background: var(--surface-hover, #f3f3f3); }
         #personEditor .pe-err { color: var(--danger-text, #b3261e); font-size: 13px; min-height: 1em; margin: 4px 0 0; }
         /* inbox.css has NO :disabled rule for form controls, so a disabled input
            inherits the browser default - which in the dark theme is very nearly
@@ -134,7 +152,17 @@ function personEditorRender(): void
                     <div class="form-group">
                         <label for="pe_<?php echo $f; ?>"><?php echo htmlspecialchars($m($f === 'manager_id' ? 'manager' : $f)); ?></label>
                         <?php if ($d['type'] === 'select'): ?>
-                            <select id="pe_<?php echo $f; ?>" data-field="<?php echo $f; ?>"></select>
+                            <?php /* The value lives in the hidden input (the id the save reads);
+                                     the text box is only for finding somebody. */ ?>
+                            <div class="pe-mgr">
+                                <input type="hidden" id="pe_<?php echo $f; ?>" data-field="<?php echo $f; ?>">
+                                <div class="pe-mgr-row">
+                                    <input type="text" id="peMgrInput" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="peMgrList" aria-expanded="false"
+                                           placeholder="<?php echo htmlspecialchars($m('manager_search')); ?>">
+                                    <button type="button" class="pe-mgr-clear" id="peMgrClear" aria-label="<?php echo htmlspecialchars($m('manager_clear')); ?>" title="<?php echo htmlspecialchars($m('manager_clear')); ?>">&times;</button>
+                                </div>
+                                <ul class="pe-mgr-list" id="peMgrList" role="listbox" hidden></ul>
+                            </div>
                         <?php else: ?>
                             <input type="<?php echo $d['type']; ?>" id="pe_<?php echo $f; ?>" data-field="<?php echo $f; ?>" autocomplete="off"
                                    maxlength="<?php echo (int)$d['max']; ?>" placeholder="<?php echo htmlspecialchars($m($f . '_placeholder')); ?>">
@@ -193,16 +221,6 @@ function personEditorRender(): void
             return companies;
         }
 
-        // Everyone this analyst may see (get_users.php is scoped by the active
-        // company filter), so a manager can only be picked from people they are
-        // allowed to see. Active people, plus the current manager whatever they are.
-        async function loadManagerOptions() {
-            try {
-                const d = await getJson(API + 'tickets/get_users.php');
-                return d.success ? (d.users || []) : [];
-            } catch (e) { return []; }
-        }
-
         function paintCompanies(tenantId) {
             const group = $('peCompanyGroup'), sel = $('peCompany');
             if (!companies || companies.length < 2) { group.hidden = true; sel.innerHTML = ''; return; }
@@ -216,25 +234,111 @@ function personEditorRender(): void
             group.hidden = false;
         }
 
-        function paintManagers(people, selfId, managerId) {
-            const sel = $('pe_manager_id');
-            if (!sel) return;
+        // ── Manager type-ahead ──────────────────────────────────────────────
+        // Searched on get_users.php, which is scoped to the people THIS analyst
+        // may see - so only they can be offered (save_user.php re-checks). A few
+        // rows per pause in typing; never the whole directory.
+        //
+        // The chosen manager lives in the hidden #pe_manager_id; data-name is
+        // their name, so leaving the box can put it back; data-unresolved keeps a
+        // manager this analyst cannot see (see paintManager).
+        let mgrSelf = null, mgrTimer = null, mgrSeq = 0, mgrRows = [], mgrActive = -1;
+
+        function mgrClose() {
+            $('peMgrList').hidden = true;
+            $('peMgrInput').setAttribute('aria-expanded', 'false');
+            mgrActive = -1;
+        }
+
+        function mgrSet(id, name) {
+            const hid = $('pe_manager_id');
+            hid.value = id ? String(id) : '';
+            hid.dataset.unresolved = '';
+            hid.dataset.name = name || '';
+            $('peMgrInput').value = name || '';
+            $('peMgrInput').placeholder = T.manager_search;
+            $('peMgrClear').hidden = false;
+            mgrClose();
+        }
+
+        function mgrPaint() {
+            $('peMgrList').innerHTML = mgrRows.map((u, i) =>
+                '<li role="option" data-i="' + i + '"' + (i === mgrActive ? ' class="active" aria-selected="true"' : '') + '>'
+                + esc(u.display_name || u.email || u.username || T.unknown_name)
+                + ((u.email && u.display_name) ? '<small>' + esc(u.email) + '</small>' : '') + '</li>').join('');
+            $('peMgrList').hidden = mgrRows.length === 0;
+            $('peMgrInput').setAttribute('aria-expanded', mgrRows.length ? 'true' : 'false');
+        }
+
+        async function mgrSearch(q) {
+            const mine = ++mgrSeq;
+            let rows = [];
+            try {
+                const d = await getJson(API + 'tickets/get_users.php?limit=20&search=' + encodeURIComponent(q));
+                rows = d.success ? (d.users || []) : [];
+            } catch (e) { rows = []; }
+            if (mine !== mgrSeq) return;                  // a newer search has started
+            // Not their own manager, and not people who have left.
+            mgrRows = rows.filter(u => String(u.id) !== String(mgrSelf ?? '') && Number(u.is_active ?? 1)).slice(0, 12);
+            mgrActive = mgrRows.length ? 0 : -1;
+            mgrPaint();
+        }
+
+        function mgrPick(i) {
+            const u = mgrRows[i];
+            if (u) mgrSet(u.id, u.display_name || u.email || u.username || T.unknown_name);
+        }
+
+        $('peMgrInput').addEventListener('input', function () {
+            clearTimeout(mgrTimer);
+            const q = this.value.trim();
+            if (!q) { mgrRows = []; mgrClose(); return; }
+            mgrTimer = setTimeout(() => mgrSearch(q), 200);
+        });
+        $('peMgrInput').addEventListener('keydown', function (e) {
+            const open = !$('peMgrList').hidden;
+            if (!open) return;
+            if (e.key === 'ArrowDown')    { e.preventDefault(); mgrActive = Math.min(mgrRows.length - 1, mgrActive + 1); mgrPaint(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); mgrActive = Math.max(0, mgrActive - 1); mgrPaint(); }
+            else if (e.key === 'Enter' && mgrActive >= 0) { e.preventDefault(); mgrPick(mgrActive); }
+            // Escape closes the list only - not the whole editor behind it.
+            else if (e.key === 'Escape')  { e.preventDefault(); e.stopPropagation(); mgrClose(); }
+        });
+        // mousedown, not click: it lands before the text box's blur.
+        $('peMgrList').addEventListener('mousedown', function (e) {
+            const li = e.target.closest('li[data-i]');
+            if (!li) return;
+            e.preventDefault();
+            mgrPick(Number(li.dataset.i));
+        });
+        // Leaving the box puts back whoever is actually chosen, so typed-but-not-
+        // picked text never looks like a manager that is about to be saved.
+        $('peMgrInput').addEventListener('blur', function () {
+            setTimeout(() => {
+                mgrClose();
+                const hid = $('pe_manager_id');
+                this.value = hid.dataset.unresolved ? '' : (hid.dataset.name || '');
+            }, 0);
+        });
+        $('peMgrClear').addEventListener('click', function () { mgrSet(null, ''); $('peMgrInput').focus(); });
+
+        function paintManager(selfId, managerId, managerName) {
+            mgrSelf = selfId;
+            mgrRows = [];
+            clearTimeout(mgrTimer);
+            mgrSeq++;                                     // ignore any search still in flight
+            if (!$('pe_manager_id')) return;
             const wanted = (managerId === null || managerId === undefined) ? '' : String(managerId);
-            let html = '<option value="">' + esc(T.manager_none) + '</option>';
-            people.forEach(u => {
-                if (String(u.id) === String(selfId ?? '')) return;                           // not their own manager
-                if (!Number(u.is_active ?? 1) && String(u.id) !== wanted) return;            // leavers, unless it is them
-                html += '<option value="' + u.id + '">' + esc(u.display_name || u.email || u.username || T.unknown_name) + '</option>';
-            });
-            sel.innerHTML = html;
-            // A manager this analyst cannot see has no option. Keep their id aside
-            // and leave the key out on save - never post it as "no manager".
-            sel.dataset.unresolved = '';
-            if (wanted === '' || sel.querySelector('option[value="' + CSS.escape(wanted) + '"]')) {
-                sel.value = wanted;
+            if (wanted !== '' && !managerName) {
+                // A manager this analyst cannot see: get_person.php gives no name.
+                // Keep their id aside and leave the key out on save - never post it
+                // as "no manager". Choosing somebody else is the way to change it.
+                mgrSet(null, '');
+                $('pe_manager_id').dataset.unresolved = wanted;
+                $('peMgrInput').placeholder = T.manager_hidden;
+                $('peMgrClear').hidden = true;
             } else {
-                sel.value = '';
-                sel.dataset.unresolved = wanted;
+                mgrSet(wanted, managerName || '');
             }
         }
 
@@ -265,7 +369,7 @@ function personEditorRender(): void
             $('peTitle').textContent = isNew ? T.add_title : T.edit_title;
 
             let person = { managed_fields: [] };
-            const [people] = await Promise.all([loadManagerOptions(), loadCompanies()]);
+            await loadCompanies();
             if (!isNew) {
                 try {
                     const d = await getJson(API + 'tickets/get_person.php?id=' + encodeURIComponent(id));
@@ -274,8 +378,12 @@ function personEditorRender(): void
                 } catch (e) { toast(T.load_failed, 'error'); return; }
             }
             paintPerson(person);
-            paintManagers(people, id, person.manager_id);
-            if ($('pe_manager_id')) $('pe_manager_id').disabled = owned.includes('manager_id');
+            paintManager(id, person.manager_id, person.manager_name);
+            // Directory-owned: shown, not changeable (and never sent - see the save).
+            if ($('peMgrInput')) {
+                $('peMgrInput').disabled = owned.includes('manager_id');
+                $('peMgrClear').disabled = owned.includes('manager_id');
+            }
             paintCompanies(person.tenant_id ?? null);
             $('pePassword').value = '';
             $('personEditor').classList.add('active');

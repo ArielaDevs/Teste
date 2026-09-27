@@ -237,6 +237,8 @@ $translationNamespaces = ['common', 'asset-management'];
 
 <script>
 const API = '../api/assets/';
+// Resolved here: this page does not export the tickets namespace to JavaScript.
+const MANAGER_ACCESS_LABEL = <?php echo json_encode(t('tickets.manager_access.button'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
 let people = [];
 let selectedId = null;
 
@@ -457,6 +459,7 @@ function renderDetail(user, assets) {
                 <button type="button" class="au-btn" onclick="toggleActive(${user.id})">
                     ${esc(window.t(p.is_active === false ? 'asset-management.users.reactivate' : 'asset-management.users.deactivate'))}
                 </button>
+                <a class="au-btn" href="manager-access.php?user_id=${user.id}">${esc(MANAGER_ACCESS_LABEL)}</a>
                 <a class="au-btn primary" href="handover.php?user_id=${user.id}" target="_blank" rel="noopener">
                     ${esc(window.t('asset-management.users.handover'))}
                 </a>

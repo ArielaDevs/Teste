@@ -258,6 +258,39 @@ function managerHasTeam(PDO $conn, int $userId): bool
 }
 
 /**
+ * The team as it WOULD be with managers switched on - for the admin screens, so
+ * an admin can check who sees what before turning the portal over. Only the
+ * master switch is pretended; a missing table still gives nobody. The memo is
+ * put back afterwards, so nothing else in the request sees the pretence.
+ *
+ * @return int[]
+ */
+function managerTeamPreviewIds(PDO $conn, int $managerUserId): array
+{
+    $saved = $GLOBALS['managers_memo'] ?? [];
+    $asIfOn = managersSettings($conn);
+    $asIfOn['enabled'] = '1';
+    $GLOBALS['managers_memo'] = ['settings' => $asIfOn];
+    try {
+        return managerTeamUserIds($conn, $managerUserId);
+    } finally {
+        $GLOBALS['managers_memo'] = $saved;
+    }
+}
+
+/**
+ * May the signed-in analyst add or remove management lines? System -> Managers
+ * decides: administrators only (the default), or anyone who can edit people -
+ * the caller has already required Tickets or Assets. Being able to reach the
+ * manager (analystCanAccessUser) is checked by the caller as well.
+ */
+function managerLinesEditable(PDO $conn): bool
+{
+    if (sessionIsAdmin()) return true;
+    return managersSettings($conn)['edit_by'] === 'people_editors';
+}
+
+/**
  * THE question every portal endpoint asks: may this portal user see this ticket,
  * and as whom?
  *

@@ -58,6 +58,16 @@ try {
         : [];
     $u['is_active'] = (int)($u['is_active'] ?? 1) === 1;
 
+    // The manager's name, for the editor's type-ahead - ONLY when this analyst
+    // may see that person. Otherwise null, and the editor keeps the manager
+    // without showing (or sending) who it is.
+    $u['manager_name'] = null;
+    if (!empty($u['manager_id']) && analystCanAccessUser($conn, (int)$_SESSION['analyst_id'], (int)$u['manager_id'])) {
+        $mn = $conn->prepare("SELECT COALESCE(NULLIF(display_name, ''), NULLIF(email, ''), username) FROM users WHERE id = ?");
+        $mn->execute([(int)$u['manager_id']]);
+        $u['manager_name'] = $mn->fetchColumn() ?: null;
+    }
+
     echo json_encode(['success' => true, 'user' => $u]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => 'Could not load the person']);

@@ -76,6 +76,8 @@ $m = fn(string $k) => t('system.managers.' . $k);
         .mg-table th { text-align: left; font-size: 12px; color: var(--text-muted, #888); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #eee); }
         .mg-table td { padding: 10px; border-bottom: 1px solid var(--border-soft, #f2f2f2); color: var(--text, #444); vertical-align: top; }
         .mg-table .mg-email { font-size: 12px; color: var(--text-muted, #888); }
+        .mg-table .mg-name { color: var(--accent, #0078d4); text-decoration: none; }
+        .mg-table .mg-name:hover { text-decoration: underline; }
         .mg-chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11.5px; margin: 0 4px 3px 0;
             background: var(--surface-2, #eceff1); color: var(--text-muted, #555); }
         .mg-warn { display: block; margin-top: 4px; font-size: 12px; color: var(--warning-text, #6b5900); }
@@ -268,7 +270,8 @@ $m = fn(string $k) => t('system.managers.' . $k);
                         const warns = (m.warnings || []).map(w => '<span class="mg-warn">⚠ ' + esc(w.kind === 'left'
                             ? t('system.managers.warn_left')
                             : t('system.managers.warn_department', { name: w.name })) + '</span>').join('');
-                        return '<tr><td><strong>' + esc(m.name) + '</strong><div class="mg-email">' + esc(m.email || '') + '</div>' + warns + '</td>'
+                        // Their lines are changed on the full-screen Manager access page.
+                        return '<tr><td><a class="mg-name" href="../../tickets/manager-access.php?user_id=' + encodeURIComponent(m.id) + '&from=system"><strong>' + esc(m.name) + '</strong></a><div class="mg-email">' + esc(m.email || '') + '</div>' + warns + '</td>'
                              + '<td>' + esc(m.company || '') + '</td>'
                              + '<td>' + from.map(f => '<span class="mg-chip">' + esc(f) + '</span>').join('') + '</td>'
                              + '<td>' + esc(countText('can_see_people', m.can_see)) + '</td></tr>';

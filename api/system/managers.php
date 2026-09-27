@@ -124,16 +124,11 @@ try {
         $st->execute($args);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        // "Can see N people" is worked out as if managers were ON, so an admin
-        // can check the result BEFORE switching the portal over. In memory only.
-        $saved = $GLOBALS['managers_memo'] ?? [];
-        $asIfOn = $settings; $asIfOn['enabled'] = '1';
-        $GLOBALS['managers_memo'] = ['settings' => $asIfOn];
-
         $deptLines = $conn->prepare("SELECT target_value FROM manager_grants WHERE manager_user_id = ? AND grant_type = 'department'");
         foreach ($rows as &$r) {
             $id = (int)$r['id'];
-            $r['can_see'] = count(managerTeamUserIds($conn, $id));
+            // As if managers were ON, so an admin can check before switching.
+            $r['can_see'] = count(managerTeamPreviewIds($conn, $id));
             $warn = [];
             if ((int)$r['is_active'] !== 1) $warn[] = ['kind' => 'left'];
             // A department line that matches nobody: most often a renamed
@@ -151,7 +146,6 @@ try {
             $r['is_active'] = (int)$r['is_active'] === 1;
         }
         unset($r);
-        $GLOBALS['managers_memo'] = $saved;
 
         echo json_encode([
             'success' => true, 'managers' => $rows, 'total' => $total,

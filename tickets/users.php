@@ -537,7 +537,10 @@ $translationNamespaces = ['common', 'tickets'];
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            loadUsers();
+            // Deep link: ?user_id=N opens that person - the same spelling Assets ->
+            // Users uses, so Manager access can send you back to who you were on.
+            const deepLink = parseInt(new URLSearchParams(window.location.search).get('user_id') || '', 10);
+            loadUsers().then(() => { if (deepLink > 0) selectUser(deepLink); });
             loadUserCompanies();
             // Loaded up front rather than when the tab is first opened: the answer
             // carries `can_manage`, which decides whether the Add button is drawn
@@ -735,6 +738,7 @@ $translationNamespaces = ['common', 'tickets'];
                         <div style="display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;">
                             <span id="addToBookHost" data-user-id="${user.id}" style="display:contents;"></span>
                             <button class="btn btn-secondary" onclick="openUserModal(${user.id})">${escapeHtml(t('common.edit'))}</button>
+                            <a class="btn btn-secondary" href="manager-access.php?user_id=${user.id}">${escapeHtml(t('tickets.manager_access.button'))}</a>
                             <button class="btn btn-secondary" onclick="deleteUser(${user.id})">${escapeHtml(t('common.delete'))}</button>
                         </div>
                     </div>
