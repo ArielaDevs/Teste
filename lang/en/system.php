@@ -1893,7 +1893,7 @@ return [
         'notify_email'     => 'Email them',
         'notify_email_desc'=> 'An email with the ticket\'s number and subject and a link to it, sent to the manager\'s address from the ticket mailbox. Managers with no address get nothing. The link needs the public web address (Tickets → Settings → Email Templates) - without it, a ticket that arrives by email sends a link that does not work.',
         'notify_bell'      => 'In the portal\'s notification bell',
-        'notify_bell_desc' => 'A bell appears in the portal header for managers, the same as the one analysts have. Quieter than email: it is there when they next sign in.',
+        'notify_bell_desc' => 'Into the bell every manager has in the portal header - the same bell analysts have. Quieter than email: it is there when they next sign in.',
         'leavers_heading'  => 'People who have left',
         'leavers'          => 'Keep showing the tickets of people who have left',
         'leavers_desc'     => 'On by default, so a ticket still open when someone leaves keeps its oversight. A manager who has left always loses access.',
