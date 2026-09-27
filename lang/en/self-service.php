@@ -496,6 +496,14 @@ return [
         'tr_p2'    => 'Your progress is saved as you go, so you can do a course in several sittings, on any device, and pick up where you left off.',
         'tr_tip'   => '<strong>Deadlines and reminders:</strong> a course may have a date by which it should be done. You have the whole of that day. If your IT team has switched reminders on you will get an email as the date approaches, and again if it passes — those stop as soon as you finish the course.',
 
+        // Managers only (discussion #62) - the section is not drawn for anyone else.
+        'team_title'         => 'Team tickets',
+        'team_p1'            => 'You can see the tickets raised by the people you manage. They are under <strong>Team tickets</strong> in the menu, apart from your own under My Tickets.',
+        'team_li_who'        => '<strong>Who is on your team</strong> was set up by your IT team &mdash; from the Manager field in your organisation\'s directory, or chosen for you. Ask them if somebody is missing, or should not be there.',
+        'team_li_banner'     => '<strong>Each team ticket says whose it is</strong> and what you may do with it. You can always read it; your organisation decides whether you can also reply to it or close it.',
+        'team_li_conf'       => '<strong>Confidential tickets</strong> &mdash; a health matter, say &mdash; are kept from managers. Depending on your organisation you will not see them at all, or only that one exists, with its number and status and nothing it says.',
+        'team_li_seen'       => '<strong>Opening a team ticket is recorded.</strong> The person who raised it can see that you looked, and when.',
+        'team_tip'           => 'Open a colleague\'s ticket when you need to, not out of curiosity &mdash; they can see that you did.',
         's6_title'           => 'Account & security',
         's6_p1'              => 'Click your initials in the top-right corner to open the account menu. From there:',
         's6_li1'             => '<strong>My Account</strong> — set a <strong>preferred name</strong> (e.g. <em>"Ed"</em> instead of <em>"Ed Mozley"</em>) that\'s used when the system greets you in emails, keep your own <strong>contact details</strong> up to date, choose how the portal looks, and change your password.',

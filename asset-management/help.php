@@ -516,8 +516,15 @@ $translationNamespaces = ['common', 'asset-management'];
                                 <strong><?php echo htmlspecialchars(t('asset-management.help.users_step4_strong')); ?></strong> <?php echo t('asset-management.help.users_step4_text'); ?>
                             </div>
                         </div>
+                        <div class="help-step">
+                            <div class="help-step-num">5</div>
+                            <div>
+                                <strong><?php echo htmlspecialchars(t('asset-management.help.users_step5_strong')); ?></strong> <?php echo t('asset-management.help.users_step5_text'); ?>
+                            </div>
+                        </div>
                     </div>
 
+                    <p><?php echo t('asset-management.help.users_managers'); ?></p>
                     <p class="help-note"><?php echo htmlspecialchars(t('asset-management.help.users_tip')); ?></p>
                 </div>
 

@@ -564,11 +564,17 @@ try {
 
                     <p style="margin-top: 16px;"><?php echo t('tickets.help.users.edit_heading'); ?></p>
                     <p><?php echo t('tickets.help.users.edit_body'); ?></p>
+                    <p><?php echo t('tickets.help.users.company_body'); ?></p>
 
                     <p style="margin-top: 16px;"><?php echo t('tickets.help.users.managed_heading'); ?></p>
                     <p><?php echo t('tickets.help.users.managed_body'); ?></p>
                     <p><?php echo t('tickets.help.users.source_body'); ?></p>
                     <p><?php echo t('tickets.help.users.add_book_body'); ?></p>
+
+                    <p style="margin-top: 16px;"><?php echo t('tickets.help.users.managers_heading'); ?></p>
+                    <p><?php echo t('tickets.help.users.managers_body'); ?></p>
+                    <p><?php echo t('tickets.help.users.managers_sources'); ?></p>
+                    <p><?php echo t('tickets.help.users.managers_rules'); ?></p>
 
                     <p style="margin-top: 16px;"><?php echo t('tickets.help.users.delete_heading'); ?></p>
                     <p><?php echo t('tickets.help.users.delete_body'); ?></p>
@@ -1115,6 +1121,11 @@ try {
                     <p>
                         Each automatic change is written to the ticket's audit trail with the reason, for example
                         <em>Confidential - arrived through the HR inbox mailbox</em>.
+                    </p>
+                    <p>
+                        <strong>What a manager sees of a confidential ticket</strong> is set under <strong>System &rarr; Managers</strong>:
+                        nothing at all (the default), only that one exists, or everything. Managers are explained under
+                        <a href="#user-management">User management</a>.
                     </p>
                 </div>
             </div>

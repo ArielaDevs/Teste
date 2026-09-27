@@ -315,6 +315,25 @@ function getHelpTopics() {
                      . ' phone mobile department employee id manager email edit read-only greyed out'
                      . ' gdpr article 16 rectification carddav address book write back customers update themselves',
         ],
+        // Portal managers (discussion #62).
+        'managers' => [
+            'hero' => 'Managers',
+            'sub'  => 'Let people in the self-service portal see the tickets of the people they manage - from your directory\'s reporting line, from lines you set up, or both - and decide what they see of a confidential ticket.',
+            'sections' => [
+                ['id' => 'overview',     'label' => 'What a manager is'],
+                ['id' => 'sources',      'label' => 'Where managers come from'],
+                ['id' => 'rules',        'label' => 'The rules that always apply'],
+                ['id' => 'confidential', 'label' => 'Confidential tickets'],
+                ['id' => 'views',        'label' => 'Who has looked'],
+                ['id' => 'list',         'label' => 'The list of managers'],
+                ['id' => 'settings',     'label' => 'The settings'],
+                ['id' => 'before',       'label' => 'Before you switch on'],
+            ],
+            'terms' => 'manager line manager head of department team tickets reports direct reports reporting line'
+                     . ' active directory manager attribute management lines exclusion exclude department renamed'
+                     . ' people group everyone confidential stub hidden who has seen viewed privacy grievance'
+                     . ' leavers left reply close portal self-service see other people\'s tickets oversight',
+        ],
         'search' => [
             'hero' => 'Search',
             'sub'  => 'What the search index holds, why a particular document or short word is not being found, and when a rebuild is actually needed.',
