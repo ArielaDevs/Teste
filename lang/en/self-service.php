@@ -255,7 +255,7 @@ return [
         'title'              => 'Self-Service Portal - New Ticket',
         // Discussion #62
         'confidential'       => 'This is confidential',
-        'confidential_hint'  => 'Tick this if your ticket is personal - about your health, say, or a complaint. Confidential tickets are kept from managers. The service desk still sees them.',
+        'confidential_hint'  => 'Turn this on if your ticket is personal - about your health, say, or a complaint. Confidential tickets are kept from managers. The service desk still sees them.',
         'heading'            => 'New Ticket',
         'mailbox'            => 'Mailbox *',
         'mailbox_loading'    => 'Loading...',
@@ -436,7 +436,7 @@ return [
         // organisation has switched the field on and has portal-visible categories.
         's3_li_category'     => '<strong>What is this about?</strong> — a short list your IT team has set up ("Printing", "Access requests") to get the ticket to the right person faster. It only appears if they have chosen to offer it, it is always optional, and picking <em>Not sure</em> is a perfectly good answer — an analyst confirms the real category when the ticket is dealt with.',
         // Discussion #62
-        's3_li_confidential' => '<strong>This is confidential</strong> — tick it if the ticket is personal: about your health, say, or a complaint. Confidential tickets are kept from managers; the service desk still sees them. You can also mark a ticket confidential later with <em>Mark confidential</em> at the top of it, but only the service desk can undo that.',
+        's3_li_confidential' => '<strong>This is confidential</strong> — turn it on if the ticket is personal: about your health, say, or a complaint. Confidential tickets are kept from managers; the service desk still sees them. You can also mark a ticket confidential later with <em>Mark confidential</em> at the top of it, but only the service desk can undo that.',
         's3_p2'              => 'Click <strong>Submit</strong>. You\'ll see a confirmation with your ticket reference (something like <em>LVB-805-40499</em>) — quote that if you ever need to chase it up.',
         's3_tip'             => 'A picture is worth 1000 words. A screenshot or recording (see below) is worth 1000 pictures. Don\'t be shy — the more visual context you can attach, the quicker the IT team can identify the problem.',
 

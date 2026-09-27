@@ -1096,7 +1096,7 @@ try {
                     </p>
                     <p><strong>Tickets become confidential on their own</strong>, before anyone has read them, when:</p>
                     <ul>
-                        <li>the person raising it ticks <strong>This is confidential</strong> in the self-service portal, or marks it later;</li>
+                        <li>the person raising it turns on <strong>This is confidential</strong> in the self-service portal, or marks it later;</li>
                         <li>it arrives through a mailbox set to confidential (<strong>Settings &rarr; Mailboxes</strong>): use this for an HR mailbox;</li>
                         <li>it is in, or is moved into, a department set to confidential (<strong>Settings &rarr; Departments</strong>);</li>
                         <li>it is split from, or merged with, a confidential ticket.</li>

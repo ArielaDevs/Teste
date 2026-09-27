@@ -296,10 +296,18 @@ $pageStyles = <<<'CSS'
            `.form-group label { display:block }` and `.form-group input { width:100%;
            padding:10px 12px }` further down are at least as specific, and drew the
            box as a full-width block on its own line ABOVE its label. */
-        .form-group.confidential-choice .confidential-label { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0; }
-        .form-group.confidential-choice .confidential-label input[type="checkbox"] {
-            width: 16px; height: 16px; padding: 0; margin: 0; flex: 0 0 auto;
-            accent-color: var(--danger-accent, #c62828);
+        /* The shared toggle switch (inbox.css, #453), but the other way up: its
+           standard layout puts the caption ABOVE the switch; here the switch comes
+           first and "This is confidential" sits under it. Red when on - it is the
+           one setting on this form that changes who can read the ticket. */
+        .form-group.confidential-choice .confidential-label {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+            font-weight: 600; margin: 0; cursor: pointer;
+            --toggle-accent: var(--danger-accent, #c62828);
+        }
+        .form-group.confidential-choice .confidential-label .toggle-switch { order: 0; }
+        .form-group.confidential-choice .confidential-label .toggle-switch input {
+            width: 0; height: 0; padding: 0; margin: 0; border: 0;   /* undo `.form-group input` */
         }
         .field-hint {
             margin-top: 5px;
@@ -1087,7 +1095,10 @@ require __DIR__ . '/includes/header.php';
                          the last place for something a person in a difficult situation
                          needs to notice. */ ?>
                 <div class="form-group confidential-choice">
-                    <label class="confidential-label"><input type="checkbox" id="confidential"> <?php echo htmlspecialchars(t('self-service.new_ticket.confidential')); ?></label>
+                    <label class="toggle-label confidential-label">
+                        <span class="toggle-switch"><input type="checkbox" id="confidential"><span class="toggle-slider"></span></span>
+                        <span><?php echo htmlspecialchars(t('self-service.new_ticket.confidential')); ?></span>
+                    </label>
                     <div class="field-hint"><?php echo htmlspecialchars(t('self-service.new_ticket.confidential_hint')); ?></div>
                 </div>
                 <?php /* Equipment (discussion #57). Hidden entirely unless the user
