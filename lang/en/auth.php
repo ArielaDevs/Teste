@@ -48,6 +48,7 @@ return [
 
     // The way across to the requester portal (discussion #82)
     'portal_link'   => 'Go to the Self-Service Portal',
+    'powered_by'    => 'Powered by FreeITSM',
 
     // --- Messages -----------------------------------------------------------
     'err_missing'   => 'Please enter both username and password',

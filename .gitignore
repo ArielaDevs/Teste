@@ -196,3 +196,6 @@ tests/azure-openai/last-request.json
 # run in progress is not clobbered by chunking the next locale.
 .i18n-work/
 .i18n-work-*/
+
+# Your own additions that no release ships or overwrites (e.g. Feature Bingo cards in local/feature_bingo/).
+local/

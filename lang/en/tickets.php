@@ -1777,7 +1777,7 @@ return [
         'general' => [
             'system_name'         => 'System name',
             'system_name_placeholder' => 'e.g., Service Desk Ticketing System',
-            'system_name_help'    => 'This name appears in the header and page titles.',
+            'system_name_help'    => 'Shown at the start of every page title - the name in the browser tab and in bookmarks. Blank means "Service Desk".',
             'reopen_label'        => 'Reopening',
             'reopen_toggle'       => 'Reopen a closed ticket when the requester replies',
             'snooze_hour_label'   => 'Start of the working day',

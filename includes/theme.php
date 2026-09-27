@@ -125,3 +125,6 @@ class Theme
         return self::$cache[$ckey] = $theme;
     }
 }
+
+// systemName() - the install's name for page titles (Tickets -> Settings -> General).
+require_once __DIR__ . '/system_name.php';

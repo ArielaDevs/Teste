@@ -739,6 +739,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-decoration: none;
         }
         .portal-link a:hover { text-decoration: underline; }
+        /* "Powered by FreeITSM" - very faint and small, the last line inside the
+           card (Ed). currentColor + opacity, so it suits a dark card too. */
+        .powered-by { margin-top: 14px; text-align: center; font-size: 10.5px; letter-spacing: .3px; opacity: .38; }
+        .powered-by a { color: inherit; text-decoration: none; }
+        .powered-by a:hover { text-decoration: underline; }
 
         /* MFA challenge styles */
         .mfa-icon {
@@ -1115,6 +1120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="portal-link">
             <a href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>self-service/login.php"><?php echo htmlspecialchars(tr('portal_link', 'Go to the Self-Service Portal')); ?></a>
         </div>
+        <div class="powered-by"><a href="https://freeitsm.co.uk" target="_blank" rel="noopener"><?php echo htmlspecialchars(tr('powered_by', 'Powered by FreeITSM')); ?></a></div>
     </div>
 <?php if ($brand && $brand['footer_text'] !== ''): ?>
     <div class="login-strip login-strip-footer"><?php echo htmlspecialchars($brand['footer_text']); ?></div>

@@ -29,7 +29,7 @@ $b = fn(string $k) => t('system.bingo.' . $k);
     <link rel="icon" type="image/svg+xml" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>favicon.svg">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Desk - <?php echo htmlspecialchars($b('heading')); ?></title>
+    <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars($b('heading')); ?></title>
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <script src="../../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
@@ -228,7 +228,8 @@ $b = fn(string $k) => t('system.bingo.' . $k);
                 + '<div class="fb-title">' + esc(c.title) + '</div>'
                 + '<div class="fb-tags"><span class="fb-tag">' + esc(D.categories[c.category]) + '</span>'
                 + (c.tier !== 'extra' ? '<span class="fb-tag ' + c.tier + '">' + esc(T('tier_' + c.tier)) + '</span>' : '')
-                + (c.state === 'dismissed' ? '<span class="fb-tag nfu">' + esc(T('not_for_us')) + '</span>' : '') + '</div>'
+                + (c.state === 'dismissed' ? '<span class="fb-tag nfu">' + esc(T('not_for_us')) + '</span>' : '')
+                + (c.local ? '<span class="fb-tag">' + esc(T('added_here')) + '</span>' : '') + '</div>'
                 + '</button>';
         }
 

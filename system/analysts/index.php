@@ -36,7 +36,7 @@ $translationNamespaces = ['common', 'tickets'];
     <link rel="icon" type="image/svg+xml" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>favicon.svg">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Desk - <?php echo htmlspecialchars(t('tickets.settings.headings.analysts')); ?></title>
+    <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('tickets.settings.headings.analysts')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>

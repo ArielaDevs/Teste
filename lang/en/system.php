@@ -1897,6 +1897,7 @@ return [
         'put_back'          => 'Put it back',
         'module_not_for_us' => 'Not for us: all of {module}',
         'module_put_back'   => 'Put back all of {module}',
+        'added_here'        => 'Added here',
     ],
 
     // System -> Managers (discussion #62)

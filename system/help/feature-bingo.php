@@ -64,6 +64,7 @@ require __DIR__ . '/_top.php';
         </div>
     </div>
     <p>Cards are PHP data in <code>includes/feature_bingo/cards/</code>, one file per module or area. A card is an id, a module, a tier, a category, a title, <em>what</em>, <em>why</em>, <em>done</em> (the plain-words check), a link, and a <strong>check</strong> - a declarative, read-only test: rows in a table, a setting's value, or a single counting <code>SELECT</code>, combined with any/all. The format is documented at the top of <code>includes/feature_bingo.php</code>.</p>
+    <p><strong>Cards of your own</strong> - for your own processes, or a feature you have added to your copy - go in <code>local/feature_bingo/</code> instead: same format, never shipped or overwritten by an update, and shown with an <em>Added here</em> tag. On Docker, put that folder on a volume (or set <code>FEATURE_BINGO_LOCAL_DIR</code> in <code>config.php</code>). The wiki's Feature Bingo developer guide walks through it.</p>
     <p>Run <code>php scripts/feature_bingo_check.php</code> against a database: it runs every check and reports any that errors (a table or column that does not exist) and any link to a page that is not there - on the page those would quietly read as "not set up" forever.</p>
 </div>
 

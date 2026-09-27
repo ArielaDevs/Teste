@@ -100,7 +100,7 @@ $sections = $isSlack ? [
     <link rel="icon" type="image/svg+xml" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>favicon.svg">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Desk - <?php echo htmlspecialchars($name); ?> setup</title>
+    <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars($name); ?> setup</title>
     <link rel="stylesheet" href="<?php echo $assetBase; ?>assets/css/theme.css?v=24">
     <link rel="stylesheet" href="<?php echo $assetBase; ?>assets/css/inbox.css?v=73">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/help.css?v=3">

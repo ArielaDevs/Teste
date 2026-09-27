@@ -245,6 +245,11 @@ $localAllowed = $localOn || $forceLocal;
             text-decoration: none;
         }
         .login-links a:hover { text-decoration: underline; }
+        /* "Powered by FreeITSM" - very faint and small, the last line inside the
+           card (Ed). currentColor + opacity, so it suits a dark card too. */
+        .powered-by { margin-top: 14px; text-align: center; font-size: 10.5px; letter-spacing: .3px; opacity: .38; }
+        .powered-by a { color: inherit; text-decoration: none; }
+        .powered-by a:hover { text-decoration: underline; }
         .login-links .divider {
             color: #ccc;
             margin: 0 8px;
@@ -389,6 +394,8 @@ $localAllowed = $localOn || $forceLocal;
                 <a onclick="backToLogin()"><?php echo htmlspecialchars(t('self-service.login.back_to_login')); ?></a>
             </div>
         </div>
+        <?php /* Outside both steps, so it shows on the password step and the code step alike. */ ?>
+        <div class="powered-by"><a href="https://freeitsm.co.uk" target="_blank" rel="noopener"><?php echo htmlspecialchars(t('self-service.login.powered_by')); ?></a></div>
     </div>
 
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>

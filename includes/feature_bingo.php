@@ -113,6 +113,11 @@ function featureBingoCards(?array &$problems = null): array
     $modules = featureBingoModules();
     $files = glob(__DIR__ . '/feature_bingo/cards/*.php') ?: [];
     sort($files);
+    // Your own cards, from a folder no update touches (see featureBingoLocalDir()).
+    $local = glob(featureBingoLocalDir() . '/*.php') ?: [];
+    sort($local);
+    $isLocal = array_fill_keys($local, true);
+    $files = array_merge($files, $local);
     foreach ($files as $file) {
         $list = include $file;
         if (!is_array($list)) { $problems[] = basename($file) . ': does not return a list'; continue; }
@@ -127,6 +132,7 @@ function featureBingoCards(?array &$problems = null): array
             if (isset($seen[$c['id']]))                              { $problems[] = "$where: duplicate id '{$c['id']}' (also " . $seen[$c['id']] . ')'; continue; }
             $seen[$c['id']] = $where;
             $c['link'] = (string)($c['link'] ?? '');
+            $c['local'] = isset($isLocal[$file]);   // "Added here" on the page
             $cards[] = $c;
         }
     }
@@ -241,4 +247,19 @@ function featureBingoReady(PDO $conn): bool
 {
     try { $conn->query("SELECT card_id FROM feature_bingo_dismissed LIMIT 0"); return true; }
     catch (Throwable $e) { return false; }
+}
+
+/**
+ * Where an install keeps ITS OWN cards - for its own processes, or for a
+ * feature it has added to its copy of FreeITSM. Same format, same checks.
+ *
+ * Deliberately NOT includes/feature_bingo/cards/: that folder ships with every
+ * release, and in Docker the code is part of the image, so a file added there
+ * is gone after the next update. `local/` is ignored by git and never shipped;
+ * define FEATURE_BINGO_LOCAL_DIR in config.php to put the folder elsewhere -
+ * for Docker, somewhere on a volume.
+ */
+function featureBingoLocalDir(): string
+{
+    return defined('FEATURE_BINGO_LOCAL_DIR') ? rtrim((string)FEATURE_BINGO_LOCAL_DIR, '/\\') : dirname(__DIR__) . '/local/feature_bingo';
 }

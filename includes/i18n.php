@@ -279,3 +279,6 @@ class I18n {
 function t($key, $params = []) {
     return I18n::t($key, $params);
 }
+
+// systemName() - the install's name for page titles (Tickets -> Settings -> General).
+require_once __DIR__ . '/system_name.php';
