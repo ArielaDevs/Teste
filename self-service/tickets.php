@@ -23,7 +23,7 @@ $pageData = ['ticketId' => (int)($_GET['id'] ?? 0)];
 $pageStyles = <<<'CSS'
 /* Two panes filling the viewport under the 48px header, each scrolling its own
    body — the same structure as the analyst inbox (.main-container). */
-.tk-shell { display: flex; height: calc(100vh - 48px); }
+.tk-shell { display: flex; height: calc(100vh - var(--ss-chrome, 48px)); }   /* the bar + any logo band */
 
 .tk-list {
     width: 380px;

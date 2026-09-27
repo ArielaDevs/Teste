@@ -76,6 +76,10 @@ body {
     padding: 20px 24px 0;
     display: flex;
     align-items: center;
+    /* A FIXED height (padding + the image cap), not whatever the image comes
+       to, so --ss-chrome below can be exact. */
+    height: 76px;
+    box-sizing: border-box;
 }
 .portal-page-logo img {
     max-height: 56px;
@@ -83,8 +87,19 @@ body {
     filter: none;
 }
 @media (max-width: 640px) {
-    .portal-page-logo { padding: 14px 16px 0; }
+    .portal-page-logo { padding: 14px 16px 0; height: 54px; }
     .portal-page-logo img { max-height: 40px; max-width: 180px; }
+}
+
+/* Everything above .portal-layout: the 48px bar, plus the logo band when the
+   logo is on the page. The app-shell pages size themselves as
+   `calc(100vh - var(--ss-chrome))` - one number, so a page cannot forget the
+   band again (it did: New Ticket, My Tickets and the course player all
+   subtracted 48px and lost their bottom edge to a scroll-locked shell). */
+body { --ss-chrome: 48px; }
+body.ss-page-logo { --ss-chrome: 124px; }            /* 48 + 76 */
+@media (max-width: 640px) {
+    body.ss-page-logo { --ss-chrome: 102px; }        /* 48 + 54 */
 }
 
 /* The nav uses inbox.css's shared .nav-btn (the portal already loads that

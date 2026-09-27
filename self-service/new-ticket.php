@@ -75,7 +75,7 @@ $pageStyles = <<<'CSS'
         body.portal-app .portal-layout {
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 48px);   /* 48px = the portal header */
+            height: calc(100vh - var(--ss-chrome, 48px));   /* the bar, plus the logo band if shown - see self-service.css */
             padding: 20px 24px;
             box-sizing: border-box;
             overflow: hidden;
@@ -152,6 +152,9 @@ $pageStyles = <<<'CSS'
         .compose-side {
             border-left: 1px solid var(--border, #e5e7eb);
             padding-left: 18px;
+            /* Room for the panel's own scrollbar, so the selects are not drawn
+               hard against it. */
+            padding-right: 14px;
             overflow-y: auto;
             min-height: 0;
         }
@@ -205,6 +208,7 @@ $pageStyles = <<<'CSS'
                 border-left: none;
                 border-top: 1px solid var(--border, #e5e7eb);
                 padding-left: 0;
+                padding-right: 0;   /* stacked below the editor it does not scroll on its own */
                 padding-top: 16px;
                 max-height: none;
             }
@@ -285,8 +289,15 @@ $pageStyles = <<<'CSS'
         /* Hint under a field — introduced for the equipment picker (#57). */
         /* Discussion #62: the Confidential tick. */
         .confidential-choice { padding: 10px 12px; border: 1px solid var(--border, #e0e0e0); border-radius: 8px; background: var(--surface-2, #f7f9fa); }
-        .confidential-label { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0; }
-        .confidential-label input { width: 16px; height: 16px; accent-color: var(--danger-accent, #c62828); }
+        /* ⚠️ Scoped under .form-group.confidential-choice on purpose: the general
+           `.form-group label { display:block }` and `.form-group input { width:100%;
+           padding:10px 12px }` further down are at least as specific, and drew the
+           box as a full-width block on its own line ABOVE its label. */
+        .form-group.confidential-choice .confidential-label { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0; }
+        .form-group.confidential-choice .confidential-label input[type="checkbox"] {
+            width: 16px; height: 16px; padding: 0; margin: 0; flex: 0 0 auto;
+            accent-color: var(--danger-accent, #c62828);
+        }
         .field-hint {
             margin-top: 5px;
             font-size: 12px;

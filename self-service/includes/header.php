@@ -192,7 +192,7 @@ try {
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
-    <link rel="stylesheet" href="../assets/css/self-service.css?v=18">
+    <link rel="stylesheet" href="../assets/css/self-service.css?v=19">
 <?php if ($ssAppearance['background_pattern'] !== ''): ?>
     <!-- Only fetched when a pattern is actually in use. -->
     <link rel="stylesheet" href="../assets/css/self-service-patterns.css?v=4">
@@ -218,18 +218,25 @@ $ssVars = '';
 if ($ssAppearance['header_colour'] !== '')       $ssVars .= '--ss-header-bg:' . $ssAppearance['header_colour'] . ';';
 if ($ssAppearance['table_header_colour'] !== '') $ssVars .= '--ss-table-header-bg:' . $ssAppearance['table_header_colour'] . ';';
 $ssBodyClass = trim($bodyClass . ($ssAppearance['background_pattern'] !== '' ? ' ss-pat-' . $ssAppearance['background_pattern'] : ''));
+
+// Resolved BEFORE <body>: the header's class depends on it, the img is inside
+// it, and <body> needs to know too.
+$ssLogoUrl = selfServicePortalLogoUrl($conn ?? connectToDatabase());
+// A custom logo shown on the PAGE is not shown in the bar as well: repeating
+// it twice on one screen is clutter, and falling back to the bundled FreeITSM
+// mark would put our branding beside theirs.
+$ssLogoOnPage = ($ssLogoUrl !== '' && ($ssAppearance['logo_position'] ?? 'header') === 'page');
+// ⚠️ The logo band sits ABOVE .portal-layout, and the app-shell pages (New
+// Ticket, My Tickets, a course) size themselves as "the window minus the
+// chrome". Without this class they subtracted the 48px bar only, came out
+// taller than the window by the band, and - the shell being scroll-locked -
+// their bottom could not be reached at all. See --ss-chrome in self-service.css.
+if ($ssLogoOnPage) {
+    $ssBodyClass = trim($ssBodyClass . ' ss-page-logo');
+}
 ?>
 <body class="<?php echo htmlspecialchars($ssBodyClass); ?>"<?php echo $ssVars !== '' ? ' style="' . htmlspecialchars($ssVars, ENT_QUOTES) . '"' : ''; ?>>
     <div class="portal-header">
-        <?php /* Resolved BEFORE the div: the class depends on it, and the img
-                 below is inside. */ ?>
-        <?php $ssLogoUrl = selfServicePortalLogoUrl($conn ?? connectToDatabase()); ?>
-        <?php
-        /* A custom logo shown on the PAGE is not shown here as well: repeating
-           it twice on one screen is clutter, and falling back to the bundled
-           FreeITSM mark would put our branding beside theirs. */
-        $ssLogoOnPage = ($ssLogoUrl !== '' && ($ssAppearance['logo_position'] ?? 'header') === 'page');
-        ?>
         <div class="portal-brand<?php echo $ssLogoUrl !== '' && !$ssLogoOnPage ? ' has-custom-logo' : ''; ?>">
             <?php /* A portal-specific logo if one is set, otherwise the shared
                      one from System → Branding. Empty means "use the main one",
