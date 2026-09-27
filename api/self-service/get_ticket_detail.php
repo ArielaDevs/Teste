@@ -84,8 +84,15 @@ try {
 
         // Recorded AFTER every check above, so a refusal never counts as a look,
         // and shown to the requester under "Who has seen this ticket" (step 2).
-        require_once '../../includes/ticket_views.php';
-        ticketViewRecord($conn, $ticketId, 'user', $userId);
+        // NOT for a confidential stub: the manager saw that a ticket exists and
+        // nothing it says, and "your manager has seen this ticket" on a grievance
+        // about that manager would alarm the person it exists to protect (Ed:
+        // "if the manager has not been able to view the ticket contents then
+        // don't record anything").
+        if (!$access['stub']) {
+            require_once '../../includes/ticket_views.php';
+            ticketViewRecord($conn, $ticketId, 'user', $userId);
+        }
     }
 
     // A confidential ticket shown to a manager as a STUB: that it exists, and
