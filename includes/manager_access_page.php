@@ -131,7 +131,8 @@ function managerAccessRender(int $managerId, string $backUrl): void
            Sign-in conflict explanation (system/analysts/index.php): a head with
            a round icon, a picture, an info box, then numbered ways out. ─── */
         #maWhy .modal-content { max-width: 820px; padding: 18px 22px 14px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
-        #maWhy .modal-actions { display: flex; justify-content: flex-end; padding: 0; border: 0; }
+        /* 13px = a step row's padding + border, so Close lines up under the buttons above it. */
+        #maWhy .modal-actions { display: flex; justify-content: flex-end; padding: 0 13px 0 0; border: 0; }
         .mw-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
         .mw-head-icon { flex: 0 0 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
             background: var(--info-bg, #e3f2fd); color: var(--info-text, #0d47a1); border: 1px solid var(--info-border, #90caf9); }
@@ -166,7 +167,7 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .mw-conn.only::before  { display: none; }
         .mw-cell { padding: 3px 0; }
         .mw-reason { background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-left: 3px solid var(--mw-tone, var(--accent, #0078d4));
-            border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; box-sizing: border-box; height: 100%; }
+            border-radius: 8px; padding: 7px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; box-sizing: border-box; height: 100%; }
         .mw-kind { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 600;
             background: var(--mw-tone-bg, var(--accent-soft, #e8f4fd)); color: var(--mw-tone, var(--accent, #0078d4)); }
         .mw-kind svg { width: 13px; height: 13px; flex: 0 0 13px; }
@@ -191,7 +192,9 @@ function managerAccessRender(int $managerId, string $backUrl): void
             background: var(--success-bg, #e8f5e9); color: var(--success-text, #2e7d32); border: 1px solid var(--success-border, #a5d6a7); }
         .mw-fix-text { flex: 1; font-size: 13px; line-height: 1.4; color: var(--text-muted, #666); }
         .mw-fix-text strong { display: block; color: var(--text, #333); }
-        .mw-fix .btn { flex: 0 0 auto; padding: 6px 14px; font-size: 13px; text-decoration: none; }
+        /* Open, Remove, Exclude and Close: one size, whatever the word or element (Ed). */
+        .mw-fix .btn, #mwClose { flex: 0 0 auto; box-sizing: border-box; width: 96px; height: 34px; padding: 0 10px; font-size: 13px; line-height: 1;
+            display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
         .mw-gone { text-align: center; padding: 20px 10px; font-size: 14px; color: var(--success-text, #2e7d32); }
         @media (max-width: 560px) {
             /* A phone has no room across: the grid collapses to one column. */
