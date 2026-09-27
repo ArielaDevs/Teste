@@ -121,7 +121,10 @@ $pageStyles = <<<'CSS'
         .compose-body {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 300px;
+            /* 340, not 300: the panel also carries 32px of padding (the gap to its
+               border, and room for its own scrollbar), and at 300 the selects and
+               the Confidential note were cramped. The editor takes what is left. */
+            grid-template-columns: 1fr 340px;
             grid-template-rows: auto 1fr;   /* label sized to content; editor takes the rest */
             gap: 18px;
             align-items: stretch;
