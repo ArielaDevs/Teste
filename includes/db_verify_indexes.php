@@ -79,6 +79,8 @@ return [
     ['ticket_merges', 'ix_ticket_merges_source', 'key', '(`source_ticket_id`)'],
     ['ticket_merges', 'ix_ticket_merges_target', 'key', '(`target_ticket_id`)'],
     ['ticket_ai_summaries', 'ix_ticket_ai_summaries_ticket', 'key', '(`ticket_id`,`kind`,`version`)'],
+    ['manager_grants', 'uq_manager_grant', 'unique', '(`manager_user_id`,`grant_type`,`target_id`,`target_value`,`is_exclusion`)'],
+    ['manager_grants', 'ix_manager_grants_manager', 'key', '(`manager_user_id`)'],
     ['ticket_views', 'uq_ticket_views_day', 'unique', '(`ticket_id`,`viewer_type`,`viewer_id`,`view_date`)'],
     ['ticket_views', 'ix_ticket_views_ticket', 'key', '(`ticket_id`,`last_viewed_datetime`)'],
     ['ticket_time_entries', 'ix_time_entries_ticket_id', 'key', '(`ticket_id`)'],

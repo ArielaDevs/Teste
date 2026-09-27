@@ -1363,6 +1363,22 @@ CREATE TABLE IF NOT EXISTS `ticket_audit` (
     CONSTRAINT `fk_ticket_audit_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Management lines (discussion #62, step 3): whose tickets a portal user may see
+-- as a manager. Exclusions always win. See includes/managers.php.
+CREATE TABLE IF NOT EXISTS `manager_grants` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `manager_user_id`       INT NOT NULL,
+    `grant_type`            VARCHAR(20) NOT NULL,          -- everyone | user | group | department | reports
+    `target_id`             INT NOT NULL DEFAULT 0,        -- users.id or knowledge_user_groups.id
+    `target_value`          VARCHAR(150) NOT NULL DEFAULT '', -- department name, or 'all' for reports
+    `is_exclusion`          TINYINT(1) NOT NULL DEFAULT 0,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_manager_grant` (`manager_user_id`, `grant_type`, `target_id`, `target_value`, `is_exclusion`),
+    KEY `ix_manager_grants_manager` (`manager_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Who has looked at a ticket (discussion #62, step 2): one row per viewer per UTC
 -- day. Separate from ticket_audit, whose actor can only be an analyst.
 CREATE TABLE IF NOT EXISTS `ticket_views` (

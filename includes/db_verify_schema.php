@@ -790,6 +790,21 @@ return [
         'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',   // set by the demo data importer (#1297)
     ],
 
+    // Management lines (discussion #62, step 3): who a portal user may see the
+    // tickets of, as a MANAGER. One row per line; exclusions always win. See
+    // includes/managers.php. uq_manager_grant (db_verify_indexes.php) stops the
+    // same line being added twice.
+    'manager_grants' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'manager_user_id'       => 'INT NOT NULL',
+        'grant_type'            => 'VARCHAR(20) NOT NULL',         // everyone | user | group | department | reports
+        'target_id'             => 'INT NOT NULL DEFAULT 0',       // users.id or knowledge_user_groups.id
+        'target_value'          => "VARCHAR(150) NOT NULL DEFAULT ''", // department name, or 'all' for reports
+        'is_exclusion'          => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+
     // Who has looked at a ticket (discussion #62, step 2). ONE ROW PER VIEWER PER
     // DAY - opening a ticket twenty times is one row with view_count 20 - which is
     // what uq_ticket_views_day (db_verify_indexes.php) makes true. Kept apart from
