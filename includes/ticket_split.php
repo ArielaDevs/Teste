@@ -185,6 +185,12 @@ function splitTicket(PDO $conn, int $actorId, int $ticketId, int $fromEmailId, b
     $conn->beginTransaction();
     try {
         $newId     = splitCreateTicket($conn, $source, $moving, $actorId, $newSubject);
+        // Confidential travels with the messages (discussion #62): what was split
+        // off a confidential ticket is the same conversation, and must not become
+        // readable by a manager just because it now has its own number.
+        require_once __DIR__ . '/ticket_sensitivity.php';
+        ticketSensitivityInherit($conn, (int)$newId, [(int)$source['id']], 'split from confidential ticket ' . $source['ticket_number']);
+        ticketSensitivityApplyDefaults($conn, (int)$newId);
         $newNumber = (string)$conn->query("SELECT ticket_number FROM tickets WHERE id = " . (int)$newId)->fetchColumn();
 
         $ids = array_map(fn($m) => (int)$m['id'], $moving);

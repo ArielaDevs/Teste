@@ -241,6 +241,8 @@ CREATE TABLE IF NOT EXISTS `departments` (
     `description`       VARCHAR(255) NULL,
     `is_active`         TINYINT(1) NULL DEFAULT 1,
     `display_order`     INT NULL DEFAULT 0,
+    -- 'confidential' = tickets in, or moved into, this department become confidential (#62).
+    `default_sensitivity` VARCHAR(20) NOT NULL DEFAULT 'normal',
     `created_datetime`  DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
     `is_demo`           TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)
     PRIMARY KEY (`id`),
@@ -1159,6 +1161,8 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     `snoozed_at`            DATETIME NULL,
     `snoozed_by`            INT NULL,
     `snooze_reason`         VARCHAR(255) NULL,
+    -- 'normal' or 'confidential' (discussion #62); see includes/ticket_sensitivity.php.
+    `sensitivity`           VARCHAR(20) NOT NULL DEFAULT 'normal',
     `is_demo`           TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_tickets_number` (`ticket_number`),
@@ -1564,6 +1568,8 @@ CREATE TABLE IF NOT EXISTS `target_mailboxes` (
     `last_error_datetime`   DATETIME NULL,
     `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `last_checked_datetime` DATETIME NULL,
+    -- 'confidential' = every ticket arriving here is confidential (#62).
+    `default_sensitivity`   VARCHAR(20) NOT NULL DEFAULT 'normal',
     PRIMARY KEY (`id`),
     KEY `ix_target_mailboxes_tenant_id` (`tenant_id`),
     CONSTRAINT `fk_target_mailboxes_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,

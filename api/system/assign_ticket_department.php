@@ -70,6 +70,13 @@ try {
         $audit->execute([$tid, $analystId, $old, $deptName]);
     }
 
+    // This screen bypasses TicketsService::updateTicket(), so it must raise
+    // confidential tickets itself when the new department is confidential (#62).
+    require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
+    foreach ($ticketIds as $tid) {
+        if (array_key_exists($tid, $oldById)) ticketSensitivityApplyDefaults($conn, (int)$tid);
+    }
+
     $conn->commit();
     echo json_encode(['success' => true, 'updated' => $updated, 'department' => $deptName]);
 

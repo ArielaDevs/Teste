@@ -31,6 +31,9 @@ $subject = trim($input['subject'] ?? '');
 $description = trim($input['description'] ?? '');
 $priority = $input['priority'] ?? 'Normal';
 $mailboxId = !empty($input['mailbox_id']) ? (int)$input['mailbox_id'] : null;
+// The requester's own "Confidential" tick (discussion #62). They can only ever
+// raise a ticket's sensitivity, never lower one - see includes/ticket_sensitivity.php.
+$wantsConfidential = !empty($input['confidential']);
 $inputAttachments = $input['attachments'] ?? [];
 $recordingIds = array_values(array_filter(array_map('intval', $input['recording_ids'] ?? [])));
 
@@ -41,6 +44,15 @@ if (empty($subject)) {
 
 try {
     $conn = connectToDatabase();
+
+    // Refuse the Confidential tick rather than drop it (discussion #62): before
+    // Database Verification it cannot be stored, and a requester who ticked it
+    // must never end up with a ticket they believe is confidential and is not.
+    require_once '../../includes/ticket_sensitivity.php';
+    if ($wantsConfidential && !ticketSensitivityReady($conn)) {
+        echo json_encode(['success' => false, 'error' => 'Confidential tickets are not available on this service desk yet. Please untick it, or contact the service desk directly.']);
+        exit;
+    }
 
     // Validate the submitted priority against the CONFIGURED active priorities
     // (not a hardcoded Low/Normal/High list) so custom priorities like
@@ -268,6 +280,14 @@ try {
     // Deliberately AFTER the commit, for the same reason the recordings claim is:
     // a ticket that rolled back must never have announced itself. It also matters
     // to the search indexer downstream, which cannot see uncommitted rows.
+    // Confidential - the requester's tick, or the mailbox they chose. Before the
+    // announcement, so nothing downstream ever sees this ticket as Normal.
+    require_once '../../includes/ticket_sensitivity.php';
+    if ($wantsConfidential) {
+        ticketSensitivityRaise($conn, (int)$ticketId, 'the requester asked for it when raising the ticket');
+    }
+    ticketSensitivityApplyDefaults($conn, (int)$ticketId, $mailboxId);
+
     require_once '../../includes/ticket_events.php';
     ticketDispatchCreated($conn, (int)$ticketId, $userId, $fromEmail);
 

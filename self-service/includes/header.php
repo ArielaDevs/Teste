@@ -191,7 +191,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
     <link rel="stylesheet" href="../assets/css/self-service.css?v=18">
 <?php if ($ssAppearance['background_pattern'] !== ''): ?>
     <!-- Only fetched when a pattern is actually in use. -->

@@ -410,6 +410,14 @@ function mergeTickets(PDO $conn, int $actorId, array $sourceIds, int $targetId):
             $merged[] = $sid;
         }
 
+        // Confidential travels with the messages (discussion #62). The target now
+        // holds every source's conversation, so if ANY of them was confidential,
+        // so is it - otherwise merging would be a way to show a manager a ticket
+        // they were never meant to see. Unmerging leaves it confidential (raise-only).
+        require_once __DIR__ . '/ticket_sensitivity.php';
+        ticketSensitivityInherit($conn, (int)$realTarget, $merged, 'merged with a confidential ticket');
+        ticketSensitivityApplyDefaults($conn, (int)$realTarget);
+
         $conn->commit();
         return [
             'target_id'     => $realTarget,

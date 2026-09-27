@@ -103,6 +103,11 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
                 )";
         $conn->prepare($sql)->execute([$ticketNumber, $subject, $userId, $tenantId, $originId]);
         $ticketId = (int) $conn->lastInsertId();
+        // Confidential defaults (discussion #62). No department or mailbox here
+        // yet, so today this does nothing - but every ticket-creating path calls
+        // it, so a default added later cannot be missed on this one.
+        require_once __DIR__ . '/../ticket_sensitivity.php';
+        ticketSensitivityApplyDefaults($conn, $ticketId);
     } else {
         $conn->prepare("UPDATE tickets SET updated_datetime = UTC_TIMESTAMP(), last_inbound_at = UTC_TIMESTAMP() WHERE id = ?")
              ->execute([$ticketId]);

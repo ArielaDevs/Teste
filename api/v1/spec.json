@@ -223,6 +223,12 @@
                             "req": false
                         },
                         {
+                            "name": "sensitivity",
+                            "in": "body",
+                            "desc": "'normal' or 'confidential'. Confidential keeps the ticket from the requester's managers; a department or mailbox set to confidential makes it confidential whatever is sent (discussion #62).",
+                            "req": false
+                        },
+                        {
                             "name": "mailbox_id",
                             "in": "body",
                             "desc": "Send-from mailbox for later replies",
@@ -378,6 +384,12 @@
                             "name": "work_start_at",
                             "in": "body",
                             "desc": "Scheduled work start, ISO 8601 (null clears)",
+                            "req": false
+                        },
+                        {
+                            "name": "sensitivity",
+                            "in": "body",
+                            "desc": "'normal' or 'confidential'. The only way to make a confidential ticket normal again. Moving a ticket into a confidential department makes it confidential (discussion #62).",
                             "req": false
                         },
                         {

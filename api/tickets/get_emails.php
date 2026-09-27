@@ -32,6 +32,9 @@ try {
     // product must not name them until Database Verification has run.
     $snoozeReady = snoozeSchemaReady($conn);
     $snoozeCols  = $snoozeReady ? "t.snoozed_until, t.snooze_reason," : "NULL AS snoozed_until, NULL AS snooze_reason,";
+    // Normal / Confidential (discussion #62) - same guard, for the same reason.
+    require_once '../../includes/ticket_sensitivity.php';
+    $sensCol     = ticketSensitivityReady($conn) ? "t.sensitivity," : "'normal' AS sensitivity,";
 
     // The schedule travels with the row so the context menu can open Schedule on
     // ANY ticket, not just the one in the reading pane — right-clicking a row
@@ -102,6 +105,7 @@ try {
                 -- #1566. So a drag onto a team folder can audit the team it came FROM.
                 t.assigned_team_id,
                 $snoozeCols
+                $sensCol
                 $schedCols
                 tp.name AS priority,
                 -- Row-display fields (discussion #61). The names and the analyst id

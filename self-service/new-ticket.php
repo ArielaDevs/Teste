@@ -283,6 +283,10 @@ $pageStyles = <<<'CSS'
             margin-bottom: 20px;
         }
         /* Hint under a field — introduced for the equipment picker (#57). */
+        /* Discussion #62: the Confidential tick. */
+        .confidential-choice { padding: 10px 12px; border: 1px solid var(--border, #e0e0e0); border-radius: 8px; background: var(--surface-2, #f7f9fa); }
+        .confidential-label { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; margin: 0; }
+        .confidential-label input { width: 16px; height: 16px; accent-color: var(--danger-accent, #c62828); }
         .field-hint {
             margin-top: 5px;
             font-size: 12px;
@@ -923,6 +927,8 @@ let attachments = [];
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     mailbox_id: document.getElementById('mailbox').value || null,
+                    // Discussion #62 - raise-only, see api/self-service/create_ticket.php.
+                    confidential: document.getElementById('confidential').checked ? 1 : 0,
                     subject: document.getElementById('subject').value.trim(),
                     priority: document.getElementById('priority').value,
                     // Optional. Re-validated server-side against the portal-visible
@@ -1082,6 +1088,14 @@ require __DIR__ . '/includes/header.php';
                     <button type="button" class="record-toggle" id="recordToggle" onclick="ScreenRecorder.open()">
                         <span class="rec-dot"></span> <?php echo htmlspecialchars(t('self-service.recorder.button')); ?>
                     </button>
+                </div>
+
+                <?php /* Discussion #62: the requester's own Confidential tick. It can only
+                         make a ticket confidential, never the reverse - a department or
+                         mailbox set to confidential makes it so whatever is ticked here. */ ?>
+                <div class="form-group confidential-choice">
+                    <label class="confidential-label"><input type="checkbox" id="confidential"> <?php echo htmlspecialchars(t('self-service.new_ticket.confidential')); ?></label>
+                    <div class="field-hint"><?php echo htmlspecialchars(t('self-service.new_ticket.confidential_hint')); ?></div>
                 </div>
 
                         <div class="form-actions">

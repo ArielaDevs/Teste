@@ -44,7 +44,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Service Desk - <?php echo htmlspecialchars(t('system.sso.title')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
     <style>
         /* System module accent (blue-grey) — pin the generic --accent to it. */
         body {

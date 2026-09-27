@@ -1118,6 +1118,12 @@ function saveEmailToDatabase($conn, $email, $accessToken, $mailboxId) {
     // Placed here so the opening message row already exists: the search indexer
     // reads the ticket and its messages together.
     if (!empty($ticketWasCreatedHere) && $ticketId) {
+        // Confidential mailbox (discussion #62) - BEFORE the ticket is announced.
+        // This is the path a grievance emailed to HR takes, and an emailed ticket
+        // gets no department, so the mailbox is the only thing that can protect it.
+        require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
+        ticketSensitivityApplyDefaults($conn, (int)$ticketId, isset($mailboxId) ? (int)$mailboxId : null);
+
         require_once __DIR__ . '/../../includes/ticket_events.php';
         // created_by is null on purpose — nobody signed in created this, it
         // arrived. The requester's address is resolved from the linked user.

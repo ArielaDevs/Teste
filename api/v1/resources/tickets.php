@@ -88,6 +88,9 @@ function apiSerializeTicket(array $r): array {
         // ticket that has already come back, and reporting it would say otherwise.
         'snoozed_until' => (!empty($r['snoozed_until']) && strtotime($r['snoozed_until'] . ' UTC') > time())
                             ? apiIsoDate($r['snoozed_until']) : null,
+        // 'normal' or 'confidential' (discussion #62). 'normal' before Database
+        // Verification has added the column, which is what every ticket then is.
+        'sensitivity'   => $r['sensitivity'] ?? 'normal',
         'deleted_at'    => apiIsoDate($r['deleted_datetime']),
     ];
 }

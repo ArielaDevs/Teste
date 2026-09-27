@@ -34,6 +34,9 @@ try {
               // #1566. Independent of assigned_analyst_id by design — the service
               // never writes one as a side effect of the other.
               'assigned_team_id',
+              // Normal / Confidential (discussion #62). Lowering it is only ever done here,
+              // by a person; see includes/ticket_sensitivity.php.
+              'sensitivity',
               // ⚠️ NOT a ticket field (#142). A one-off note for the closure
               // email only: nothing stores it, and it is ignored unless this
               // request is the one that closes the ticket.
@@ -42,7 +45,17 @@ try {
     }
 
     TicketsService::updateTicket($conn, ActorContext::fromSession($conn), (int)$ticketId, $in, false);
-    echo json_encode(['success' => true]);
+
+    // The sensitivity AFTER the save (discussion #62). A department move can make a
+    // ticket confidential on the server's own initiative, and the open ticket would
+    // otherwise keep showing Normal until it was reopened.
+    $sensitivity = null;
+    if (ticketSensitivityReady($conn)) {
+        $sq = $conn->prepare("SELECT sensitivity FROM tickets WHERE id = ?");
+        $sq->execute([(int)$ticketId]);
+        $sensitivity = ticketSensitivityNormalise($sq->fetchColumn());
+    }
+    echo json_encode(['success' => true, 'sensitivity' => $sensitivity]);
 } catch (ServiceError $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 } catch (Exception $e) {

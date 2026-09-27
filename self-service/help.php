@@ -230,6 +230,7 @@ require __DIR__ . '/includes/header.php';
                 <li><?php echo t('self-service.help.s3_li4'); ?></li>
                 <li><?php echo t('self-service.help.s3_li5'); ?></li>
                 <li><?php echo t('self-service.help.s3_li_category'); ?></li>
+                <li><?php echo t('self-service.help.s3_li_confidential'); ?></li>
             </ul>
             <p><?php echo t('self-service.help.s3_p2'); ?></p>
             <p class="help-note"><?php echo t('self-service.help.s3_tip'); ?></p>

@@ -85,7 +85,7 @@ if (!in_array($activeTab, ['categories', 'roles', 'layout'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(t('checklists.settings.page_title')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
     <style>
         /* Full-width settings shell — the same one tickets/settings and LMS use.
          * ⚠️ Dropping max-width alone is NOT enough: inbox.css sets

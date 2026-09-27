@@ -1935,7 +1935,7 @@ function renderEmailList() {
                  oncontextmenu="openTicketContextMenu(event, ${ticketId}, '${escapeHtml(email.ticket_number || '')}')">
                 ${inboxRowStripes(email)}${inboxRowBlocks(email)}
                 <div class="email-from">${escapeHtml(email.ticket_number || '')}${rowNameSuffix(email)} ${countBadge}</div>
-                <div class="email-subject">${escapeHtml(email.subject)}</div>
+                <div class="email-subject">${email.sensitivity === 'confidential' ? confidentialIcon() : ''}${escapeHtml(email.subject)}</div>
                 <div class="email-preview">${escapeHtml(email.body_preview || '')}</div>
                 <div class="email-footer-row">
                     <div class="email-time">${formatDateTime(email.received_datetime)}</div>
@@ -2966,6 +2966,9 @@ function displayEmail(email, recordings) {
                     ${escapeHtml(t('tickets.reading_pane.properties_title'))}
                 </div>
                 <div class="ticket-properties-summary">
+                    <!-- Discussion #62: shown with the panel collapsed too, so nobody works a
+                         confidential ticket without seeing that it is one. -->
+                    <span class="summary-confidential" id="summaryConfidential" ${email.sensitivity === 'confidential' ? '' : 'hidden'} title="${escapeHtml(t('tickets.reading_pane.sensitivity_help'))}">${confidentialIcon()}${escapeHtml(t('tickets.reading_pane.sensitivity_confidential'))}</span>
                     <span class="ticket-properties-summary-item">
                         <span class="ticket-properties-summary-label">${escapeHtml(t('tickets.reading_pane.summary_dept'))}</span>
                         <span class="ticket-properties-summary-value" id="summaryDept">${escapeHtml(summaryDept)}</span>
@@ -3008,6 +3011,13 @@ ${classificationFields}
                         <select class="toolbar-select" id="prioritySelect" onchange="assignPriority()">
                             <option value=""></option>
                             ${priorityOptions}
+                        </select>
+                    </div>
+                    <div class="toolbar-field" title="${escapeHtml(t('tickets.reading_pane.sensitivity_help'))}">
+                        <label class="toolbar-label">${escapeHtml(t('tickets.reading_pane.field_sensitivity'))}</label>
+                        <select class="toolbar-select${email.sensitivity === 'confidential' ? ' is-confidential' : ''}" id="sensitivitySelect" onchange="assignSensitivity()">
+                            <option value="normal" ${email.sensitivity !== 'confidential' ? 'selected' : ''}>${escapeHtml(t('tickets.reading_pane.sensitivity_normal'))}</option>
+                            <option value="confidential" ${email.sensitivity === 'confidential' ? 'selected' : ''}>${escapeHtml(t('tickets.reading_pane.sensitivity_confidential'))}</option>
                         </select>
                     </div>
                     <div class="toolbar-field">
@@ -4464,6 +4474,16 @@ async function assignDepartment() {
         if (data.success) {
             await logAudit(currentEmail.ticket_id, 'Department', oldValue, newValue);
             currentEmail.department_id = departmentId || null;
+            // Moving into a confidential department makes the ticket confidential on
+            // the server (discussion #62) - show it now, not on the next open.
+            if (data.sensitivity && data.sensitivity !== currentEmail.sensitivity) {
+                currentEmail.sensitivity = data.sensitivity;
+                const sensSel = document.getElementById('sensitivitySelect');
+                if (sensSel) {
+                    sensSel.value = data.sensitivity;
+                    sensSel.classList.toggle('is-confidential', data.sensitivity === 'confidential');
+                }
+            }
             updatePropertiesSummary();
             loadFolderCounts();
             loadEmails();
@@ -4990,6 +5010,42 @@ async function assignPriority() {
     }
 }
 
+// Normal / Confidential (discussion #62). Confidential keeps a ticket from the
+// requester's managers; the service desk is unaffected. Lowering it back to
+// Normal is only ever done here, by a person - nothing automatic does.
+function confidentialIcon() {
+    return `<span class="row-confidential-icon" title="${escapeHtml(t('tickets.reading_pane.sensitivity_confidential'))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>`;
+}
+
+async function assignSensitivity() {
+    const select = document.getElementById('sensitivitySelect');
+    const value  = select.value;
+    const label  = v => t(v === 'confidential' ? 'tickets.reading_pane.sensitivity_confidential' : 'tickets.reading_pane.sensitivity_normal');
+    const old    = currentEmail.sensitivity === 'confidential' ? 'confidential' : 'normal';
+    try {
+        const response = await fetch(API_BASE + 'assign_ticket.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket_id: currentEmail.ticket_id, sensitivity: value })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await logAudit(currentEmail.ticket_id, 'Sensitivity', label(old), label(value));
+            currentEmail.sensitivity = value;
+            select.classList.toggle('is-confidential', value === 'confidential');
+            updatePropertiesSummary();
+            loadEmails();
+        } else {
+            select.value = old;
+            showToast(t('tickets.reading_pane.sensitivity_failed') + ': ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        select.value = old;
+        showToast(t('tickets.reading_pane.sensitivity_failed'), 'error');
+    }
+}
+
 // Assign origin
 async function assignOrigin() {
     const originId = document.getElementById('originSelect').value;
@@ -5470,6 +5526,10 @@ function updatePropertiesSummary() {
     }
     if (summaryOwner && currentEmail) {
         summaryOwner.textContent = getDisplayName('owner', currentEmail.owner_id) || t('tickets.reading_pane.summary_unassigned');
+    }
+    const summaryConfidential = document.getElementById('summaryConfidential');
+    if (summaryConfidential && currentEmail) {
+        summaryConfidential.hidden = currentEmail.sensitivity !== 'confidential';
     }
 }
 
@@ -7532,6 +7592,8 @@ function openNewTicketModal() {
     reqReset();
     document.getElementById('newTicketSubject').value = '';
     document.getElementById('newTicketBody').value = '';
+    const sensEl = document.getElementById('newTicketSensitivity');
+    if (sensEl) sensEl.value = 'normal';
 
     // Populate department dropdown
     const deptSelect = document.getElementById('newTicketDepartment');
@@ -7706,6 +7768,8 @@ async function createNewTicket() {
                 ticket_type_id: ticketTypeId || null,
                 priority: priority,
                 mailbox_id: mailboxId || null,
+                // Normal / Confidential (discussion #62).
+                sensitivity: (document.getElementById('newTicketSensitivity') || {}).value || 'normal',
                 // #1554: only sent from the consolidated view, where it was asked for.
                 tenant_id: newTicketCompanyId || null
             })

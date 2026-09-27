@@ -87,6 +87,8 @@ try {
         'department_id'       => $input['department_id'] ?? null,
         'ticket_type_id'      => $input['ticket_type_id'] ?? null,
         'mailbox_id'          => $input['mailbox_id'] ?? null,
+        // Normal / Confidential, chosen on the new-ticket form (discussion #62).
+        'sensitivity'         => $input['sensitivity'] ?? null,
     ];
     // Only pass a priority if the form actually sent one. This used to default to
     // the literal 'Normal', which the service resolves BY NAME and rejects with

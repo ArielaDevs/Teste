@@ -1162,6 +1162,36 @@ body.ticket-popout .ticket-toolbar {
     border-color: var(--accent, #0078d4);
 }
 
+/* Confidential tickets (discussion #62): the Sensitivity select and a padlock
+   before the subject in the ticket list. Danger tones, from the theme, so they
+   follow light and dark. */
+.toolbar-select.is-confidential {
+    background: var(--danger-bg, #fdecea);
+    color: var(--danger-text, #b71c1c);
+    border-color: var(--danger-border, #f5c2c0);
+    font-weight: 600;
+}
+.row-confidential-icon {
+    display: inline-flex;
+    vertical-align: -2px;
+    margin-right: 4px;
+    color: var(--danger-text, #b71c1c);
+}
+.row-confidential-icon svg { width: 13px; height: 13px; }
+.summary-confidential {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--danger-bg, #fdecea);
+    color: var(--danger-text, #b71c1c);
+    border: 1px solid var(--danger-border, #f5c2c0);
+}
+.summary-confidential[hidden] { display: none; }
+.summary-confidential .row-confidential-icon { margin-right: 4px; }
+
 /* Action Toolbar */
 .action-toolbar {
     /* Side padding deliberately much tighter than the 30px the message bodies

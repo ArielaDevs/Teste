@@ -43,7 +43,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(t('tickets.calendar.page_title')); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
     <link rel="stylesheet" href="../assets/css/calendar-grid.css?v=1">
     <link rel="stylesheet" href="../assets/css/calendar.css?v=11">
     <link rel="stylesheet" href="../assets/css/mobile.css?v=152">

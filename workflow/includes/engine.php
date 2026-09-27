@@ -2395,6 +2395,10 @@ class WorkflowEngine
                 $departmentId, $typeId, $assignedTeamId, $assignedAnalystId, $userId,
             ]);
             $newTicketId = (int)$conn->lastInsertId();
+            // Confidential defaults (discussion #62) - the rule may have put it in a
+            // confidential department. Every ticket-creating path calls this.
+            require_once dirname(__DIR__, 2) . '/includes/ticket_sensitivity.php';
+            ticketSensitivityApplyDefaults($conn, $newTicketId);
 
             // Initial "Manual" email entry so the new ticket appears in the
             // inbox like all others (same trick api/tickets/create_ticket.php

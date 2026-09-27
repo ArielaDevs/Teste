@@ -39,7 +39,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(t('tickets.help.page_title')); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
     <link rel="stylesheet" href="../assets/css/help.css?v=3">
     <style>
         /* Tickets is the one module with no accent of its own — it uses the
@@ -112,6 +112,10 @@ try {
             <a href="#whatsapp" class="help-nav-link" data-section="whatsapp">
                 <span class="help-nav-num"><?php echo $showTenancyHelp ? 14 : 13; ?></span>
                 WhatsApp channel
+            </a>
+            <a href="#confidential" class="help-nav-link" data-section="confidential">
+                <span class="help-nav-num"><?php echo $showTenancyHelp ? 15 : 14; ?></span>
+                Confidential tickets
             </a>
         </div>
 
@@ -1072,6 +1076,39 @@ try {
                         Testing on a laptop? Providers can only reach a public address, so run a tunnel
                         (e.g. <code>ngrok http 80</code>) and use the HTTPS URL it gives you as the webhook host. See the
                         <a href="https://github.com/edmozley/freeitsm/wiki/WhatsApp" target="_blank" rel="noopener">WhatsApp wiki page</a> for a full walkthrough.
+                    </p>
+                </div>
+
+                <!-- Confidential tickets (discussion #62) -->
+                <div class="help-section" id="confidential">
+                    <div class="help-section-header">
+                        <span class="help-section-num"><?php echo $showTenancyHelp ? 15 : 14; ?></span>
+                        <div>
+                            <h3>Confidential tickets</h3>
+                            <p>Some tickets are nobody else's business: a health matter raised with HR, or a complaint about a manager. Mark them <strong>Confidential</strong> and they are kept from the requester's managers.</p>
+                        </div>
+                    </div>
+                    <p>
+                        Every ticket has a <strong>Sensitivity</strong> of <strong>Normal</strong> or <strong>Confidential</strong>, in the ticket properties
+                        and on the new-ticket form. A confidential ticket shows a red <strong>Confidential</strong> marker in its properties bar, even with
+                        the panel collapsed, and a padlock in the ticket list. <strong>The service desk sees confidential tickets exactly as before</strong>;
+                        who on the desk can see a ticket is still decided by teams, departments and companies.
+                    </p>
+                    <p><strong>Tickets become confidential on their own</strong>, before anyone has read them, when:</p>
+                    <ul>
+                        <li>the person raising it ticks <strong>This is confidential</strong> in the self-service portal, or marks it later;</li>
+                        <li>it arrives through a mailbox set to confidential (<strong>Settings &rarr; Mailboxes</strong>): use this for an HR mailbox;</li>
+                        <li>it is in, or is moved into, a department set to confidential (<strong>Settings &rarr; Departments</strong>);</li>
+                        <li>it is split from, or merged with, a confidential ticket.</li>
+                    </ul>
+                    <p class="help-note">
+                        <strong>Nothing automatic ever makes a ticket Normal again.</strong> Moving a ticket out of a confidential department, or switching
+                        the department's setting off, leaves its tickets confidential. Only a person choosing <strong>Normal</strong> on the ticket
+                        lowers it, and the audit trail records who did. Requesters can make their ticket confidential, but never undo it.
+                    </p>
+                    <p>
+                        Each automatic change is written to the ticket's audit trail with the reason, for example
+                        <em>Confidential - arrived through the HR inbox mailbox</em>.
                     </p>
                 </div>
             </div>

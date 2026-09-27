@@ -21,13 +21,17 @@ if (!isset($_SESSION['analyst_id'])) {
 try {
     $conn = connectToDatabase();
 
+    // Confidential mailbox (discussion #62), guarded until Database Verification has run.
+    require_once '../../includes/ticket_sensitivity.php';
+    $sensCol = ticketSensitivityReady($conn) ? 'default_sensitivity,' : "'normal' AS default_sensitivity,";
+
     $sql = "SELECT id, name, provider, azure_tenant_id, azure_client_id, azure_client_secret,
                    oauth_redirect_uri, oauth_scopes, imap_server, imap_port, imap_encryption,
                    imap_username, imap_password, smtp_server, smtp_port, smtp_encryption,
                    smtp_username, smtp_password,
                    target_mailbox, auth_mode, authenticated_as, authenticated_addresses, email_folder, max_emails_per_check, mark_as_read,
                    rejected_action, imported_action, imported_folder,
-                   is_active, tenant_id, default_origin_id, health_dismissed, created_datetime, last_checked_datetime,
+                   is_active, tenant_id, default_origin_id, $sensCol health_dismissed, created_datetime, last_checked_datetime,
                    last_error, last_error_datetime,
                    CASE WHEN token_data IS NOT NULL AND token_data != '' THEN 1 ELSE 0 END as is_authenticated
             FROM target_mailboxes

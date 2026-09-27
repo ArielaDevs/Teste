@@ -42,7 +42,7 @@ $translationNamespaces = ['common', 'checklists'];
     <script src="../assets/js/tz.js?v=5"></script>
     <script src="../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
     <link rel="stylesheet" href="../assets/css/help.css?v=3">
     <style>
         body {

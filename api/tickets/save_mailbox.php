@@ -208,6 +208,14 @@ try {
         'auth_mode'            => $auth_mode,
     ];
 
+    // Confidential mailbox (discussion #62) - an HR mailbox whose tickets must be
+    // confidential the moment they land. Only when sent, and only once Database
+    // Verification has added the column.
+    require_once '../../includes/ticket_sensitivity.php';
+    if (array_key_exists('default_sensitivity', $data) && ticketSensitivityReady($conn)) {
+        $cols['default_sensitivity'] = ticketSensitivityNormalise($data['default_sensitivity']);
+    }
+
     $secretProvided   = !(empty($azure_client_secret)  || preg_match('/^\*+/', $azure_client_secret));
     $passwordProvided = !(empty($imap_password_plain)   || preg_match('/^\*+/', $imap_password_plain));
     if ($secretProvided)   $cols['azure_client_secret'] = encryptValue($azure_client_secret);

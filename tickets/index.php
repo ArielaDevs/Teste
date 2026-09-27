@@ -35,7 +35,7 @@ $translationNamespaces = ['common', 'tickets'];
     <title><?php echo htmlspecialchars(t('tickets.title')); ?> - <?php echo htmlspecialchars(t('tickets.nav.inbox')); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../checklists/ticket_checklist.css?v=4">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
     <link rel="stylesheet" href="../assets/css/mobile.css?v=152">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
@@ -474,7 +474,7 @@ $translationNamespaces = ['common', 'tickets'];
                         <small style="color: var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.new_ticket_modal.company_hint')); ?></small>
                     </div>
                 </div>
-                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
                     <div class="form-group">
                         <label class="form-label"><?php echo htmlspecialchars(t('tickets.new_ticket_modal.department')); ?></label>
                         <select class="form-select" id="newTicketDepartment">
@@ -491,6 +491,15 @@ $translationNamespaces = ['common', 'tickets'];
                         <label class="form-label"><?php echo htmlspecialchars(t('tickets.new_ticket_modal.priority')); ?></label>
                         <!-- Populated from the configured priorities in openNewTicketModal() (#40) -->
                         <select class="form-select" id="newTicketPriority"></select>
+                    </div>
+                    <!-- Normal / Confidential (discussion #62). A department or mailbox set to
+                         confidential makes it Confidential anyway; this can only add to that. -->
+                    <div class="form-group" title="<?php echo htmlspecialchars(t('tickets.reading_pane.sensitivity_help')); ?>">
+                        <label class="form-label"><?php echo htmlspecialchars(t('tickets.reading_pane.field_sensitivity')); ?></label>
+                        <select class="form-select" id="newTicketSensitivity">
+                            <option value="normal"><?php echo htmlspecialchars(t('tickets.reading_pane.sensitivity_normal')); ?></option>
+                            <option value="confidential"><?php echo htmlspecialchars(t('tickets.reading_pane.sensitivity_confidential')); ?></option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -994,7 +1003,7 @@ $translationNamespaces = ['common', 'tickets'];
     <script src="../assets/js/schedule.js?v=1"></script>
     <script src="../checklists/search_scoring.js?v=1"></script>
     <script src="../checklists/ticket_view.js?v=8"></script>
-    <script src="../assets/js/inbox.js?v=136"></script>
+    <script src="../assets/js/inbox.js?v=137"></script>
     <script src="../assets/js/mobile.js?v=65"></script>
     <script>
     // Auto-check mailboxes every 60 seconds

@@ -41,7 +41,7 @@ $translationNamespaces = ['common', 'forms'];
          disagree the first time a field type changes. -->
     <script src="../assets/js/form-pdf.js?v=2"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
     <!-- The detail panel draws a table QUESTION as a real table, and .form-table
          lives in the shared sheet. Without this the markup is right and the
          table renders unstyled - borderless rows running into each other. -->

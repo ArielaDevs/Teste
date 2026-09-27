@@ -150,6 +150,15 @@ $pageStyles = <<<'CSS'
     background: var(--danger-bg, #fdecea);
 }
 .tk-close-btn:disabled { opacity: .55; cursor: progress; }
+/* Confidential (discussion #62) - danger tones from the theme. */
+.tk-lock { width: 12px; height: 12px; vertical-align: -1px; margin-right: 4px; flex-shrink: 0; }
+.tk-item-subject .tk-lock { color: var(--danger-text, #b3261e); }
+.tk-confidential { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+    background: var(--danger-bg, #fdecea); color: var(--danger-text, #b3261e); border: 1px solid var(--danger-border, #f5c6c2); }
+.tk-mark-confidential { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-family: inherit;
+    background: transparent; color: var(--text-muted, #666); border: 1px dashed var(--border, #e5e7eb); cursor: pointer; }
+.tk-mark-confidential:hover:not(:disabled) { color: var(--danger-text, #b3261e); border-color: var(--danger-border, #f5c6c2); background: var(--danger-bg, #fdecea); }
+.tk-mark-confidential:disabled { opacity: .55; cursor: progress; }
 .tk-read-subject { font-size: 17px; font-weight: 600; color: var(--text, #333); margin: 0 0 8px 0; }
 .tk-read-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12px; color: var(--text-muted, #666); }
 .tk-num {
@@ -410,7 +419,7 @@ let ssTickets = [];
                 return '<button type="button" class="tk-item' + (ssSelected == t.id ? ' selected' : '') + '" onclick="selectTicket(' + t.id + ')">'
                      +   '<div class="tk-item-top">'
                      +     '<span class="tk-dot" style="background:' + esc(c) + '"></span>'
-                     +     '<span class="tk-item-subject">' + esc(t.subject || '') + '</span>'
+                     +     '<span class="tk-item-subject">' + (t.sensitivity === 'confidential' ? SS_LOCK_ICON : '') + esc(t.subject || '') + '</span>'
                      +     '<span class="tk-item-date">' + esc(shortDate(t.updated_datetime || t.created_datetime)) + '</span>'
                      +   '</div>'
                      +   (t.preview ? '<div class="tk-item-preview">' + esc(stripTags(t.preview)) + '</div>' : '')
@@ -560,6 +569,7 @@ let ssTickets = [];
               +     '<span class="status-badge" style="background-color:' + esc(c) + '1f;color:' + esc(c) + ';border:1px solid ' + esc(c) + '33">' + esc(t.status || '') + '</span>'
               +     '<span>' + esc(t.priority || '') + '</span>'
               +     (t.department_name ? '<span>' + esc(t.department_name) + '</span>' : '')
+              +     confidentialHtml(t)
               +     '<span>' + esc(window.t('self-service.ticket.created', { date: fullDate(t.created_datetime) })) + '</span>'
               +   '</div>'
               + '</div>'
@@ -570,6 +580,8 @@ let ssTickets = [];
             wireComposer();
             const closeBtn = document.getElementById('ssSelfClose');
             if (closeBtn) closeBtn.addEventListener('click', selfCloseTicket);
+            const confBtn = document.getElementById('ssMarkConfidential');
+            if (confBtn) confBtn.addEventListener('click', markConfidential);
             const thread = document.getElementById('tkThread');
             if (thread) thread.scrollTop = thread.scrollHeight;   // newest first to the eye
         }
@@ -637,6 +649,58 @@ let ssTickets = [];
         // three layers of markup-building string concatenation to get there
         // would be worse than one variable beside them.
         let ssCurrentTicketId = 0;
+
+        // ── Confidential (discussion #62) ─────────────────────────────────
+        // A badge when the ticket is confidential; otherwise a quiet button to
+        // make it so. ONE WAY: only the service desk makes a ticket Normal again
+        // (api/self-service/mark_confidential.php enforces it, not this button).
+        const SS_LOCK_ICON = '<svg class="tk-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+
+        function confidentialHtml(t) {
+            if (t.sensitivity === 'confidential') {
+                return '<span class="tk-confidential" title="' + esc(window.t('self-service.ticket.confidential_hint')) + '">'
+                     + SS_LOCK_ICON + esc(window.t('self-service.ticket.confidential')) + '</span>';
+            }
+            return '<button type="button" class="tk-mark-confidential" id="ssMarkConfidential" title="'
+                 + esc(window.t('self-service.ticket.confidential_hint')) + '">'
+                 + SS_LOCK_ICON + esc(window.t('self-service.ticket.mark_confidential')) + '</button>';
+        }
+
+        async function markConfidential() {
+            const ok = await showConfirm({
+                title:   window.t('self-service.ticket.mark_confidential_title'),
+                message: window.t('self-service.ticket.mark_confidential_confirm'),
+                okLabel: window.t('self-service.ticket.mark_confidential')
+            });
+            if (!ok) return;
+            const btn = document.getElementById('ssMarkConfidential');
+            if (btn) btn.disabled = true;
+            try {
+                const r = await fetch(API_BASE + 'mark_confidential.php', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticket_id: ssCurrentTicketId })
+                });
+                const d = await r.json();
+                if (!d.success) {
+                    showToast(d.error || window.t('self-service.ticket.mark_confidential_failed'), 'error');
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                showToast(window.t('self-service.ticket.mark_confidential_done'), 'success');
+                // Swap the button for the badge in place, and put the padlock in the list.
+                if (btn) btn.outerHTML = confidentialHtml({ sensitivity: 'confidential' });
+                markListRowConfidential(ssCurrentTicketId);
+            } catch (e) {
+                showToast(window.t('self-service.ticket.mark_confidential_failed'), 'error');
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function markListRowConfidential(id) {
+            const row = ssTickets.find(x => Number(x.id) === Number(id));
+            if (row) { row.sensitivity = 'confidential'; renderList(); }
+        }
 
         /**
          * "No longer needed", offered only when the administrator has switched

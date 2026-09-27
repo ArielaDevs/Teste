@@ -301,6 +301,10 @@ function catalogueCreateTicketFromSubmission(PDO $conn, array $sub, array $overr
         $userId, $tenantId,
     ]);
     $ticketId = (int)$conn->lastInsertId();
+    // Confidential defaults (discussion #62). Every path that creates a ticket
+    // calls this - see the header of includes/ticket_sensitivity.php for why.
+    require_once __DIR__ . '/ticket_sensitivity.php';
+    ticketSensitivityApplyDefaults($conn, $ticketId);
 
     $conn->prepare(
         "INSERT INTO emails (subject, from_address, from_name, to_recipients, received_datetime,

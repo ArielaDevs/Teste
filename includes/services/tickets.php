@@ -41,6 +41,7 @@ require_once dirname(__DIR__, 2) . '/workflow/includes/engine.php';
 require_once __DIR__ . '/../calendar_sync/push.php';   // scheduled work -> the owner's calendar (GH #75)
 require_once __DIR__ . '/checklists.php';              // mandatory SOP steps at closure (PR #141)
 require_once __DIR__ . '/mandatory_fields.php';        // mandatory ticket fields at closure
+require_once __DIR__ . '/../ticket_sensitivity.php';   // Normal / Confidential (discussion #62)
 
 class TicketsService
 {
@@ -87,6 +88,11 @@ class TicketsService
 
         if ($subject === '') {
             throw new ServiceError('validation', 'missing_field', "'subject' is required.");
+        }
+        // Same refusal as updateTicket(): never create a ticket someone asked to be
+        // confidential as a Normal one because the column is not there yet (#62).
+        if (ticketSensitivityNormalise($in['sensitivity'] ?? '') === 'confidential' && !ticketSensitivityReady($conn)) {
+            throw new ServiceError('validation', 'invalid_field', 'Run System → Database Verification before marking tickets confidential.');
         }
         // The address is required only when there is no chosen requester to
         // stand in for it — picking somebody from the directory already
@@ -257,6 +263,13 @@ class TicketsService
         // the mailbox ingest call. The payload is built there from the stored
         // row so all three channels announce identically — see the header of
         // includes/ticket_events.php for why that stopped being true.
+        // Confidential (discussion #62): asked for outright, or by the department
+        // or mailbox defaults. Raise-only, so the order does not matter.
+        if (ticketSensitivityNormalise($in['sensitivity'] ?? '') === 'confidential') {
+            ticketSensitivityRaise($conn, $ticketId, 'set when the ticket was raised');
+        }
+        ticketSensitivityApplyDefaults($conn, $ticketId, $mailboxId !== null ? (int)$mailboxId : null);
+
         require_once dirname(__DIR__) . '/ticket_events.php';
         ticketDispatchCreated($conn, (int)$ticketId, $ctx->actorId, $requesterEmail);
 
@@ -574,6 +587,32 @@ class TicketsService
             }
         }
 
+        // Sensitivity (discussion #62). The one way a ticket is made Normal again:
+        // a person choosing it. Nothing automatic ever lowers it.
+        $departmentChanged = false;
+        foreach ($updates as $u) {
+            if (strpos($u, 'department_id = ') === 0) { $departmentChanged = true; }
+        }
+        // ⚠️ Refuse rather than ignore. Before Database Verification there is
+        // nowhere to store it, and quietly saving nothing would leave someone
+        // believing a ticket is confidential when it is not.
+        if (array_key_exists('sensitivity', $in) && !ticketSensitivityReady($conn)
+            && ticketSensitivityNormalise($in['sensitivity']) === 'confidential') {
+            throw new ServiceError('validation', 'invalid_field', 'Run System → Database Verification before marking tickets confidential.');
+        }
+        if (array_key_exists('sensitivity', $in) && ticketSensitivityReady($conn)) {
+            $newSens = strtolower(trim((string)$in['sensitivity']));
+            if (!in_array($newSens, TICKET_SENSITIVITIES, true)) {
+                throw new ServiceError('validation', 'invalid_field', "'sensitivity' must be 'normal' or 'confidential'.");
+            }
+            $oldSens = ticketSensitivityNormalise($current['sensitivity'] ?? 'normal');
+            if ($newSens !== $oldSens) {
+                $updates[] = 'sensitivity = ?';
+                $args[]    = $newSens;
+                $audits[]  = ['Sensitivity', ucfirst($oldSens), ucfirst($newSens)];
+            }
+        }
+
         if (!$updates) {
             return; // idempotent
         }
@@ -611,6 +650,13 @@ class TicketsService
             if ($writeAudit || !empty($entry[3])) {
                 self::auditWrite($conn, $ticketId, $actorId, $field, $old, $new);
             }
+        }
+
+        // Moved into a confidential department: raise it. Writes its own audit
+        // entry whatever $writeAudit says, because the UI asked only for the move
+        // and cannot log a change it does not know the server made.
+        if ($departmentChanged) {
+            ticketSensitivityApplyDefaults($conn, $ticketId);
         }
 
         // Template emails + CSAT — non-blocking, same as assign_ticket.php.

@@ -41,6 +41,9 @@ try {
     $schedCols = scheduleSchemaReady($conn)
         ? "t.work_end_datetime, t.work_all_day,"
         : "NULL AS work_end_datetime, 0 AS work_all_day,";
+    // Normal / Confidential (discussion #62), guarded the same way.
+    require_once '../../includes/ticket_sensitivity.php';
+    $sensCol = ticketSensitivityReady($conn) ? "t.sensitivity," : "'normal' AS sensitivity,";
 
     // Query full email details with ticket information
     $sql = "SELECT
@@ -74,6 +77,7 @@ try {
                 t.closure_category_id,
                 t.resolution_code_id,
                 t.assigned_team_id,
+                $sensCol
                 t.assigned_analyst_id,
                 t.origin_id,
                 t.first_time_fix,

@@ -72,7 +72,7 @@ $translationNamespaces = ['common', 'tickets'];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(t('tickets.settings.page_title')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=72">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <script src="../../assets/js/i18n.js?v=3"></script>
     <script src="../../assets/js/ai-settings.js?v=2"></script>
@@ -2239,6 +2239,14 @@ $translationNamespaces = ['common', 'tickets'];
                     <small style="display: block; color: var(--text-muted, #666); margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.settings.modals.lookup.closed_help')); ?></small>
                 </div>
 
+                <!-- Discussion #62: departments only -->
+                <div class="form-group" id="itemConfidentialGroup" style="display: none;">
+                    <label>
+                        <input type="checkbox" id="itemConfidential"> <?php echo htmlspecialchars(t('tickets.settings.dept_confidential.label')); ?>
+                    </label>
+                    <small style="display: block; color: var(--text-muted, #666); margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.settings.dept_confidential.help')); ?></small>
+                </div>
+
                 <div class="form-group" id="itemPausesSlaGroup" style="display: none;">
                     <label>
                         <input type="checkbox" id="itemPausesSla"> <?php echo htmlspecialchars(t('tickets.settings.pauses_sla.label')); ?>
@@ -2425,6 +2433,12 @@ $translationNamespaces = ['common', 'tickets'];
                         <label for="mailboxOrigin"><?php echo htmlspecialchars(t('tickets.settings.modals.mailbox.origin_label')); ?></label>
                         <select id="mailboxOrigin"></select>
                         <small style="color: var(--text-muted, #666); display: block; margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.settings.modals.mailbox.origin_help')); ?></small>
+                    </div>
+
+                    <!-- Discussion #62: an HR mailbox whose tickets are confidential on arrival. -->
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label><input type="checkbox" id="mailboxConfidential"> <?php echo htmlspecialchars(t('tickets.settings.mailbox_confidential.label')); ?></label>
+                        <small style="color: var(--text-muted, #666); display: block; margin-top: 4px;"><?php echo htmlspecialchars(t('tickets.settings.mailbox_confidential.help')); ?></small>
                     </div>
 
                     <div class="form-group provider-microsoft">
@@ -3500,6 +3514,7 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('itemColourGroup').style.display      = isColouredLookup ? '' : 'none';
             document.getElementById('itemClosedGroup').style.display      = isStatus ? '' : 'none';
             document.getElementById('itemPausesSlaGroup').style.display   = isStatus ? '' : 'none';
+            document.getElementById('itemConfidentialGroup').style.display = type === 'department' ? '' : 'none';
             document.getElementById('itemDefaultGroup').style.display     = isColouredLookup ? '' : 'none';
         }
 
@@ -3559,7 +3574,7 @@ $translationNamespaces = ['common', 'tickets'];
 
                 return `
                 <tr>
-                    <td><strong>${escapeHtml(dept.name)}</strong></td>
+                    <td><strong>${escapeHtml(dept.name)}</strong>${dept.default_sensitivity === 'confidential' ? ` <span class="status-badge" style="background:var(--danger-bg,#fdecea);color:var(--danger-text,#b71c1c);margin-left:6px;">${escapeHtml(t('tickets.settings.dept_confidential.chip'))}</span>` : ''}</td>
                     <td>${escapeHtml(dept.description || '')}</td>
                     <td>${teamsText}</td>
                     <td>${dept.display_order}</td>
@@ -3844,6 +3859,7 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('itemColour').value = type === 'status' ? '#2563eb' : '#2563eb';
             document.getElementById('itemClosed').checked = false;
             document.getElementById('itemPausesSla').checked = false;
+            document.getElementById('itemConfidential').checked = false;
             document.getElementById('itemDefault').checked = false;
             configureModalFields(type);
             document.getElementById('editModal').classList.add('active');
@@ -3898,6 +3914,7 @@ $translationNamespaces = ['common', 'tickets'];
                         document.getElementById('itemColour').value = item.colour || '#2563eb';
                         document.getElementById('itemClosed').checked = !!item.is_closed;
                         document.getElementById('itemPausesSla').checked = !!item.pauses_sla;
+                        document.getElementById('itemConfidential').checked = item.default_sensitivity === 'confidential';
                         document.getElementById('itemDefault').checked = !!item.is_default;
                         configureModalFields(type);
                         document.getElementById('editModal').classList.add('active');
@@ -4118,6 +4135,9 @@ $translationNamespaces = ['common', 'tickets'];
                     display_order: parseInt(document.getElementById('itemOrder').value),
                     is_active: document.getElementById('itemActive').checked ? 1 : 0
                 };
+                if (type === 'department') {
+                    formData.default_sensitivity = document.getElementById('itemConfidential').checked ? 'confidential' : 'normal';
+                }
             }
 
             try {
@@ -4131,6 +4151,9 @@ $translationNamespaces = ['common', 'tickets'];
                 if (data.success) {
                     closeModal();
                     showToast('Saved', 'success');
+                    if (data.raised > 0) {
+                        showToast(t('tickets.settings.dept_confidential.raised', { count: data.raised }), 'info', 6000);
+                    }
                     if (type === 'department') {
                         loadDepartments();
                     } else if (type === 'ticket-type') {
@@ -5010,6 +5033,7 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('verifyFolderResult').style.display = 'none';
             document.getElementById('verifyIntakeFolderResult').style.display = 'none';
             document.getElementById('mailboxActive').checked = mailbox ? mailbox.is_active : true;
+            document.getElementById('mailboxConfidential').checked = !!(mailbox && mailbox.default_sensitivity === 'confidential');
             await populateMailboxCompanies(mailbox ? (mailbox.tenant_id ?? null) : null);
             await populateMailboxOrigins(
                 mailbox ? (mailbox.default_origin_id ?? null) : null,
@@ -5488,7 +5512,8 @@ $translationNamespaces = ['common', 'tickets'];
                 is_active: document.getElementById('mailboxActive').checked,
                 // Multi-tenancy: "" (shared intake) when the picker is hidden/unset → NULL server-side.
                 tenant_id: document.getElementById('mailboxCompany').value || null,
-                default_origin_id: document.getElementById('mailboxOrigin').value || null
+                default_origin_id: document.getElementById('mailboxOrigin').value || null,
+                default_sensitivity: document.getElementById('mailboxConfidential').checked ? 'confidential' : 'normal'
             };
 
             try {

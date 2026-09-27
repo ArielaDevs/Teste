@@ -26,6 +26,10 @@ if (!$ticketId) {
 try {
     $conn = connectToDatabase();
 
+    // Discussion #62 - shown to the requester, and whether to offer "Mark confidential".
+    require_once '../../includes/ticket_sensitivity.php';
+    $sensCol = ticketSensitivityReady($conn) ? 't.sensitivity' : "'normal' AS sensitivity";
+
     // Fetch ticket - validate ownership
     $ticketStmt = $conn->prepare(
         "SELECT t.id, t.ticket_number, t.subject,
@@ -36,7 +40,7 @@ try {
                 -- add their own, and more than one can be a closed one.
                 ts.is_closed,
                 tp.name AS priority,
-                t.created_datetime, t.updated_datetime,
+                t.created_datetime, t.updated_datetime, $sensCol,
                 d.name as department_name
          FROM tickets t
          LEFT JOIN ticket_statuses ts ON ts.id = t.status_id

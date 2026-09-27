@@ -168,6 +168,12 @@ return [
         'category_cleared'        => 'The category was cleared - it belonged to the previous ticket type.',
         'field_status'        => 'Status',
         'field_priority'      => 'Priority',
+        // Normal / Confidential (discussion #62)
+        'field_sensitivity'   => 'Sensitivity',
+        'sensitivity_normal'  => 'Normal',
+        'sensitivity_confidential' => 'Confidential',
+        'sensitivity_help'    => 'Confidential tickets are kept from the requester\'s managers. The service desk sees them as usual.',
+        'sensitivity_failed'  => 'Could not change the sensitivity',
         'field_origin'        => 'Origin',
         'field_first_time_fix'=> 'First Time Fix',
         'field_it_training'   => 'IT Training',
@@ -1694,6 +1700,17 @@ return [
         ],
 
         // Lookup modal — "Pauses SLA clock" group (statuses only).
+        // Discussion #62: a department or mailbox whose tickets are always confidential
+        'dept_confidential' => [
+            'label'   => 'Tickets here are confidential',
+            'help'    => 'Every ticket in this department, or moved into it, is marked Confidential, and so kept from the requester\'s managers. Turning this on also marks the tickets already here. Turning it off changes no ticket - make one Normal again on the ticket itself.',
+            'chip'    => 'Confidential',
+            'raised'  => 'Tickets now marked confidential: {count}.',
+        ],
+        'mailbox_confidential' => [
+            'label'   => 'Tickets from this mailbox are confidential',
+            'help'    => 'For a mailbox such as HR. Every ticket that arrives here is marked Confidential the moment it lands, before anyone has read it, and so kept from the requester\'s managers.',
+        ],
         'pauses_sla' => [
             'label' => 'Pauses SLA clock',
             'help'  => 'When a ticket is in this status, the SLA clock stops ticking. Used for statuses where the ticket isn\'t being actively worked (e.g. <em>On Hold</em>, <em>Awaiting Response</em>).',

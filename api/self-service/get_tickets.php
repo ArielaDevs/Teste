@@ -20,12 +20,16 @@ $statusFilter = $_GET['status'] ?? '';
 try {
     $conn = connectToDatabase();
 
+    // Discussion #62 - the requester sees which of their tickets are confidential.
+    require_once '../../includes/ticket_sensitivity.php';
+    $sensCol = ticketSensitivityReady($conn) ? 't.sensitivity' : "'normal' AS sensitivity";
+
     // status_colour + is_closed drive the list pane's dot and its Open/Closed
     // filter; `preview` is the newest message, so the list reads like a mailbox
     // rather than a table of subjects.
     $sql = "SELECT t.id, t.ticket_number, t.subject, ts.name AS status, tp.name AS priority,
                    ts.colour AS status_colour, ts.is_closed,
-                   t.created_datetime, t.updated_datetime,
+                   t.created_datetime, t.updated_datetime, $sensCol,
                    d.name as department_name,
                    a.full_name as assigned_analyst_name,
                    (SELECT LEFT(e.body_preview, 160) FROM emails e

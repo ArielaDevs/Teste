@@ -211,6 +211,10 @@ function webchatOpenTicket(PDO $conn, array $conversation, array $channel, strin
             )";
     $conn->prepare($sql)->execute([$ticketNumber, $subject, $userId, $tenantId, $originId]);
     $ticketId = (int) $conn->lastInsertId();
+    // Confidential defaults (discussion #62). Nothing to apply yet - no department
+    // or mailbox - but every ticket-creating path calls it; see ticket_sensitivity.php.
+    require_once __DIR__ . '/../ticket_sensitivity.php';
+    ticketSensitivityApplyDefaults($conn, $ticketId);
 
     $conn->prepare("UPDATE webchat_conversations SET ticket_id = ?, last_activity_datetime = UTC_TIMESTAMP() WHERE id = ?")
          ->execute([$ticketId, (int) $conversation['id']]);
