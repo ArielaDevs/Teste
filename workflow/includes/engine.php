@@ -2473,8 +2473,16 @@ class WorkflowEngine
         // format is chosen, load + serialise the record (reusing the REST API
         // serialisers) so the same rich, typed shape the API returns is sent.
         // Only when needed — a plain Slack ping shouldn't trigger an extra query.
+        // A confidential ticket leaves as its number and status only - never its
+        // subject, text or requester (discussion #62). Done BEFORE the full-record
+        // enrichment, which is then skipped: the full record IS the content.
+        require_once dirname(__DIR__, 2) . '/includes/ticket_sensitivity.php';
+        $redacted = ticketRedactForOutbound($conn, $payload);
+        $isConfidential = !empty($redacted['confidential']);
+        $payload = $redacted;
+
         $preset = strtolower(trim((string)($args['preset'] ?? '')));
-        if ($preset === 'full' || strpos((string)($args['body'] ?? ''), '.full') !== false) {
+        if (!$isConfidential && ($preset === 'full' || strpos((string)($args['body'] ?? ''), '.full') !== false)) {
             $payload = self::enrichWithFullObjects($conn, $payload);
         }
 
@@ -2528,6 +2536,14 @@ class WorkflowEngine
 
         if (!$ticketId)     throw new Exception('ticket_id is required');
         if (!$connectionId) throw new Exception('a tracker connection is required');
+        // A confidential ticket is never copied into an external tracker by a
+        // workflow: nobody is there to see the warning an analyst gets and decide
+        // (discussion #62). Skipped, not failed, so the rest of the workflow runs
+        // and the run history says why.
+        require_once dirname(__DIR__, 2) . '/includes/ticket_sensitivity.php';
+        if (ticketIsConfidential(connectToDatabase(), $ticketId)) {
+            return ['skipped' => true, 'reason' => 'confidential', 'ticket_id' => $ticketId];
+        }
         // ⚠️ No check on $project here any more. A blank one means "use the
         // connection's mapping", and only the service knows what that resolves
         // to. If nothing resolves, integrationsEscalate() still refuses — with a
@@ -2598,6 +2614,14 @@ class WorkflowEngine
         $note     = self::argString($args, 'note', $payload);
         if (!$ticketId)  throw new Exception('ticket_id is required');
         if ($note === '') throw new Exception('note is required');
+        // A confidential ticket is never copied into an external tracker by a
+        // workflow: nobody is there to see the warning an analyst gets and decide
+        // (discussion #62). Skipped, not failed, so the rest of the workflow runs
+        // and the run history says why.
+        require_once dirname(__DIR__, 2) . '/includes/ticket_sensitivity.php';
+        if (ticketIsConfidential(connectToDatabase(), $ticketId)) {
+            return ['skipped' => true, 'reason' => 'confidential', 'ticket_id' => $ticketId];
+        }
 
         require_once __DIR__ . '/../../includes/integrations/integrations.php';
         $conn  = connectToDatabase();

@@ -1894,6 +1894,17 @@ $translationNamespaces = ['common', 'tickets'];
                     <small style="color: var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.general.ai_read_help')); ?></small>
                 </div>
 
+                <?php /* Confidential tickets and AI (discussion #62). Covers EVERY AI
+                         feature that reads a ticket, not just the two above. */ ?>
+                <div class="form-group">
+                    <label for="aiConfidential"><?php echo htmlspecialchars(t('tickets.settings.general.ai_confidential_label')); ?></label>
+                    <select id="aiConfidential">
+                        <option value="block"><?php echo htmlspecialchars(t('tickets.settings.general.ai_confidential_block')); ?></option>
+                        <option value="allow"><?php echo htmlspecialchars(t('tickets.settings.general.ai_confidential_allow')); ?></option>
+                    </select>
+                    <small style="color: var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.general.ai_confidential_help')); ?></small>
+                </div>
+
                 <div style="display: flex; gap: 10px; justify-content: flex-start; margin-top: 30px;">
                     <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(t('common.save')); ?></button>
                 </div>
@@ -6039,6 +6050,8 @@ $translationNamespaces = ['common', 'tickets'];
                     cb('aiSummaryEnabled',     'ticket_ai_summary_enabled',     false);
                     cb('aiSummaryIncludeNotes','ticket_ai_summary_include_notes', true);
                     cb('aiReadEnabled',        'ticket_ai_read_enabled',        false);
+                    // Never saved = block: the safe way to be wrong (#62).
+                    document.getElementById('aiConfidential').value = data.settings.ticket_ai_confidential === 'allow' ? 'allow' : 'block';
                     cb('collapseExpandNewest', 'ticket_collapse_expand_newest', true);
                     cb('collapseQuoted',       'ticket_collapse_quoted',        true);
                     cb('collapseRemember',     'ticket_collapse_remember',      true);
@@ -6405,6 +6418,7 @@ $translationNamespaces = ['common', 'tickets'];
                 ticket_ai_summary_max_messages:  document.getElementById('aiSummaryMaxMessages').value,
                 ticket_ai_summary_include_notes: document.getElementById('aiSummaryIncludeNotes').checked ? '1' : '0',
                 ticket_ai_read_enabled:          document.getElementById('aiReadEnabled').checked ? '1' : '0',
+                ticket_ai_confidential:          document.getElementById('aiConfidential').value,
                 ticket_collapse_lines:         String(document.getElementById('collapseLines').value || 12),
                 ticket_collapse_expand_newest: document.getElementById('collapseExpandNewest').checked ? '1' : '0',
                 ticket_collapse_quoted:        document.getElementById('collapseQuoted').checked ? '1' : '0',

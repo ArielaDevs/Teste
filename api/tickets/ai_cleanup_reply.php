@@ -75,6 +75,13 @@ try {
         sse_send('error', ['message' => 'Ticket not found']);
         exit;
     }
+    // A confidential ticket is not sent to an AI provider unless Tickets -> Settings
+    // says so (discussion #62) - checked here, on the server, whatever the page does.
+    require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
+    if (!ticketAiAllowed($conn, $ticketId)) {
+        sse_send('error', ['message' => TICKET_AI_CONFIDENTIAL_ERROR, 'confidential' => true]);
+        exit;
+    }
 
     // Provider / model / key / verify_ssl come from the shared AI block
     // (ns=tickets_reply_cleanup) so this feature keeps its own key + billing

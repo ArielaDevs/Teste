@@ -119,10 +119,13 @@ try {
         $clusterCount = (int)$cluster['ticket_count'];
         $mode = 'cluster';
 
+        // The other tickets' subjects go to the model too - never a confidential
+        // one's (discussion #62).
+        require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
         $st = $conn->prepare(
             "SELECT t.subject FROM knowledge_gap_cluster_tickets ct
                JOIN tickets t ON t.id = ct.ticket_id
-              WHERE ct.cluster_id = ? AND ct.ticket_id <> ?
+              WHERE ct.cluster_id = ? AND ct.ticket_id <> ?" . ticketAiExclusionSql($conn, 't') . "
               LIMIT 15"
         );
         $st->execute([$clusterId, $ticketId]);
@@ -133,6 +136,13 @@ try {
     // cluster still has to be one this analyst may read.
     if (!analystCanAccessTicket($conn, $analystId, $ticketId)) {
         sse_send('error', ['message' => 'Ticket not found']);
+        exit;
+    }
+    // A confidential ticket is not sent to an AI provider unless Tickets -> Settings
+    // says so (discussion #62) - checked here, on the server, whatever the page does.
+    require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
+    if (!ticketAiAllowed($conn, $ticketId)) {
+        sse_send('error', ['message' => TICKET_AI_CONFIDENTIAL_ERROR, 'confidential' => true]);
         exit;
     }
 

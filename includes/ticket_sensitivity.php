@@ -141,3 +141,107 @@ function ticketSensitivityInherit(PDO $conn, int $ticketId, array $sourceIds, st
     }
     return ticketSensitivityRaise($conn, $ticketId, $reason);
 }
+
+/* ─── Keeping confidential tickets inside FreeITSM (discussion #62) ──────────
+ * Confidential keeps a ticket from managers. It also has to keep it from
+ * leaving: an AI provider, a Slack channel or a Jira project is somebody else's
+ * system, and a diagnosis sent to HR should not turn up in any of them.
+ * These are the ONE answers the three kinds of exit ask.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** Is this ticket confidential? False before Database Verification (no column). */
+function ticketIsConfidential(PDO $conn, int $ticketId): bool
+{
+    if ($ticketId <= 0 || !ticketSensitivityReady($conn)) return false;
+    try {
+        $st = $conn->prepare("SELECT sensitivity FROM tickets WHERE id = ?");
+        $st->execute([$ticketId]);
+        return ticketSensitivityNormalise($st->fetchColumn()) === 'confidential';
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * Tickets -> Settings -> "Confidential tickets and AI": 'block' (the default -
+ * never send) or 'allow'. Never saved means block: an upgrade must not start
+ * sending confidential tickets to a provider it was not sending them to.
+ */
+function ticketAiConfidentialPolicy(PDO $conn): string
+{
+    try {
+        $st = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'ticket_ai_confidential'");
+        $st->execute();
+        return $st->fetchColumn() === 'allow' ? 'allow' : 'block';
+    } catch (Throwable $e) {
+        return 'block';
+    }
+}
+
+/** May this ticket's content go to an AI provider? */
+function ticketAiAllowed(PDO $conn, int $ticketId): bool
+{
+    return !ticketIsConfidential($conn, $ticketId) || ticketAiConfidentialPolicy($conn) === 'allow';
+}
+
+/** What every AI endpoint says when it refuses. The UI shows it as it is. */
+const TICKET_AI_CONFIDENTIAL_ERROR = 'This ticket is confidential, so it is not sent to AI. An administrator can change that in Tickets -> Settings -> General.';
+
+/**
+ * For AI features that read MANY tickets (problem root cause, suggested
+ * problems, knowledge gap analysis, Warbot): an SQL condition that leaves the
+ * confidential ones out, or '' when the policy allows them or the column does
+ * not exist yet. Pass the tickets table's alias.
+ */
+function ticketAiExclusionSql(PDO $conn, string $alias = 't'): string
+{
+    if (!ticketSensitivityReady($conn) || ticketAiConfidentialPolicy($conn) === 'allow') return '';
+    return " AND $alias.sensitivity <> 'confidential'";
+}
+
+/**
+ * The ticket's subject as an AI may see it: 'Confidential ticket' in place of a
+ * confidential one's (under the block policy), so a count or a list stays true
+ * while its content stays home. An SQL expression; pass the tickets alias.
+ */
+function ticketAiSubjectSql(PDO $conn, string $alias = 't'): string
+{
+    if (!ticketSensitivityReady($conn) || ticketAiConfidentialPolicy($conn) === 'allow') return "$alias.subject";
+    return "CASE WHEN $alias.sensitivity = 'confidential' THEN 'Confidential ticket' ELSE $alias.subject END";
+}
+
+/**
+ * A workflow event's payload as it may leave for a webhook, Slack or Teams
+ * (discussion #62). Unchanged for a normal ticket. For a confidential one it is
+ * cut down to an ALLOW-LIST - identifiers, number, status, priority, department,
+ * team, dates - because a deny-list of "content" fields would miss the next one
+ * somebody adds. The subject becomes "Confidential ticket" and `confidential` is
+ * set, so a message template still reads sensibly.
+ *
+ * Never a setting: unlike AI, nobody chooses to post an HR ticket's subject into
+ * a team channel, and a chat post cannot be taken back.
+ */
+function ticketRedactForOutbound(PDO $conn, array $payload): array
+{
+    $tid = (int)($payload['ticket']['id'] ?? ($payload['ticket_id'] ?? 0));
+    if ($tid <= 0 || !ticketIsConfidential($conn, $tid)) return $payload;
+
+    $keepTicket = '/^(id|ticket_id|ticket_number|number|ref|reference|status|status_id|status_name|priority|priority_id|priority_name|'
+                . 'department_id|department|department_name|type_id|ticket_type_id|type|type_name|category_id|category|'
+                . 'assigned_analyst_id|assigned_analyst|assigned_analyst_name|assigned_team_id|assigned_team|team_id|team|'
+                . 'owner_id|owner|owner_name|origin_id|created_datetime|updated_datetime|closed_datetime|url|link|tenant_id)$/';
+    $ticket = [];
+    foreach ((array)($payload['ticket'] ?? []) as $k => $v) {
+        if (preg_match($keepTicket, (string)$k) && !is_array($v)) $ticket[$k] = $v;
+    }
+    $ticket['id'] = $tid;
+    $ticket['subject'] = 'Confidential ticket';
+    $ticket['sensitivity'] = 'confidential';
+
+    $keepTop = '/^(event|event_type|trigger|source|note_id|is_internal|occurred_at|timestamp)$/';
+    $out = ['ticket' => $ticket, 'confidential' => true];
+    foreach ($payload as $k => $v) {
+        if ($k !== 'ticket' && preg_match($keepTop, (string)$k) && !is_array($v)) $out[$k] = $v;
+    }
+    return $out;
+}

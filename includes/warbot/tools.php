@@ -298,7 +298,9 @@ function warbotToolOpenIncidents(PDO $conn, array $args, int $analystId): string
         $where[] = "p.name = :prio";
         $params[':prio'] = $priority;
     }
-    $sql = "SELECT t.ticket_number, t.subject, p.name AS priority, s.name AS status,
+    // What the model sees - a confidential ticket counts, but by number only (#62).
+    require_once __DIR__ . '/../ticket_sensitivity.php';
+    $sql = "SELECT t.ticket_number, " . ticketAiSubjectSql($conn, 't') . " AS subject, p.name AS priority, s.name AS status,
                    a.full_name AS assignee, t.created_datetime
               FROM tickets t
               LEFT JOIN ticket_statuses   s ON s.id = t.status_id
@@ -587,7 +589,7 @@ function warbotToolTicketSpike(PDO $conn, array $args, int $analystId): string
     // What they are ABOUT is the actionable half — a spike of one subject is an
     // incident, a spike of twenty different subjects is a bad morning.
     $subj = $conn->prepare(
-        "SELECT subject FROM tickets
+        "SELECT " . ticketAiSubjectSql($conn, 'tickets') . " AS subject FROM tickets
           WHERE deleted_datetime IS NULL
             AND created_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL :m MINUTE)
           ORDER BY id DESC LIMIT 8"
@@ -724,7 +726,8 @@ function warbotToolRelatedTickets(PDO $conn, array $args, int $analystId): strin
     $ref = trim((string)($args['ticket'] ?? ''));
     if ($ref === '') return 'Give me a ticket number.';
 
-    $find = $conn->prepare("SELECT id, ticket_number, subject FROM tickets WHERE ticket_number = :r AND deleted_datetime IS NULL LIMIT 1");
+    require_once __DIR__ . '/../ticket_sensitivity.php';
+    $find = $conn->prepare("SELECT id, ticket_number, " . ticketAiSubjectSql($conn, 'tickets') . " AS subject FROM tickets WHERE ticket_number = :r AND deleted_datetime IS NULL LIMIT 1");
     $find->execute([':r' => $ref]);
     $t = $find->fetch(PDO::FETCH_ASSOC);
     if (!$t) return "No ticket numbered \"$ref\".";
@@ -732,7 +735,7 @@ function warbotToolRelatedTickets(PDO $conn, array $args, int $analystId): strin
     $stmt = $conn->prepare(
         "SELECT l.relation_type,
                 CASE WHEN l.source_ticket_id = :id1 THEN 'to' ELSE 'from' END AS dir,
-                o.ticket_number, o.subject, s.name AS state
+                o.ticket_number, " . ticketAiSubjectSql($conn, 'o') . " AS subject, s.name AS state
            FROM ticket_links l
            JOIN tickets o ON o.id = CASE WHEN l.source_ticket_id = :id2 THEN l.target_ticket_id ELSE l.source_ticket_id END
            LEFT JOIN ticket_statuses s ON s.id = o.status_id

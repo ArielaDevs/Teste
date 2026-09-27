@@ -143,6 +143,12 @@ if ($body !== '') {
     $doc->rule()->para($body);
 }
 
+// A confidential ticket (discussion #62) can still be escalated - the analyst
+// may genuinely need the supplier's help - but only knowingly: the preview says
+// so, and the escalation is refused unless that warning was acknowledged.
+require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
+$isConfidential = ticketIsConfidential($conn, $ticketId);
+
 if ($isPreview) {
     // ⚠️ The files are part of the preview, not a detail. "You cannot unsend
     // it" is doubly true of an attachment: a screenshot can carry a password, a
@@ -167,7 +173,14 @@ if ($isPreview) {
         'summary'     => $summary,
         'body'        => $doc->toPlainText(),
         'attachments' => $files,
+        'confidential' => $isConfidential,
     ]);
+    exit;
+}
+
+if ($isConfidential && empty($in['confirm_confidential'])) {
+    echo json_encode(['success' => false, 'confidential' => true,
+        'error' => 'This ticket is confidential. Tick the box to confirm you mean to copy it into the tracker.']);
     exit;
 }
 

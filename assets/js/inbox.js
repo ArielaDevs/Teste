@@ -3954,9 +3954,11 @@ async function openEscalateTrackerModal(ticketId, ref) {
             document.getElementById('escSummary').value = j.summary || '';
             document.getElementById('escPreview').textContent = j.body || '';
             renderEscalateAttachments(j.attachments || []);
+            renderEscalateConfidential(!!j.confidential);
         } else {
             document.getElementById('escPreview').textContent = j.error || '';
             renderEscalateAttachments([]);
+            renderEscalateConfidential(false);
         }
     } catch (e) {
         document.getElementById('escPreview').textContent = t('tickets.tracker.preview_failed');
@@ -3995,6 +3997,29 @@ function renderEscalateAttachments(files) {
     box.style.display = '';
 }
 
+/**
+ * A confidential ticket (discussion #62) can still be escalated, but only on
+ * purpose: a warning and a box to tick, above the attachments. The server
+ * refuses the escalation without it, so this is the explanation, not the guard.
+ */
+function renderEscalateConfidential(isConfidential) {
+    let box = document.getElementById('escConfidential');
+    const anchor = document.getElementById('escAttachments');
+    if (!box && anchor) {
+        box = document.createElement('div');
+        box.id = 'escConfidential';
+        anchor.parentNode.insertBefore(box, anchor);
+    }
+    if (!box) return;
+    if (!isConfidential) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.cssText = 'margin:10px 0;padding:10px 12px;border-radius:6px;font-size:13px;line-height:1.45;'
+        + 'background:var(--warning-bg,#fff4ce);border:1px solid var(--warning-border,#f0d78c);color:var(--warning-text,#6b5900);';
+    box.innerHTML = '<strong>' + escapeHtml(t('tickets.tracker.confidential_title')) + '</strong><br>'
+        + escapeHtml(t('tickets.tracker.confidential_body'))
+        + '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:600;">'
+        + '<input type="checkbox" id="escConfidentialOk"> ' + escapeHtml(t('tickets.tracker.confidential_confirm')) + '</label>';
+}
+
 function closeEscalateTrackerModal() {
     const m = document.getElementById('escalateTrackerModal');
     if (m) m.classList.remove('active');
@@ -4017,7 +4042,9 @@ async function submitEscalateTracker() {
                 connection_id: document.getElementById('escConnection').value,
                 project:       project,
                 issue_type:    document.getElementById('escIssueType').value.trim() || 'Bug',
-                summary:       document.getElementById('escSummary').value.trim()
+                summary:       document.getElementById('escSummary').value.trim(),
+                // Only meaningful for a confidential ticket; the server decides.
+                confirm_confidential: !!(document.getElementById('escConfidentialOk') || {}).checked
             })
         });
         const j = await r.json();
@@ -8642,7 +8669,9 @@ async function _sendTicketAiMessage(question, isAutoContext) {
         const response = await fetch('../api/knowledge/ai_chat.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: question, include_archived: false })
+            // The ticket goes too, so the server can keep a confidential one's
+            // text away from the AI provider (#62).
+            body: JSON.stringify({ question: question, include_archived: false, ticket_id: currentEmail ? currentEmail.ticket_id : null })
         });
         const data = await response.json();
 
@@ -10914,6 +10943,13 @@ async function loadAiSummary(ticketId) {
         const d = await r.json();
         // The ticket may have changed underneath a slow request. Landing an old
         // ticket's summary on a new ticket would be a quiet, confident lie.
+        // Confidential and not sent to AI (#62): say so where the summary would
+        // be, rather than leave the analyst wondering where it went.
+        if (d.confidential && _aiSummaryTicketId === ticketId) {
+            const slot = document.getElementById('aiSummarySlot');
+            if (slot) slot.innerHTML = '<div class="ai-summary-confidential" style="font-size:12px;color:var(--text-muted,#666);padding:6px 0;">' + escapeHtml(d.error || '') + '</div>';
+            return;
+        }
         if (!d.success || d.disabled || _aiSummaryTicketId !== ticketId) return;
         _aiSummaryState = d;
         renderAiSummary();

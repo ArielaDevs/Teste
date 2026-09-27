@@ -72,6 +72,13 @@ try {
         echo json_encode(['success' => false, 'error' => 'Ticket not found']);
         exit;
     }
+    // A confidential ticket is not sent to an AI provider unless Tickets -> Settings
+    // says so (discussion #62) - checked here, on the server, whatever the page does.
+    require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
+    if (!ticketAiAllowed($conn, $ticketId)) {
+        echo json_encode(['success' => false, 'confidential' => true, 'error' => TICKET_AI_CONFIDENTIAL_ERROR]);
+        exit;
+    }
 
     $settings = ticketAiSettings($conn);
     if (!$settings['read_enabled']) {

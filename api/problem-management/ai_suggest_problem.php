@@ -22,6 +22,9 @@ try {
     if (($cfg['api_key'] ?? '') === '') throw new Exception('Problem AI is not configured. Set a provider + key in Problem Management → Settings.');
 
     [$tf, $tp] = ticketTenantFilter($conn, $analystId, 't');
+    // Subjects go to the AI provider - never a confidential ticket's (#62).
+    require_once __DIR__ . '/../../includes/ticket_sensitivity.php';
+    $tf .= ticketAiExclusionSql($conn, 't');
     $sql = "SELECT t.ticket_number, t.subject
             FROM tickets t
             WHERE t.deleted_datetime IS NULL AND t.closed_datetime IS NULL" . $tf . "

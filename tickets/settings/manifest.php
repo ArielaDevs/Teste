@@ -259,7 +259,9 @@ return [
                                 // they are the only settings here that spend money.
                                 'ticket_ai_summary_enabled', 'ticket_ai_summary_auto_after',
                                 'ticket_ai_summary_max_messages', 'ticket_ai_summary_include_notes',
-                                'ticket_ai_read_enabled'],
+                                'ticket_ai_read_enabled',
+                                // Whether a confidential ticket may go to AI at all (#62).
+                                'ticket_ai_confidential'],
         ],
         [
             'id'           => 'privacy',

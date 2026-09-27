@@ -32,6 +32,24 @@ if (empty($question)) {
     exit;
 }
 
+// Asked from a TICKET ("Ask AI" in the inbox), the question carries that
+// ticket's text - so the ticket comes too, and a confidential one is refused
+// here, on the server (discussion #62). Asked from Knowledge, there is none.
+if (!empty($input['ticket_id'])) {
+    require_once '../../includes/tenancy.php';
+    require_once '../../includes/ticket_sensitivity.php';
+    $aiConn = connectToDatabase();
+    $aiTicket = (int)$input['ticket_id'];
+    if (!analystCanAccessTicket($aiConn, (int)$_SESSION['analyst_id'], $aiTicket)) {
+        echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+        exit;
+    }
+    if (!ticketAiAllowed($aiConn, $aiTicket)) {
+        echo json_encode(['success' => false, 'confidential' => true, 'error' => TICKET_AI_CONFIDENTIAL_ERROR]);
+        exit;
+    }
+}
+
 /**
  * Calculate cosine similarity between two vectors
  */

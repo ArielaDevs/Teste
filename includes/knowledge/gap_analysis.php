@@ -48,6 +48,10 @@ function knowledgeOpenAiKey(PDO $conn): string
 function gapWindowSql(PDO $conn, int $analystId, int $lookbackDays): array
 {
     [$tSql, $tArgs] = activeTenantFilter($conn, $analystId, 't');
+    // Every ticket in this window is sent to an embeddings provider, so a
+    // confidential one is left out of the analysis altogether (#62).
+    require_once __DIR__ . '/../ticket_sensitivity.php';
+    $tSql .= ticketAiExclusionSql($conn, 't');
     return [
         'from'  => "FROM tickets t
                     JOIN ticket_statuses s ON s.id = t.status_id AND s.is_closed = 1",
