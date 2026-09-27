@@ -71,6 +71,7 @@ function managersSettings(PDO $conn): array
         'can_reply'         => '0',
         'can_close'         => '0',
         'edit_by'           => 'admins',  // who may set up lines: 'admins' | 'people_editors'
+        'notify'            => 'none',    // tell managers about a new team ticket: 'none' | 'email' | 'bell'
     ];
     try {
         foreach ($conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'managers\\_%'") as $r) {
@@ -81,6 +82,7 @@ function managersSettings(PDO $conn): array
     if (!in_array($s['directory_depth'], ['direct', 'all'], true)) $s['directory_depth'] = 'direct';
     if (!in_array($s['confidential'], ['none', 'stub', 'all'], true)) $s['confidential'] = 'none';
     if (!in_array($s['edit_by'], ['admins', 'people_editors'], true)) $s['edit_by'] = 'admins';
+    if (!in_array($s['notify'], ['none', 'email', 'bell'], true)) $s['notify'] = 'none';
     return $memo = $s;
 }
 
@@ -339,4 +341,123 @@ function portalTicketAccess(PDO $conn, int $userId, int $ticketId): ?array
         'can_close' => !$stub && $s['can_close'] === '1',
         'ticket'    => $t,
     ];
+}
+
+/**
+ * Tell the requester's managers that a new ticket has been raised, as
+ * System -> Managers says: 'none' (the default), 'email', or 'bell' - the
+ * self-service portal's own notification bell.
+ *
+ * Called from ticketDispatchCreated() (includes/ticket_events.php), which every
+ * route that announces a new ticket goes through, AFTER the confidential defaults
+ * have been applied - so an HR-mailbox ticket is confidential before anybody is
+ * told about it.
+ *
+ * WHO: every manager who could open it, decided by portalTicketAccess() - the
+ * same rule as the ticket page - and never somebody who would only see a
+ * confidential stub. "Your team member raised a confidential ticket" is exactly
+ * the thing confidentiality exists to stop.
+ *
+ * Candidates are worked out BACKWARDS from the requester: everyone above them on
+ * the reporting line, plus everyone with a management line. The rule then decides
+ * for each, so a candidate list that is too generous costs a query, never a leak.
+ *
+ * Never throws; a manager's notification is never worth the ticket.
+ */
+function managersNotifyNewTicket(PDO $conn, int $ticketId): void
+{
+    try {
+        if (!managersActive($conn)) return;
+        $how = managersSettings($conn)['notify'];
+        if ($how !== 'email' && $how !== 'bell') return;
+
+        $st = $conn->prepare(
+            "SELECT t.id, t.ticket_number, t.subject, t.user_id,
+                    COALESCE(NULLIF(u.display_name, ''), NULLIF(u.email, ''), u.username) AS requester_name
+               FROM tickets t LEFT JOIN users u ON u.id = t.user_id
+              WHERE t.id = ? AND t.deleted_datetime IS NULL"
+        );
+        $st->execute([$ticketId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t || !$t['user_id']) return;
+        $requester = (int)$t['user_id'];
+
+        // Everyone above them on the reporting line (bounded, loop-safe)...
+        $cands = [];
+        $up = $conn->prepare("SELECT manager_id FROM users WHERE id = ?");
+        $cur = $requester;
+        for ($i = 0; $i < 25; $i++) {
+            $up->execute([$cur]);
+            $next = (int)$up->fetchColumn();
+            if (!$next || isset($cands[$next])) break;
+            $cands[$next] = true;
+            $cur = $next;
+        }
+        // ...and everyone with a management line.
+        foreach ($conn->query("SELECT DISTINCT manager_user_id FROM manager_grants WHERE is_exclusion = 0")->fetchAll(PDO::FETCH_COLUMN) as $mid) {
+            $cands[(int)$mid] = true;
+        }
+        unset($cands[$requester]);
+
+        $sent = 0;
+        foreach (array_keys($cands) as $mid) {
+            $access = portalTicketAccess($conn, $mid, $ticketId);
+            if (!$access || $access['role'] !== 'manager' || $access['stub']) continue;
+
+            if ($how === 'bell') {
+                require_once __DIR__ . '/services/notifications.php';
+                NotificationsService::notify($conn, [
+                    'portal_user_id' => $mid,
+                    'event_type'     => 'ticket.created',        // "Raised by {actor}" - the analyst bell's own words
+                    'entity_type'    => 'ticket',
+                    'entity_id'      => $ticketId,
+                    'entity_ref'     => $t['ticket_number'],
+                    'title'          => $t['subject'],
+                    'actor_user_id'  => $requester,
+                    'actor_name'     => $t['requester_name'],
+                ]);
+                $sent++;
+            } else {
+                $sent += managersEmailNewTicket($conn, $mid, $t) ? 1 : 0;
+            }
+        }
+        if ($sent) error_log("[managers] ticket $ticketId: told $sent manager(s) by $how");
+    } catch (Throwable $e) {
+        error_log('[managersNotifyNewTicket] ' . $e->getMessage());
+    }
+}
+
+/**
+ * The email version. Sent through the portal's own sender (the ticket mailbox,
+ * as account emails are), to the manager's address - none, nothing sent. The link
+ * is built on the configured public address, because a ticket that arrives by
+ * email is created from cron, where there is no request to take a host from.
+ *
+ * English, like the portal's other system emails (includes/self_service_email.php).
+ */
+function managersEmailNewTicket(PDO $conn, int $managerId, array $t): bool
+{
+    $st = $conn->prepare("SELECT email, COALESCE(NULLIF(preferred_name, ''), NULLIF(display_name, ''), '') AS name FROM users WHERE id = ?");
+    $st->execute([$managerId]);
+    $m = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$m || empty($m['email'])) return false;
+
+    require_once __DIR__ . '/self_service_email.php';
+    require_once __DIR__ . '/public_url.php';
+    $link = publicAbsoluteUrl($conn, 'self-service/tickets.php?view=team&id=' . (int)$t['id']);
+    $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $who = $t['requester_name'] ?: 'Someone on your team';
+
+    $html = '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:15px;color:#2c3e50;line-height:1.6">'
+          . '<p>Hi ' . $h($m['name'] !== '' ? $m['name'] : 'there') . ',</p>'
+          . '<p><strong>' . $h($who) . '</strong> has raised a new ticket with IT:</p>'
+          . '<p style="margin:16px 0;padding:12px 16px;background:#f4f6f8;border-left:3px solid #2d6a4f;border-radius:4px">'
+          . '<span style="color:#5a6c7d;font-size:13px">' . $h($t['ticket_number']) . '</span><br>'
+          . '<strong>' . $h($t['subject']) . '</strong></p>'
+          . '<p style="margin:24px 0"><a href="' . $h($link) . '" '
+          . 'style="background:#2d6a4f;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:600">View the ticket</a></p>'
+          . '<p style="font-size:13px;color:#5a6c7d">You are getting this because you can see the tickets of the people you manage in the self-service portal. '
+          . 'Opening a ticket there is shown to the person who raised it.</p>'
+          . '</div>';
+    return ssSendSystemEmail($conn, (string)$m['email'], 'New ticket from ' . $who . ': ' . $t['subject'], $html, 'portal');
 }

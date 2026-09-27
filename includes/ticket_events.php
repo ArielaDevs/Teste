@@ -84,4 +84,16 @@ function ticketDispatchCreated(PDO $conn, int $ticketId, ?int $createdBy = null,
     } catch (Throwable $e) {
         error_log('[ticketDispatchCreated] ' . $e->getMessage());
     }
+
+    // The requester's managers, if System -> Managers says to tell them
+    // (discussion #62). Here, after every caller has applied the confidential
+    // defaults (mailbox, department), so a ticket that is confidential the moment
+    // it lands is never announced to a manager first. Its own try: a manager's
+    // email must never cost the workflow above, or the ticket itself.
+    try {
+        require_once __DIR__ . '/managers.php';
+        managersNotifyNewTicket($conn, $ticketId);
+    } catch (Throwable $e) {
+        error_log('[ticketDispatchCreated managers] ' . $e->getMessage());
+    }
 }

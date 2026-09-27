@@ -35,6 +35,7 @@ function managersSettingRules(): array
         'can_reply'       => ['0', '1'],
         'can_close'       => ['0', '1'],
         'edit_by'         => ['admins', 'people_editors'],
+        'notify'          => ['none', 'email', 'bell'],
     ];
 }
 

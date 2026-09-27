@@ -58,6 +58,13 @@ $pageStyles = <<<'CSS'
     max-width: 170px;
 }
 .tk-filter:focus { outline: none; border-color: var(--ss-accent, #10b981); }
+/* Team tickets: who and which status, side by side under the heading (#62). */
+.tk-list-filters { display: flex; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--border, #e5e7eb); }
+.tk-list-filters .tk-filter { flex: 1; min-width: 0; max-width: none; }
+.tk-more { display: block; width: calc(100% - 36px); margin: 12px 18px 16px; padding: 8px 12px; border: 1px solid var(--border, #e5e7eb);
+    border-radius: 6px; background: var(--surface, #fff); color: var(--text, #333); font-family: inherit; font-size: 13px; cursor: pointer; }
+.tk-more:hover { border-color: var(--ss-accent, #10b981); }
+.tk-more small { display: block; color: var(--text-muted, #666); font-size: 11px; margin-top: 2px; }
 
 /* The line between tickets. Translucent so it takes its weight from the
    surface beneath it, and keyed on the theme MODE so any dark palette is
@@ -364,7 +371,10 @@ let ssTickets = [];
 
         document.addEventListener('DOMContentLoaded', function () {
             const sel = document.getElementById('tkFilter');
-            if (sel) sel.addEventListener('change', function () { ssFilter = sel.value; renderList(); });
+            // Team tickets filter on the SERVER (they are paged), My tickets in the page.
+            if (sel) sel.addEventListener('change', function () { ssFilter = sel.value; ssTeam ? loadTickets() : renderList(); });
+            const who = document.getElementById('tkPerson');
+            if (who) who.addEventListener('change', function () { ssPerson = who.value; ssFilter = ''; loadTickets(); });
             loadTickets();
         });
 
@@ -373,11 +383,10 @@ let ssTickets = [];
                 // A manager's team view reads a different list; everything after
                 // this - the reading pane, the files, replying - is the same page,
                 // and every endpoint behind it decides for itself (#62).
-                const r = await fetch(window.PAGE.view === 'team'
-                    ? '../api/self-service/get_team_tickets.php'
-                    : '../api/self-service/get_tickets.php');
+                const r = await fetch(ssTeam ? teamUrl(1) : '../api/self-service/get_tickets.php');
                 const d = await r.json();
                 ssTickets = d.success ? (d.tickets || []) : [];
+                if (ssTeam) { ssTeamData = d.success ? d : null; ssTeamPage = 1; }
                 renderFilterOptions();
                 renderList();
 
@@ -409,6 +418,7 @@ let ssTickets = [];
         function renderFilterOptions() {
             const sel = document.getElementById('tkFilter');
             if (!sel) return;
+            if (ssTeam) { renderTeamFilters(sel); return; }
 
             const order = [];
             const counts = {};
@@ -427,7 +437,47 @@ let ssTickets = [];
             if (sel.value !== ssFilter) ssFilter = '';   // status vanished → fall back to All
         }
 
+        // ── Team tickets: paged and filtered on the server (#62) ─────────────
+        // A head of department's team can have thousands of tickets, so the list
+        // arrives 50 at a time with a Load more, and both dropdowns ask the
+        // server again rather than filtering what happens to be loaded.
+        const ssTeam = window.PAGE.view === 'team';
+        let ssTeamData = null, ssTeamPage = 1, ssPerson = '';
+        function teamUrl(page) {
+            return '../api/self-service/get_team_tickets.php?' + new URLSearchParams({ page: page, person: ssPerson, status: ssFilter });
+        }
+        function renderTeamFilters(sel) {
+            const d = ssTeamData || { people: [], statuses: [] };
+            const sum = a => a.reduce((n, x) => n + x.count, 0);
+            const who = document.getElementById('tkPerson');
+            if (who) {
+                who.innerHTML = '<option value="">' + esc(window.t('self-service.tickets.team_person_all')) + ' (' + sum(d.people) + ')</option>'
+                    + d.people.map(p => '<option value="' + p.id + '">' + esc(p.name) + ' (' + p.count + ')</option>').join('');
+                who.value = ssPerson;
+                if (who.value !== String(ssPerson)) ssPerson = '';
+            }
+            sel.innerHTML = '<option value="">' + esc(window.t('self-service.tickets.filter_all')) + ' (' + sum(d.statuses) + ')</option>'
+                + d.statuses.map(s => '<option value="' + esc(s.name) + '">' + esc(s.name) + ' (' + s.count + ')</option>').join('');
+            sel.value = ssFilter;
+            if (sel.value !== ssFilter) ssFilter = '';
+        }
+        async function ssLoadMore(btn) {
+            if (btn) btn.disabled = true;
+            try {
+                const d = await (await fetch(teamUrl(ssTeamPage + 1))).json();
+                if (!d.success) return;
+                ssTeamPage = d.page;
+                ssTeamData.has_more = d.has_more;
+                ssTickets = ssTickets.concat(d.tickets || []);
+                // Keep the reader where they were: the list only grows below them.
+                const host = document.getElementById('tkList'), top = host.scrollTop;
+                renderList();
+                host.scrollTop = top;
+            } finally { if (btn) btn.disabled = false; }
+        }
+
         function visibleTickets() {
+            if (ssTeam) return ssTickets;          // already filtered by the server
             if (!ssFilter) return ssTickets;
             return ssTickets.filter(t => (t.status || '') === ssFilter);
         }
@@ -455,7 +505,11 @@ let ssTickets = [];
                      +   '<div class="tk-item-meta">' + (t.requester_name ? '<strong>' + esc(t.requester_name) + '</strong> &middot; ' : '')
                      +     esc(t.ticket_number || '') + ' &middot; ' + esc(t.status || '') + '</div>'
                      + '</button>';
-            }).join('');
+            }).join('')
+            + ((ssTeam && ssTeamData && ssTeamData.has_more)
+                ? '<button type="button" class="tk-more" onclick="ssLoadMore(this)">' + esc(window.t('self-service.tickets.load_more'))
+                  + '<small>' + esc(window.t('self-service.tickets.showing_of', { shown: list.length, total: ssTeamData.total })) + '</small></button>'
+                : '');
         }
 
         // ── Phone master/detail ───────────────────────────────────────────
@@ -1077,10 +1131,19 @@ require_once __DIR__ . '/includes/header.php';
         <div class="tk-list">
             <div class="tk-list-head">
                 <h2><?php echo htmlspecialchars(t($ssView === 'team' ? 'self-service.tickets.team_heading' : 'self-service.tickets.heading')); ?></h2>
+                <?php if ($ssView !== 'team'): ?>
                 <!-- Populated from the statuses actually on this person's tickets,
                      so the list never offers a filter that would come back empty. -->
                 <select class="tk-filter" id="tkFilter" aria-label="<?php echo htmlspecialchars(t('self-service.tickets.filter_label')); ?>"></select>
+                <?php endif; ?>
             </div>
+            <?php if ($ssView === 'team'): ?>
+            <?php /* Who, and which status - both with counts from the server. */ ?>
+            <div class="tk-list-filters">
+                <select class="tk-filter" id="tkPerson" aria-label="<?php echo htmlspecialchars(t('self-service.tickets.team_person_label')); ?>"></select>
+                <select class="tk-filter" id="tkFilter" aria-label="<?php echo htmlspecialchars(t('self-service.tickets.filter_label')); ?>"></select>
+            </div>
+            <?php endif; ?>
             <div class="tk-list-body" id="tkList">
                 <div class="loading-state"><?php echo htmlspecialchars(t('self-service.tickets.loading')); ?></div>
             </div>

@@ -18,6 +18,8 @@ return [
     ['asset_handover_templates', 'ix_aht_default', 'key', '(`is_default`,`is_active`)'],
     ['notifications', 'ix_notif_unread', 'key', '(`analyst_id`,`read_datetime`,`updated_datetime`)'],
     ['notifications', 'ix_notif_coalesce', 'key', '(`analyst_id`,`entity_type`,`entity_id`,`read_datetime`)'],
+    ['portal_notifications', 'ix_pnotif_unread', 'key', '(`user_id`,`read_datetime`,`updated_datetime`)'],
+    ['portal_notifications', 'ix_pnotif_coalesce', 'key', '(`user_id`,`entity_type`,`entity_id`,`read_datetime`)'],
     ['analyst_teams', 'uq_analyst_team', 'unique', '(`analyst_id`,`team_id`)'],
     ['department_teams', 'uq_department_team', 'unique', '(`department_id`,`team_id`)'],
     ['analyst_modules', 'uq_analyst_module', 'unique', '(`analyst_id`,`module_key`)'],

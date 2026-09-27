@@ -347,6 +347,8 @@ if ($ssHelpIsManager) array_splice($helpNav, array_search('s7', $helpNav, true),
                 <li><?php echo t('self-service.help.team_li_who'); ?></li>
                 <li><?php echo t('self-service.help.team_li_banner'); ?></li>
                 <li><?php echo t('self-service.help.team_li_conf'); ?></li>
+                <li><?php echo t('self-service.help.team_li_filter'); ?></li>
+                <li><?php echo t('self-service.help.team_li_told'); ?></li>
                 <li><?php echo t('self-service.help.team_li_seen'); ?></li>
             </ul>
             <p class="help-note"><?php echo t('self-service.help.team_tip'); ?></p>

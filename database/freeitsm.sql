@@ -350,6 +350,31 @@ CREATE TABLE IF NOT EXISTS `notifications` (
     CONSTRAINT `fk_notif_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- The bell in the SELF-SERVICE PORTAL (discussion #62): the same shape as
+-- `notifications`, for portal users rather than analysts. A sibling table, not a
+-- column on that one: its analyst_id is NOT NULL with a foreign key to analysts,
+-- and one table keyed two ways would let an analyst and a portal user with the
+-- same id read each other's bell. NotificationsService serves both.
+CREATE TABLE IF NOT EXISTS `portal_notifications` (
+    `id`                INT NOT NULL AUTO_INCREMENT,
+    `user_id`           INT NOT NULL,
+    `event_type`        VARCHAR(64) NOT NULL,     -- 'ticket.created' (a team ticket, for a manager)
+    `entity_type`       VARCHAR(32) NOT NULL,
+    `entity_id`         INT NOT NULL,
+    `entity_ref`        VARCHAR(64) NULL,
+    `title`             VARCHAR(255) NULL,
+    `body`              VARCHAR(500) NULL,
+    `actor_name`        VARCHAR(100) NULL,
+    `event_count`       INT NOT NULL DEFAULT 1,
+    `created_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `read_datetime`     DATETIME NULL,
+    PRIMARY KEY (`id`),
+    KEY `ix_pnotif_unread` (`user_id`, `read_datetime`, `updated_datetime`),
+    KEY `ix_pnotif_coalesce` (`user_id`, `entity_type`, `entity_id`, `read_datetime`),
+    CONSTRAINT `fk_pnotif_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `teams` (
     `id`                INT NOT NULL AUTO_INCREMENT,
     `name`              VARCHAR(100) NOT NULL,

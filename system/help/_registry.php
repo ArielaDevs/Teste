@@ -332,7 +332,8 @@ function getHelpTopics() {
             'terms' => 'manager line manager head of department team tickets reports direct reports reporting line'
                      . ' active directory manager attribute management lines exclusion exclude department renamed'
                      . ' people group everyone confidential stub hidden who has seen viewed privacy grievance'
-                     . ' leavers left reply close portal self-service see other people\'s tickets oversight',
+                     . ' leavers left reply close portal self-service see other people\'s tickets oversight'
+                     . ' notify notification email bell alert new ticket tell manager',
         ],
         'search' => [
             'hero' => 'Search',

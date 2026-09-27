@@ -279,6 +279,38 @@ if ($ssLogoOnPage) {
          * there is no moment where the drawer exists but cannot be opened.
          */
         ?>
+        <?php
+        /*
+         * The bell (discussion #62) - the SAME bell as the analyst app
+         * (includes/notification_bell.php), pointed at the portal's endpoint.
+         *
+         * Only shown when it has a job: to a manager while System -> Managers
+         * says "notify in the bell", or to anyone who already has a notification
+         * (the setting can change after they were sent). A permanently empty bell
+         * in front of every requester would be clutter that invites a question.
+         */
+        $ssShowBell = false;
+        try {
+            require_once __DIR__ . '/../../includes/managers.php';
+            $ssConnBell = connectToDatabase();
+            $hasAny = $ssConnBell->prepare("SELECT 1 FROM portal_notifications WHERE user_id = ? LIMIT 1");
+            $hasAny->execute([(int)$ss_user_id]);
+            $ssShowBell = (bool)$hasAny->fetchColumn()
+                || (managersSettings($ssConnBell)['notify'] === 'bell' && $portalNavCap('is_manager'));
+        } catch (Throwable $e) {
+            $ssShowBell = false;   // before Database Verification: no table, no bell
+        }
+        if ($ssShowBell) {
+            require_once __DIR__ . '/../../includes/notification_bell.php';
+            notificationBellRender('../', [
+                'list'       => '../api/self-service/notifications.php?action=list',
+                'markRead'   => '../api/self-service/notifications.php?action=mark_read',
+                'clear'      => '../api/self-service/notifications.php?action=clear',
+                'linkPrefix' => '../',
+                'seenKey'    => 'ssNbSeenUnread',
+            ]);
+        }
+        ?>
         <button type="button" class="ss-nav-btn" onclick="ssToggleNav()"
                 aria-label="<?php echo htmlspecialchars(t('self-service.nav.menu')); ?>"
                 aria-expanded="false" aria-controls="portalNav">&#9776;</button>

@@ -130,6 +130,7 @@ require __DIR__ . '/_top.php';
             <tr><td><strong>Use each person's Manager field</strong></td><td>On</td><td>Whoever is set as someone's Manager can see their tickets. <strong>How far down</strong>: direct reports, or everyone below them.</td></tr>
             <tr><td><strong>Reply to / Close their team's tickets</strong></td><td>Off</td><td>What a manager may do beyond reading. A manager's reply and a close are recorded as theirs.</td></tr>
             <tr><td><strong>Confidential tickets</strong></td><td>Nothing at all</td><td>See above.</td></tr>
+            <tr><td><strong>Telling managers about new tickets</strong></td><td>Don't notify</td><td>When someone on a manager's team raises a ticket: <strong>email</strong> them (number, subject and a link - the link needs the public web address under Tickets &rarr; Settings &rarr; Email Templates), or put it in the <strong>portal's notification bell</strong>, the same bell analysts have. Never for a ticket the manager may not open, so never for a confidential one.</td></tr>
             <tr><td><strong>Keep showing the tickets of people who have left</strong></td><td>On</td><td>An open ticket still needs oversight after its requester goes.</td></tr>
             <tr><td><strong>Who may set up management lines</strong></td><td>Administrators only</td><td>Or anyone who can edit people on Tickets &rarr; Users or Assets &rarr; Users. Everyone else sees the Manager access page read-only. A line lets one person read another's tickets, so keep it to a few.</td></tr>
         </tbody>

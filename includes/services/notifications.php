@@ -24,6 +24,16 @@
  *      per analyst.
  *
  * Anything added here later must go through notify() so it inherits all four.
+ *
+ * TWO BELLS, ONE SERVICE (discussion #62)
+ * ----------------------------------------
+ * The self-service portal has a bell too - a manager hears about a new ticket
+ * from their team there. Its rows live in `portal_notifications` (keyed on
+ * users.id), a sibling of `notifications` (keyed on analysts.id), and every
+ * method here serves both: pass an analyst id as before, or
+ * NotificationsService::portalUser($userId) for a portal user. Coalescing,
+ * reading and clearing are the same code either way; only the per-analyst type
+ * preferences (rule 4) are analyst-only, because a portal user has none.
  */
 
 require_once __DIR__ . '/../service_context.php';
@@ -53,6 +63,24 @@ class NotificationsService
      * Use the helper pair below; do not set this directly, or an exception
      * mid-loop leaves the flag stuck on for the rest of the request.
      */
+    /**
+     * A portal user as a recipient. Anything else passed where a recipient is
+     * expected is an analyst id, so every existing caller is unchanged.
+     */
+    public static function portalUser(int $userId): array
+    {
+        return ['portal_user' => $userId];
+    }
+
+    /** [table, id column, id, is portal] for a recipient. The ONLY place that choice is made. */
+    private static function who($recipient): array
+    {
+        if (is_array($recipient) && isset($recipient['portal_user'])) {
+            return ['portal_notifications', 'user_id', (int)$recipient['portal_user'], true];
+        }
+        return ['notifications', 'analyst_id', (int)$recipient, false];
+    }
+
     private static bool $bulkMode = false;
     private static int $bulkSuppressed = 0;
 
@@ -206,12 +234,14 @@ class NotificationsService
      * Returns the notification id, or null when the rules said no — which is the
      * common case and is not an error.
      *
-     * $in: analyst_id, event_type, entity_type, entity_id, entity_ref, title,
-     *      body, actor_id, actor_name
+     * $in: analyst_id (or portal_user_id), event_type, entity_type, entity_id,
+     *      entity_ref, title, body, actor_id, actor_name
      */
     public static function notify(PDO $conn, array $in): ?int
     {
-        $analystId = (int)($in['analyst_id'] ?? 0);
+        // Who it is for: an analyst, or (portal_user_id) a self-service portal user.
+        $recipient = !empty($in['portal_user_id']) ? self::portalUser((int)$in['portal_user_id']) : (int)($in['analyst_id'] ?? 0);
+        [$table, $col, $analystId, $isPortal] = self::who($recipient);
         $eventType = (string)($in['event_type'] ?? '');
         $entityId  = (int)($in['entity_id'] ?? 0);
 
@@ -230,13 +260,15 @@ class NotificationsService
         // ── Rule 1: never tell you about your own action ──────────────────────
         // The single biggest source of noise. An analyst working their own queue
         // generates most of the events on their own tickets.
-        $actorId = isset($in['actor_id']) ? (int)$in['actor_id'] : 0;
+        // actor_id is an analyst id and actor_user_id a portal user's, so an
+        // analyst and a portal user who share a number are never confused.
+        $actorId = $isPortal ? (int)($in['actor_user_id'] ?? 0) : (isset($in['actor_id']) ? (int)$in['actor_id'] : 0);
         if ($actorId > 0 && $actorId === $analystId) {
             return null;
         }
 
         // ── Rule 4: is this type wanted at all? ───────────────────────────────
-        if (!self::typeEnabled($conn, $analystId, $eventType)) {
+        if (!$isPortal && !self::typeEnabled($conn, $analystId, $eventType)) {
             return null;
         }
 
@@ -253,8 +285,8 @@ class NotificationsService
         // separate rows that happen to be about one ticket.
         try {
             $find = $conn->prepare(
-                "SELECT id FROM notifications
-                 WHERE analyst_id = ? AND entity_type = ? AND entity_id = ?
+                "SELECT id FROM $table
+                 WHERE $col = ? AND entity_type = ? AND entity_id = ?
                    AND read_datetime IS NULL
                    AND updated_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? MINUTE)
                  ORDER BY id DESC LIMIT 1"
@@ -264,7 +296,7 @@ class NotificationsService
 
             if ($existingId !== false) {
                 $conn->prepare(
-                    "UPDATE notifications
+                    "UPDATE $table
                      SET event_count = event_count + 1,
                          event_type  = ?,
                          body        = ?,
@@ -276,8 +308,8 @@ class NotificationsService
             }
 
             $conn->prepare(
-                "INSERT INTO notifications
-                    (analyst_id, event_type, entity_type, entity_id, entity_ref,
+                "INSERT INTO $table
+                    ($col, event_type, entity_type, entity_id, entity_ref,
                      title, body, actor_name, event_count, created_datetime, updated_datetime)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())"
             )->execute([$analystId, $eventType, $entityType, $entityId, $entityRef, $title, $body, $actorName]);
@@ -291,13 +323,14 @@ class NotificationsService
     }
 
     /** Unread count for the badge. Cheap — this is polled by every open tab. */
-    public static function unreadCount(PDO $conn, int $analystId): int
+    public static function unreadCount(PDO $conn, $recipient): int
     {
+        [$table, $col, $id] = self::who($recipient);
         try {
             $stmt = $conn->prepare(
-                "SELECT COUNT(*) FROM notifications WHERE analyst_id = ? AND read_datetime IS NULL"
+                "SELECT COUNT(*) FROM $table WHERE $col = ? AND read_datetime IS NULL"
             );
-            $stmt->execute([$analystId]);
+            $stmt->execute([$id]);
             return (int)$stmt->fetchColumn();
         } catch (Exception $e) {
             return 0;
@@ -305,18 +338,19 @@ class NotificationsService
     }
 
     /** Newest first. Unread first is deliberately NOT done — recency is the useful order. */
-    public static function listFor(PDO $conn, int $analystId, int $limit = self::LIST_LIMIT): array
+    public static function listFor(PDO $conn, $recipient, int $limit = self::LIST_LIMIT): array
     {
+        [$table, $col, $id, $isPortal] = self::who($recipient);
         $limit = max(1, min($limit, self::LIST_LIMIT));
         $stmt = $conn->prepare(
             "SELECT id, event_type, entity_type, entity_id, entity_ref, title, body,
                     actor_name, event_count, created_datetime, updated_datetime, read_datetime
-             FROM notifications
-             WHERE analyst_id = ?
+             FROM $table
+             WHERE $col = ?
              ORDER BY updated_datetime DESC, id DESC
              LIMIT $limit"
         );
-        $stmt->execute([$analystId]);
+        $stmt->execute([$id]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($rows as &$r) {
@@ -324,7 +358,9 @@ class NotificationsService
             $r['entity_id']   = (int)$r['entity_id'];
             $r['event_count'] = (int)$r['event_count'];
             $r['is_read']     = $r['read_datetime'] !== null;
-            $r['link']        = self::linkFor($r['entity_type'], (int)$r['entity_id']);
+            // A portal user opens a ticket in the portal, never the analyst inbox.
+            $r['link']        = $isPortal ? self::portalLinkFor($r['entity_type'], (int)$r['entity_id'])
+                                          : self::linkFor($r['entity_type'], (int)$r['entity_id']);
         }
         return $rows;
     }
@@ -349,27 +385,39 @@ class NotificationsService
         return entityLink($entityType, $entityId);
     }
 
-    /** Mark specific ids read. Scoped to the analyst, so ids from elsewhere do nothing. */
-    public static function markRead(PDO $conn, int $analystId, array $ids): int
+    /**
+     * Where a portal user's notification goes. Only tickets so far; the ticket
+     * page itself decides - through portalTicketAccess() - whether they may see
+     * it, so a stale notification can never be a way in.
+     */
+    public static function portalLinkFor(string $entityType, int $entityId): ?string
     {
+        return $entityType === 'ticket' ? 'self-service/tickets.php?view=team&id=' . $entityId : null;
+    }
+
+    /** Mark specific ids read. Scoped to the analyst, so ids from elsewhere do nothing. */
+    public static function markRead(PDO $conn, $recipient, array $ids): int
+    {
+        [$table, $col, $analystId] = self::who($recipient);
         $ids = array_values(array_filter(array_map('intval', $ids), fn($i) => $i > 0));
         if (!$ids) {
             return 0;
         }
         $place = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $conn->prepare(
-            "UPDATE notifications SET read_datetime = UTC_TIMESTAMP()
-             WHERE analyst_id = ? AND read_datetime IS NULL AND id IN ($place)"
+            "UPDATE $table SET read_datetime = UTC_TIMESTAMP()
+             WHERE $col = ? AND read_datetime IS NULL AND id IN ($place)"
         );
         $stmt->execute(array_merge([$analystId], $ids));
         return $stmt->rowCount();
     }
 
-    public static function markAllRead(PDO $conn, int $analystId): int
+    public static function markAllRead(PDO $conn, $recipient): int
     {
+        [$table, $col, $analystId] = self::who($recipient);
         $stmt = $conn->prepare(
-            "UPDATE notifications SET read_datetime = UTC_TIMESTAMP()
-             WHERE analyst_id = ? AND read_datetime IS NULL"
+            "UPDATE $table SET read_datetime = UTC_TIMESTAMP()
+             WHERE $col = ? AND read_datetime IS NULL"
         );
         $stmt->execute([$analystId]);
         return $stmt->rowCount();
@@ -388,15 +436,16 @@ class NotificationsService
      * somebody else match nothing rather than erroring, which keeps a stale open
      * tab harmless.
      */
-    public static function clear(PDO $conn, int $analystId, array $ids): int
+    public static function clear(PDO $conn, $recipient, array $ids): int
     {
+        [$table, $col, $analystId] = self::who($recipient);
         $ids = array_values(array_filter(array_map('intval', $ids), fn($i) => $i > 0));
         if (!$ids) {
             return 0;
         }
         $place = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $conn->prepare(
-            "DELETE FROM notifications WHERE analyst_id = ? AND id IN ($place)"
+            "DELETE FROM $table WHERE $col = ? AND id IN ($place)"
         );
         $stmt->execute(array_merge([$analystId], $ids));
         return $stmt->rowCount();
@@ -410,9 +459,10 @@ class NotificationsService
      * ones nobody has looked at yet — so unless the analyst deliberately ticks the
      * box in the confirmation, unread news survives a Clear all.
      */
-    public static function clearAll(PDO $conn, int $analystId, bool $includeUnread = false): int
+    public static function clearAll(PDO $conn, $recipient, bool $includeUnread = false): int
     {
-        $sql = "DELETE FROM notifications WHERE analyst_id = ?";
+        [$table, $col, $analystId] = self::who($recipient);
+        $sql = "DELETE FROM $table WHERE $col = ?";
         if (!$includeUnread) {
             $sql .= " AND read_datetime IS NOT NULL";
         }

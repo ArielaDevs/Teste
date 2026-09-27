@@ -144,6 +144,17 @@ $m = fn(string $k) => t('system.managers.' . $k);
             <?php endforeach; ?>
         </div>
 
+        <?php /* Telling managers about new team tickets - off by default. */ ?>
+        <div class="mg-panel">
+            <h3><?php echo htmlspecialchars($m('notify_heading')); ?></h3>
+            <p><?php echo htmlspecialchars($m('notify_desc')); ?></p>
+            <?php foreach (['none', 'email', 'bell'] as $v): ?>
+            <label class="mg-radio"><input type="radio" name="mgNotify" value="<?php echo $v; ?>">
+                <span><span class="mg-label"><?php echo htmlspecialchars($m('notify_' . $v)); ?></span>
+                <span class="mg-desc"><?php echo htmlspecialchars($m('notify_' . $v . '_desc')); ?></span></span></label>
+            <?php endforeach; ?>
+        </div>
+
         <div class="mg-panel">
             <h3><?php echo htmlspecialchars($m('leavers_heading')); ?></h3>
             <div class="mg-field">
@@ -198,6 +209,7 @@ $m = fn(string $k) => t('system.managers.' . $k);
             $('mgLeavers').checked   = s.leavers === '1';
             document.querySelectorAll('input[name=mgConf]').forEach(r => r.checked = r.value === s.confidential);
             document.querySelectorAll('input[name=mgEditBy]').forEach(r => r.checked = r.value === s.edit_by);
+            document.querySelectorAll('input[name=mgNotify]').forEach(r => r.checked = r.value === s.notify);
             $('mgVerify').hidden = !(status && status.needs_verify);
             sync();
         }
@@ -225,6 +237,7 @@ $m = fn(string $k) => t('system.managers.' . $k);
                 leavers:         $('mgLeavers').checked ? '1' : '0',
                 confidential:    pick('mgConf') || 'none',
                 edit_by:         pick('mgEditBy') || 'admins',
+                notify:          pick('mgNotify') || 'none',
             };
             this.disabled = true;
             try {
