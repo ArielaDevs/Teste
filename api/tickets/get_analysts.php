@@ -66,6 +66,27 @@ try {
         $analyst['team_tenant_ids'] = $viaTeam;                             // granted via a team (read-only here)
         $analyst['team_all_access'] = !empty($teamAllAccess[$analyst['id']]); // in an all-access team
     }
+    unset($analyst);
+
+    // Follow team (GH #41): whether each analyst takes their sign-in method from
+    // their teams, and what those teams say. Only for System -> Analysts, which asks
+    // with ?signin=1 - every assignee list in the app calls this endpoint too, and
+    // none of them needs it.
+    if (!empty($_GET['signin'])) {
+        require_once '../../includes/analyst_signin.php';
+        if (analystSignInReady($conn)) {
+            $follow = [];
+            foreach ($conn->query("SELECT id FROM analysts WHERE auth_follow_team = 1") as $row) {
+                $follow[(int)$row['id']] = true;
+            }
+            $byAnalyst = analystSignInTeamMethods($conn);
+            foreach ($analysts as &$analyst) {
+                $analyst['auth_follow_team'] = !empty($follow[$analyst['id']]);
+                $analyst['team_signin'] = analystSignInVerdict($byAnalyst[$analyst['id']] ?? []);
+            }
+            unset($analyst);
+        }
+    }
 
     echo json_encode(['success' => true, 'analysts' => $analysts]);
 

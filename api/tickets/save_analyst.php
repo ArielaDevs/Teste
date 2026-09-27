@@ -6,6 +6,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/admin_api_guard.php'; // System admins only (issue #34)
 require_once '../../includes/functions.php';
+require_once '../../includes/analyst_signin.php';   // Follow team (GH #41)
 
 header('Content-Type: application/json');
 
@@ -31,6 +32,10 @@ $password = $data['password'] ?? null;
 $isActive = $data['is_active'] ?? true;
 // Which sign-in method: NULL/empty = local password, otherwise an auth_providers.id (SSO).
 $authProviderId = !empty($data['auth_provider_id']) ? (int)$data['auth_provider_id'] : null;
+// Follow team (GH #41): the method comes from their teams instead. Only touched when
+// the caller sends it, so an older caller cannot switch it off by leaving it out.
+$hasFollowTeam = array_key_exists('auth_follow_team', $data);
+$followTeam    = !empty($data['auth_follow_team']) ? 1 : 0;
 // Administrator flag. Only admins reach this endpoint (see admin_api_guard), so the
 // real safeguard is refusing to remove the LAST admin (below) — not who may set it.
 $isAdmin = !empty($data['is_admin']) ? 1 : 0;
@@ -75,6 +80,27 @@ try {
                 echo json_encode(['success' => false, 'error' => 'This is the last active administrator — grant admin to another analyst before removing or deactivating this one.']);
                 exit;
             }
+        }
+    }
+
+    if ($hasFollowTeam && !analystSignInReady($conn)) {
+        if ($followTeam) {
+            echo json_encode(['success' => false, 'error' => 'Run System → Database Verification before using Follow team.']);
+            exit;
+        }
+        $hasFollowTeam = false; // nothing to switch off yet
+    }
+
+    // Following their team: keep the method they have now. analystSignInApply()
+    // below replaces it with the team's, or leaves it if their teams disagree or
+    // set nothing - never guess.
+    if ($hasFollowTeam && $followTeam) {
+        $authProviderId = null;
+        if ($id) {
+            $cur = $conn->prepare("SELECT auth_provider_id FROM analysts WHERE id = ?");
+            $cur->execute([(int)$id]);
+            $v = $cur->fetchColumn();
+            $authProviderId = ($v !== false && $v !== null) ? (int)$v : null;
         }
     }
 
@@ -123,6 +149,12 @@ try {
         $message = 'Analyst created successfully';
     }
 
+    $signin = null;
+    if ($hasFollowTeam && $analystId > 0) {
+        $conn->prepare("UPDATE analysts SET auth_follow_team = ? WHERE id = ?")->execute([$followTeam, $analystId]);
+        $signin = analystSignInApplyMany($conn, [$analystId]);
+    }
+
     // Module access (issue #30): the all-modules flag. Only touched when the form
     // sends it, so other callers can't clobber it. Specific grants (when restricted)
     // are managed on System -> Modules.
@@ -152,7 +184,7 @@ try {
         }
     }
 
-    echo json_encode(['success' => true, 'message' => $message]);
+    echo json_encode(['success' => true, 'message' => $message, 'signin' => $signin]);
 
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);

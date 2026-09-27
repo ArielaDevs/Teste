@@ -49,6 +49,22 @@ try {
 
     $stmt = $conn->prepare("DELETE FROM auth_providers WHERE id = ?");
     $stmt->execute([$id]);
+
+    // The same reasoning as the write log above, for the two places that name a
+    // sign-in method. With the foreign key these find nothing left to do; without
+    // it, an analyst pinned here kept a dangling id - and a dangling OIDC-looking
+    // pin meant the password form refused them and no SSO button matched either.
+    $conn->prepare("UPDATE analysts SET auth_provider_id = NULL WHERE auth_provider_id = ?")->execute([$id]);
+    try {
+        $conn->prepare("UPDATE teams SET auth_method = NULL, auth_provider_id = NULL WHERE auth_method = 'provider' AND auth_provider_id = ?")->execute([$id]);
+        // A team that pointed here now sets nothing, which can settle a disagreement
+        // between someone's teams (GH #41).
+        require_once __DIR__ . '/../../includes/analyst_signin.php';
+        analystSignInApplyMany($conn, analystSignInFollowerIds($conn));
+    } catch (Throwable $e) {
+        // An install whose Database Verification has not added the team columns yet.
+        error_log('[sso] team sign-in cleanup skipped: ' . $e->getMessage());
+    }
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);

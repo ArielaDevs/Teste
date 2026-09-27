@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS `analysts` (
     `failed_login_count`        INT NOT NULL DEFAULT 0,
     `locked_until`              DATETIME NULL,
     `auth_provider_id`          INT NULL,
+    -- 1 = take the sign-in method from their teams (GH #41); auth_provider_id then
+    -- holds the result, copied in by includes/analyst_signin.php.
+    `auth_follow_team`          TINYINT(1) NOT NULL DEFAULT 0,
     `can_access_all_tenants`    TINYINT(1) NOT NULL DEFAULT 1,
     -- Only administrators may enter the System module (analyst/team/company mgmt,
     -- SSO, security, DB verify, etc.). New analysts default to non-admin.
@@ -362,6 +365,10 @@ CREATE TABLE IF NOT EXISTS `teams` (
     -- Team module access (issue #30). Defaults to 0 (grants no modules) for the same
     -- reason — a team must be explicitly granted modules; team_modules lists them.
     `can_access_all_modules` TINYINT(1) NOT NULL DEFAULT 0,
+    -- Default sign-in method for members set to "Follow team" (GH #41).
+    -- NULL = not set, 'local' = password, 'provider' = auth_provider_id.
+    `auth_method`       VARCHAR(10) NULL,
+    `auth_provider_id`  INT NULL,
     `created_datetime`  DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_datetime`  DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
     `is_demo`           TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)

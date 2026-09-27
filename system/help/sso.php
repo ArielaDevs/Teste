@@ -25,7 +25,7 @@ require __DIR__ . '/_top.php';
     <div class="help-cards">
         <div class="help-card">
             <h4>Analysts</h4>
-            <p>Your service-desk staff, on the main login page. Each analyst is assigned a sign-in method (local password, or a specific provider) in <strong>System &rarr; Analysts</strong>.</p>
+            <p>Your service-desk staff, on the main login page. Each analyst has one sign-in method (local password, or a specific provider), set for them in <strong>System &rarr; Analysts</strong> or taken from their team in <strong>System &rarr; Teams</strong>.</p>
         </div>
         <div class="help-card">
             <h4>Self-service portal</h4>
@@ -67,7 +67,7 @@ require __DIR__ . '/_top.php';
     <div class="help-steps">
         <div class="help-step"><div class="help-step-num">1</div><div><strong>Register an app in your identity provider.</strong> Create an app/registration in Entra, Okta, Google, etc. Set its redirect URI to the address below, and note the <strong>issuer URL</strong>, <strong>client ID</strong> and a <strong>client secret</strong>.<br><br>Redirect URI to register: <code><?php echo htmlspecialchars($redirectUri); ?></code></div></div>
         <div class="help-step"><div class="help-step-num">2</div><div><strong>Add the provider here.</strong> System &rarr; Single Sign-On &rarr; <em>Add provider</em>. Paste the issuer URL, client ID and secret, give it a display name (e.g. “Sign in with Microsoft”), tick <strong>Enabled</strong>, and use <strong>Test</strong> to confirm the issuer is reachable. Turn on the master <strong>Enable single sign-on</strong> switch.</div></div>
-        <div class="help-step"><div class="help-step-num">3</div><div><strong>Decide who uses it.</strong> For <strong>analysts</strong>, set their <em>Sign-in method</em> to this provider in System &rarr; Analysts. For <strong>portal users</strong>, turn on the provider's <em>auto-create users</em> toggle and they're created on first sign-in — or they're matched to an existing record by verified email.</div></div>
+        <div class="help-step"><div class="help-step-num">3</div><div><strong>Decide who uses it.</strong> For <strong>analysts</strong>, set the <em>Sign-in method</em> on their team in System &rarr; Teams, and everyone set to <em>Follow team</em> uses it — or set it for one person in System &rarr; Analysts. For <strong>portal users</strong>, turn on the provider's <em>auto-create users</em> toggle and they're created on first sign-in — or they're matched to an existing record by verified email.</div></div>
     </div>
 
     <div class="help-note ok"><strong>That's it.</strong> The login pages now lead with your provider's button, with the password form tucked behind a “local account” link. Nothing else to configure — there are no companies to think about.</div>

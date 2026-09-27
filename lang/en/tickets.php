@@ -1848,6 +1848,22 @@ return [
             'access_all'       => 'Access all companies',
             'access_all_help'  => 'On = this analyst can work in every company (now and any added later). Off = only the companies you tick below.',
         ],
+        // Sign-in method set at team level (GH #41) - System -> Teams and System -> Analysts
+        'team_signin' => [
+            'follow_team'      => 'Follow team',
+            'follow_help'      => 'Follow team takes the sign-in method from this analyst\'s teams, and changes when their teams do.',
+            'not_set'          => 'Not set',
+            'local'            => 'Local password',
+            'team_help'        => 'Members set to Follow team on System → Analysts sign in this way. If a member\'s teams set different methods, nothing changes for them until you choose one on their record.',
+            'from_team'        => 'From their team: {method} ({teams}).',
+            'conflict'         => 'Their teams disagree: {detail}. Still signing in with {current} until you choose one here.',
+            'none'             => 'None of their teams sets a sign-in method. Still signing in with {current}.',
+            'new_follow'       => 'Signs in with a local password until they join a team that sets a method.',
+            'badge_conflict'   => 'Teams disagree',
+            'badge_team_conflicts' => '{count} disagree',
+            'summary_changed'  => 'Analysts whose sign-in method changed: {count}.',
+            'summary_conflict' => 'Analysts whose teams disagree: {count} - choose one for each on System → Analysts.',
+        ],
     ],
 
     // tickets/rota.php — weekly staff rota grid

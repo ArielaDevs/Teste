@@ -6,6 +6,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/admin_api_guard.php'; // System admins only (issue #34)
 require_once '../../includes/functions.php';
+require_once '../../includes/analyst_signin.php';   // Follow team (GH #41)
 
 header('Content-Type: application/json');
 
@@ -49,9 +50,13 @@ try {
 
     $conn->commit();
 
+    // New teams can mean a new sign-in method for an analyst who follows their team.
+    $signin = analystSignInApplyMany($conn, [(int)$analystId]);
+
     echo json_encode([
         'success' => true,
-        'message' => 'Analyst teams updated successfully'
+        'message' => 'Analyst teams updated successfully',
+        'signin'  => $signin
     ]);
 
 } catch (Exception $e) {

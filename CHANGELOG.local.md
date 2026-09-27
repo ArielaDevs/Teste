@@ -14,6 +14,9 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
+| 1987 | System            | Feature     | Sign-in method at team level (GH #41): teams.auth_method/auth_provider_id and analysts.auth_follow_team (default Follow team for new analysts, 0 for existing); includes/analyst_signin.php copies the team's method into analysts.auth_provider_id on every save that can change it, so the enforcement code is untouched; teams that disagree change nothing and are flagged on both screens. |
+| 1988 | Authentication    | Fix         | Deleting an SSO provider now clears analysts.auth_provider_id explicitly - on a verify-built table with no foreign key the dangling pin made the password form refuse the analyst while no SSO button matched them either. |
+| 1989 | System            | Fix         | System help -> Analysts claimed an SSO-assigned analyst could still use their password ("both routes still work"); login.php has always refused them, and the help now says so. |
 
 
 

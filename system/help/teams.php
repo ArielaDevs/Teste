@@ -52,6 +52,7 @@ require __DIR__ . '/_top.php';
         <tr><td><strong>Display order</strong></td><td>Sorts the team list and every team dropdown in the app. Lower numbers first; ties fall back to name.</td></tr>
         <tr><td><strong>Active</strong></td><td>On by default. See the warning at the end of this page about what deactivating does <em>not</em> do.</td></tr>
         <tr><td><strong>Access all modules</strong></td><td><strong>Off</strong> by default for a new team. On means members can open every module.</td></tr>
+        <tr><td><strong>Sign-in method</strong></td><td><strong>Not set</strong> by default. Set it and members who <em>follow their team</em> sign in this way. See Sign-in method below.</td></tr>
     </table></div>
     <p>Once the team exists, use the buttons on its row to fill it out: <strong>Manage departments</strong>, <strong>Manage members</strong>, and — on a multi-company install — <strong>Manage company access</strong>.</p>
 </div>
@@ -114,6 +115,24 @@ require __DIR__ . '/_top.php';
         </ul>
         If a module disappears from someone's waffle right after a team change, this is the reason.
     </div>
+</div>
+
+<!-- Sign-in method (GH #41) -->
+<div class="help-section" id="signin">
+    <div class="help-section-header"><?php echo helpSectionNum('signin'); ?>
+        <div>
+            <h3>Sign-in method</h3>
+            <p>Set a sign-in method on a team once, and new people pick it up just by joining the team. It only applies to analysts whose own <strong>Sign-in method</strong> on System &rarr; Analysts is <strong>Follow team</strong>, which is the default for anyone you add from now on. Analysts who already existed keep exactly what they had until you change them.</p>
+        </div>
+    </div>
+    <div class="help-table"><table>
+        <tr><th>The analyst's teams</th><th>What happens</th></tr>
+        <tr><td>One team sets a method, or several teams set the <em>same</em> one</td><td>They sign in that way, and move automatically if you change the team's method.</td></tr>
+        <tr><td>Their teams set <em>different</em> methods</td><td><strong>Nothing changes</strong> — they keep signing in the way they did. The team list shows <em>N disagree</em>, and their row on System &rarr; Analysts shows <em>Teams disagree</em>, until you choose one on their record.</td></tr>
+        <tr><td>None of their teams sets a method</td><td>They keep what they had.</td></tr>
+    </table></div>
+    <div class="help-note warn"><strong>Moving someone between teams can change how they sign in.</strong> So can switching a team off, deleting it, or changing its method. After each of those saves, a message says how many analysts changed. Before you put a team on a single sign-on provider, make sure its members' email addresses match their accounts at that provider.</div>
+    <div class="help-note">Each analyst still has exactly <strong>one</strong> way in. Being in two teams never gives someone two sign-in methods. It only raises the question of which one, and FreeITSM leaves that to you rather than guessing.</div>
 </div>
 
 <!-- 7. Deleting a team -->

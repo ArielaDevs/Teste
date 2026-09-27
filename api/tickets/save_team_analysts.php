@@ -9,6 +9,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/admin_api_guard.php'; // System admins only (issue #34)
 require_once '../../includes/functions.php';
+require_once '../../includes/analyst_signin.php';   // Follow team (GH #41)
 
 header('Content-Type: application/json');
 
@@ -32,6 +33,10 @@ if (!$teamId) {
 try {
     $conn = connectToDatabase();
 
+    // Everyone who was a member before, as well as everyone who is one now: someone
+    // taken OUT of the team can change sign-in method too (GH #41).
+    $before = analystSignInTeamMemberIds($conn, (int)$teamId);
+
     // Start transaction
     $conn->beginTransaction();
 
@@ -52,9 +57,12 @@ try {
 
     $conn->commit();
 
+    $signin = analystSignInApplyMany($conn, array_merge($before, array_map('intval', $analystIds)));
+
     echo json_encode([
         'success' => true,
-        'message' => 'Team analysts updated successfully'
+        'message' => 'Team analysts updated successfully',
+        'signin'  => $signin
     ]);
 
 } catch (Exception $e) {

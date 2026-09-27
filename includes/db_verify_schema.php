@@ -50,6 +50,10 @@ return [
         'failed_login_count'     => 'INT NOT NULL DEFAULT 0',
         'locked_until'           => 'DATETIME NULL',
         'auth_provider_id'       => 'INT NULL',
+        // 1 = take the sign-in method from their teams (GH #41); auth_provider_id then
+        // holds the result, copied in by includes/analyst_signin.php. Defaults to 0 so
+        // nobody's sign-in changes on upgrade.
+        'auth_follow_team'       => 'TINYINT(1) NOT NULL DEFAULT 0',
         'can_access_all_tenants' => 'TINYINT(1) NOT NULL DEFAULT 1',
         // Only administrators may enter the System module. New analysts default to
         // non-admin; existing analysts are grandfathered to admin on first upgrade
@@ -241,6 +245,10 @@ return [
         // 'most' (union) mode a team defaulting to all would blow away every member's
         // individual restrictions. Grants are in team_modules.
         'can_access_all_modules' => 'TINYINT(1) NOT NULL DEFAULT 0',
+        // Default sign-in method for members set to "Follow team" (GH #41).
+        // NULL = not set, 'local' = password, 'provider' = auth_provider_id.
+        'auth_method'       => 'VARCHAR(10) NULL',
+        'auth_provider_id'  => 'INT NULL',
         'created_datetime'  => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
         'updated_datetime'  => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
         'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',   // set by the demo data importer (#1297)

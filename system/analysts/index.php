@@ -189,7 +189,10 @@ $translationNamespaces = ['common', 'tickets'];
 
                 <div class="form-group">
                     <label for="analystAuthProvider"><?php echo htmlspecialchars(t('tickets.settings.analyst_extra.signin_method')); ?></label>
-                    <select id="analystAuthProvider">
+                    <select id="analystAuthProvider" onchange="updateAnalystSigninNote()">
+                        <!-- Follow team (GH #41). Removed by JS on an install whose Database
+                             Verification has not added the column yet. -->
+                        <option value="team" id="analystFollowTeamOpt"><?php echo htmlspecialchars(t('tickets.settings.team_signin.follow_team')); ?></option>
                         <option value=""><?php echo t('tickets.settings.analyst_extra.signin_local'); ?></option>
                         <?php
                         // Single sign-on providers — assigning one makes this analyst an SSO user
@@ -202,7 +205,8 @@ $translationNamespaces = ['common', 'tickets'];
                         } catch (Exception $e) { /* table may not exist yet */ }
                         ?>
                     </select>
-                    <small style="color: var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.analyst_extra.signin_help')); ?></small>
+                    <small id="analystTeamSigninNote" style="display:none; margin: 4px 0; padding: 6px 8px; border-radius: 4px; font-size: 12px;"></small>
+                    <small style="color: var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.analyst_extra.signin_help')); ?> <?php echo htmlspecialchars(t('tickets.settings.team_signin.follow_help')); ?></small>
                 </div>
 
                 <!-- Multi-tenancy: company access. Hidden on a single-company install
@@ -341,7 +345,7 @@ $translationNamespaces = ['common', 'tickets'];
 
         async function loadAnalysts() {
             try {
-                const response = await fetch(API_BASE + 'get_analysts.php');
+                const response = await fetch(API_BASE + 'get_analysts.php?signin=1');
                 const data = await response.json();
                 if (data.success) {
                     analysts = data.analysts;
@@ -422,7 +426,7 @@ $translationNamespaces = ['common', 'tickets'];
                 return `
                     <tr>
                         <td><strong>${escapeHtml(a.username)}</strong></td>
-                        <td>${escapeHtml(a.full_name)}${accessChip}</td>
+                        <td>${escapeHtml(a.full_name)}${accessChip}${signinConflictChip(a)}</td>
                         <td>${escapeHtml(a.email || '')}</td>
                         <td>${teamsText}</td>
                         <td>${statusBadge}</td>
@@ -471,6 +475,70 @@ $translationNamespaces = ['common', 'tickets'];
                 </label>`).join('');
         }
 
+        // ── Follow team (GH #41) ──────────────────────────────────────────────
+        // get_analysts.php?signin=1 only adds auth_follow_team once Database
+        // Verification has added the column; until then the option is hidden.
+        function signinFeatureReady() {
+            return analysts.length > 0 && Object.prototype.hasOwnProperty.call(analysts[0], 'auth_follow_team');
+        }
+
+        // The name of a sign-in method, as the select shows it.
+        function signinMethodName(providerId) {
+            if (!providerId) return t('tickets.settings.team_signin.local');
+            const opt = document.querySelector(`#analystAuthProvider option[value="${Number(providerId)}"]`);
+            return opt ? opt.textContent : '#' + providerId;
+        }
+
+        function signinConflictChip(a) {
+            if (!a.auth_follow_team || !a.team_signin || a.team_signin.status !== 'conflict') return '';
+            return `<span class="status-badge" style="background:#fff3e0; color:#e65100; margin-left:6px;">${escapeHtml(t('tickets.settings.team_signin.badge_conflict'))}</span>`;
+        }
+
+        // Under the select: where Follow team gets its answer, or why it has none.
+        let signinModalAnalyst = null;
+        function updateAnalystSigninNote() {
+            const note = document.getElementById('analystTeamSigninNote');
+            const a = signinModalAnalyst;
+            if (document.getElementById('analystAuthProvider').value !== 'team') {
+                note.style.display = 'none';
+                return;
+            }
+            let text, warn = false;
+            if (!a) {
+                text = t('tickets.settings.team_signin.new_follow');
+            } else {
+                const ts = a.team_signin || { status: 'none', teams: [] };
+                // What they sign in with now - kept whenever the teams give no single answer.
+                const current = signinMethodName(a.auth_provider_id);
+                const label = m => m.key === 0 ? t('tickets.settings.team_signin.local') : m.label;
+                if (ts.status === 'agreed') {
+                    text = t('tickets.settings.team_signin.from_team', {
+                        method: label(ts.teams[0]),
+                        teams: ts.teams.map(m => m.team_name).join(', ')
+                    });
+                } else if (ts.status === 'conflict') {
+                    warn = true;
+                    text = t('tickets.settings.team_signin.conflict', {
+                        detail: ts.teams.map(m => `${m.team_name} (${label(m)})`).join(', '),
+                        current: current
+                    });
+                } else {
+                    text = t('tickets.settings.team_signin.none', { current: current });
+                }
+            }
+            note.textContent = text;
+            note.style.background = warn ? '#fff3e0' : 'var(--bg-subtle, #f5f7f8)';
+            note.style.color = warn ? '#e65100' : 'var(--text-muted, #555)';
+            note.style.display = 'block';
+        }
+
+        // After a save that can move people between sign-in methods.
+        function showSigninOutcome(signin) {
+            if (!signin) return;
+            if (signin.changed > 0) showToast(t('tickets.settings.team_signin.summary_changed', { count: signin.changed }), 'info', 6000);
+            if (signin.conflict > 0) showToast(t('tickets.settings.team_signin.summary_conflict', { count: signin.conflict }), 'warning', 9000);
+        }
+
         function openAnalystModal(analyst = null) {
             document.getElementById('analystModalTitle').textContent = analyst ? t('tickets.settings.modals.analyst.edit_title') : t('tickets.settings.modals.analyst.add_title');
             document.getElementById('analystId').value = analyst ? analyst.id : '';
@@ -481,7 +549,16 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('analystActive').checked = analyst ? analyst.is_active : true;
             document.getElementById('analystIsAdmin').checked = analyst ? !!analyst.is_admin : false;
             document.getElementById('analystAllModules').checked = analyst ? (analyst.can_access_all_modules === undefined ? true : !!Number(analyst.can_access_all_modules)) : true;
-            document.getElementById('analystAuthProvider').value = (analyst && analyst.auth_provider_id) ? String(analyst.auth_provider_id) : '';
+            const followOpt = document.getElementById('analystFollowTeamOpt');
+            const ready = signinFeatureReady();
+            if (followOpt) { followOpt.hidden = !ready; followOpt.disabled = !ready; }
+            signinModalAnalyst = analyst;
+            // A new analyst follows their team by default - that is the point of
+            // setting it on the team (GH #41). Existing analysts show what they have.
+            document.getElementById('analystAuthProvider').value =
+                (ready && (!analyst || analyst.auth_follow_team)) ? 'team'
+                : (analyst && analyst.auth_provider_id) ? String(analyst.auth_provider_id) : '';
+            updateAnalystSigninNote();
 
             // Password is required only for new analysts
             const passwordInput = document.getElementById('analystPassword');
@@ -639,6 +716,7 @@ $translationNamespaces = ['common', 'tickets'];
                 if (data.success) {
                     closeTeamAssignmentModal();
                     showToast('Saved', 'success');
+                    showSigninOutcome(data.signin);
                     delete analystTeams[entityId];
                     loadAnalysts();
                 } else {
@@ -663,8 +741,11 @@ $translationNamespaces = ['common', 'tickets'];
                 is_active: document.getElementById('analystActive').checked,
                 is_admin: document.getElementById('analystIsAdmin').checked,
                 can_access_all_modules: document.getElementById('analystAllModules').checked,
-                auth_provider_id: document.getElementById('analystAuthProvider').value || null
+                auth_provider_id: ['', 'team'].includes(document.getElementById('analystAuthProvider').value) ? null : document.getElementById('analystAuthProvider').value
             };
+            if (signinFeatureReady()) {
+                formData.auth_follow_team = document.getElementById('analystAuthProvider').value === 'team' ? 1 : 0;
+            }
 
             // Multi-tenancy: send company access only when the control is shown.
             const accessGroup = document.getElementById('analystAccessGroup');
@@ -685,6 +766,7 @@ $translationNamespaces = ['common', 'tickets'];
                 if (data.success) {
                     closeAnalystModal();
                     showToast('Analyst saved', 'success');
+                    showSigninOutcome(data.signin);
                     loadAnalysts();
                 } else {
                     showToast('Error saving analyst: ' + data.error, 'error');

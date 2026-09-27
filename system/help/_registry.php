@@ -80,9 +80,10 @@ function getHelpTopics() {
                 ['id' => 'members',     'label' => 'Members'],
                 ['id' => 'companies',   'label' => 'Company access'],
                 ['id' => 'modules',     'label' => 'Module access'],
+                ['id' => 'signin',      'label' => 'Sign-in method'],
                 ['id' => 'deleting',    'label' => 'Deleting a team'],
             ],
-            'terms' => 'group squad service desk membership queue visibility'
+            'terms' => 'group squad service desk membership queue visibility sso single sign-on login method follow team default'
                      . " can't see tickets cannot see tickets no tickets empty queue missing departments",
         ],
         'roles' => [

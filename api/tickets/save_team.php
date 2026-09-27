@@ -6,6 +6,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/admin_api_guard.php'; // System admins only (issue #34)
 require_once '../../includes/functions.php';
+require_once '../../includes/analyst_signin.php';   // Follow team (GH #41)
 
 header('Content-Type: application/json');
 
@@ -32,6 +33,10 @@ $isActive = isset($input['is_active']) ? ($input['is_active'] ? 1 : 0) : 1;
 // Only applied when the form sends it, so other callers never clobber it.
 $hasAllModules = array_key_exists('can_access_all_modules', $input);
 $allModules = !empty($input['can_access_all_modules']) ? 1 : 0;
+// Default sign-in method for members set to "Follow team" (GH #41). Sent as
+// '' (not set), 'local', or a provider id. Only applied when sent, like the above.
+$hasAuth = array_key_exists('auth_method', $input);
+$authIn  = (string)($input['auth_method'] ?? '');
 
 // Validate
 if (empty($name)) {
@@ -41,6 +46,14 @@ if (empty($name)) {
 
 try {
     $conn = connectToDatabase();
+
+    if ($hasAuth && !analystSignInReady($conn)) {
+        if ($authIn !== '') {
+            echo json_encode(['success' => false, 'error' => 'Run System → Database Verification before setting a sign-in method.']);
+            exit;
+        }
+        $hasAuth = false; // "Not set" is what an unverified install already has
+    }
 
     if ($id) {
         // Update existing team
@@ -63,10 +76,32 @@ try {
         try { $conn->prepare("UPDATE teams SET can_access_all_modules = ? WHERE id = ?")->execute([$allModules, $id]); } catch (Exception $e) {}
     }
 
+    // The sign-in method. A provider id must name a provider that exists: a
+    // dangling one would read as "not set" everywhere, which is not what was chosen.
+    if ($hasAuth) {
+        $method = null; $providerId = null;
+        if ($authIn === 'local') {
+            $method = 'local';
+        } elseif ($authIn !== '') {
+            $chk = $conn->prepare("SELECT id FROM auth_providers WHERE id = ?");
+            $chk->execute([(int)$authIn]);
+            if (!$chk->fetchColumn()) {
+                echo json_encode(['success' => false, 'error' => 'That sign-in method no longer exists.']);
+                exit;
+            }
+            $method = 'provider'; $providerId = (int)$authIn;
+        }
+        $conn->prepare("UPDATE teams SET auth_method = ?, auth_provider_id = ? WHERE id = ?")->execute([$method, $providerId, $id]);
+    }
+
+    // The method, or the team being switched off, can move its members.
+    $signin = analystSignInApplyMany($conn, analystSignInTeamMemberIds($conn, (int)$id));
+
     echo json_encode([
         'success' => true,
         'message' => $message,
-        'id' => $id
+        'id' => $id,
+        'signin' => $signin
     ]);
 
 } catch (Exception $e) {
