@@ -24,7 +24,7 @@ function managerAccessRender(int $managerId, string $backUrl): void
     $keys = [
         'page_title', 'back', 'intro', 'off_banner', 'left_banner', 'needs_verify', 'readonly',
         'can_see_label', 'people', 'people_one', 'sources_heading', 'directory_direct', 'directory_all',
-        'directory_note', 'directory_off', 'lines_heading', 'lines_none', 'excl_heading', 'excl_desc',
+        'directory_note', 'directory_off', 'directory_label', 'lines_search', 'tab_empty', 'lines_heading', 'lines_none', 'excl_heading', 'excl_desc',
         'excl_none', 'line_everyone', 'line_user', 'line_group', 'line_department', 'line_reports',
         'line_reports_all', 'line_gone_user', 'line_gone_group', 'line_meta', 'line_meta_nobody',
         'dept_empty', 'remove', 'add_heading', 'tab_people', 'tab_groups', 'tab_departments', 'tab_other',
@@ -52,6 +52,8 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .ma-stat { background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-left: 4px solid var(--accent, #0078d4);
                    border-radius: 8px; padding: 8px 16px; min-width: 200px; }
         .ma-stat[hidden] { display: none; }
+        .ma-stats { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; }
+        .ma-stat-note { font-size: 12px; color: var(--text-muted, #666); margin-top: 2px; max-width: 320px; }
         .ma-stat-label { font-size: 11px; color: var(--text-muted, #666); text-transform: uppercase; letter-spacing: .04em; }
         .ma-stat-num { font-size: 22px; font-weight: 600; color: var(--text, #333); }
         .ma-banner { border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; font-size: 13px; border: 1px solid; }
@@ -96,6 +98,8 @@ function managerAccessRender(int $managerId, string $backUrl): void
         .ma-btn:disabled { opacity: .5; cursor: default; }
         .ma-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-soft, #eee); padding: 0 12px; flex-shrink: 0; overflow-x: auto; }
         .ma-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 10px; font-size: 13px; color: var(--text-muted, #666); cursor: pointer; white-space: nowrap; }
+        span.ma-tab { cursor: default; display: inline-block; }
+        .ma-tab { line-height: 18px; font-family: inherit; }   /* a <span> tab and a <button> tab the same height, so the three filters line up */
         .ma-tab.active { color: var(--accent, #0078d4); border-bottom-color: var(--accent, #0078d4); font-weight: 600; }
         .ma-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 4px; font-size: 13px;
                      background: var(--surface, #fff); color: var(--text, #333); }
@@ -133,9 +137,14 @@ function managerAccessRender(int $managerId, string $backUrl): void
                 <h1 class="ma-name" id="maName"><?php echo htmlspecialchars($T['page_title']); ?></h1>
                 <div class="ma-sub" id="maSub"></div>
             </div>
-            <div class="ma-stat" id="maStat" hidden>
-                <div class="ma-stat-label"><?php echo htmlspecialchars($T['can_see_label']); ?></div>
-                <div class="ma-stat-num" id="maStatNum"></div>
+            <div class="ma-stats">
+                <?php /* What the Manager field alone gives them - it is not a line, and
+                         cannot be changed here, so it sits with the totals (Ed). */ ?>
+                <div class="ma-stat" id="maDir" hidden></div>
+                <div class="ma-stat" id="maStat" hidden>
+                    <div class="ma-stat-label"><?php echo htmlspecialchars($T['can_see_label']); ?></div>
+                    <div class="ma-stat-num" id="maStatNum"></div>
+                </div>
             </div>
         </div>
         <div id="maBanners"></div>
@@ -161,13 +170,19 @@ function managerAccessRender(int $managerId, string $backUrl): void
             <?php /* 2. What gives them access. */ ?>
             <div class="ma-card">
                 <div class="ma-card-head"><span><span class="ma-step" id="maStep2">2</span><?php echo htmlspecialchars($T['sources_heading']); ?></span></div>
+                <?php /* Tabs and a search box in the same place as panel 1's, so the
+                         two line up and read as one pair. Filled by paintSources(). */ ?>
+                <div class="ma-tabs" role="tablist" id="maLineTabs"></div>
+                <div class="ma-fixed"><input type="search" class="ma-search" id="maLineQ" placeholder="<?php echo htmlspecialchars($T['lines_search']); ?>" autocomplete="off"></div>
                 <div class="ma-card-body ma-fill" id="maSources"></div>
             </div>
 
             <?php /* 3. The result: who they can see. */ ?>
             <div class="ma-card">
-                <div class="ma-card-head"><span><span class="ma-step" id="maStep3">3</span><?php echo htmlspecialchars($T['team_heading']); ?></span>
-                    <span class="ma-chip" id="maTeamCount"></span></div>
+                <div class="ma-card-head"><span><span class="ma-step" id="maStep3">3</span><?php echo htmlspecialchars($T['team_heading']); ?></span></div>
+                <?php /* One tab, carrying the count - there is nothing to switch to, but
+                         it keeps this panel's filter level with the other two. */ ?>
+                <div class="ma-tabs"><span class="ma-tab active" id="maTeamCount"></span></div>
                 <div class="ma-fixed"><input type="search" class="ma-search" id="maTeamFilter" placeholder="<?php echo htmlspecialchars($T['team_filter']); ?>" autocomplete="off"></div>
                 <div class="ma-card-body ma-fill"><ul class="ma-team" id="maTeam"></ul></div>
                 <div class="ma-foot ma-muted" id="maTeamMore"></div>
@@ -197,6 +212,10 @@ function managerAccessRender(int $managerId, string $backUrl): void
         let S = null;                  // the manager's state from the server
         let kind = 'user', page = 1, timer = null, seq = 0;
         let lastSearch = null;         // the results on screen, kept so a write can re-mark them in place
+        let lineKind = 'user';         // panel 2's tab: user | group | department | other
+        // Which tab a line belongs in. Everyone and the reporting line share one,
+        // as they do in panel 1.
+        const tabOf = t => (t === 'everyone' || t === 'reports') ? 'other' : t;
 
         async function call(params, body) {
             const r = body
@@ -221,7 +240,7 @@ function managerAccessRender(int $managerId, string $backUrl): void
             const meta = l.added_by ? fmt(T.line_meta, { name: l.added_by, date: day(l.added) }) : fmt(T.line_meta_nobody, { date: day(l.added) });
             const warn = (l.grant_type === 'department' && !l.members) ? '<div class="ma-line-warn">⚠ ' + esc(T.dept_empty) + '</div>' : '';
             return '<div class="ma-line' + (l.is_exclusion ? ' excl' : '') + '">'
-                 + '<div class="ma-line-main"><div class="ma-line-label">' + esc(lineLabel(l)) + '</div>'
+                 + '<div class="ma-line-main"><div class="ma-line-label">' + esc(l._name ?? lineLabel(l)) + '</div>'
                  + '<div class="ma-line-meta">' + esc(meta) + '</div>' + warn + '</div>'
                  + '<span class="ma-chip">' + esc(people(l.members)) + '</span>'
                  + (S.can_edit ? '<button type="button" class="ma-btn" data-remove="' + l.id + '">' + esc(T.remove) + '</button>' : '')
@@ -245,34 +264,26 @@ function managerAccessRender(int $managerId, string $backUrl): void
                 if (!S.can_edit) b += '<div class="ma-banner info">' + esc(T.readonly) + '</div>';
             }
             $('maBanners').innerHTML = b;
-            if (S.needs_verify) { $('maGrid').hidden = true; $('maStat').hidden = true; return; }
+            if (S.needs_verify) { $('maGrid').hidden = true; $('maStat').hidden = true; $('maDir').hidden = true; return; }
 
             $('maStat').hidden = false;
             $('maStatNum').textContent = people(S.team_total);
+            $('maDir').hidden = false;
+            $('maDir').innerHTML = S.settings.directory
+                ? '<div class="ma-stat-label">' + esc(S.settings.directory_depth === 'all' ? T.directory_all : T.directory_direct) + '</div>'
+                  + '<div class="ma-stat-num">' + esc(people(S.reports)) + '</div>'
+                  + '<div class="ma-stat-note">' + esc(T.directory_note) + '</div>'
+                : '<div class="ma-stat-label">' + esc(T.directory_label) + '</div>'
+                  + '<div class="ma-stat-note">' + esc(T.directory_off) + '</div>';
             $('maGrid').hidden = false;
             $('maAddCard').hidden = !S.can_edit;
             // Read-only: no picker, so two panels, numbered from 1.
             $('maGrid').classList.toggle('no-add', !S.can_edit);
             $('maStep2').textContent = S.can_edit ? '2' : '1';
             $('maStep3').textContent = S.can_edit ? '3' : '2';
-            $('maTeamCount').textContent = people(S.team_total);
+            $('maTeamCount').textContent = T.tab_people + ' (' + S.team_total + ')';
 
-            // Where access comes from: the Manager field, then lines, then exclusions.
-            let h = '';
-            if (S.settings.directory) {
-                h += '<div class="ma-line dir"><div class="ma-line-main"><div class="ma-line-label">'
-                   + esc(S.settings.directory_depth === 'all' ? T.directory_all : T.directory_direct) + '</div>'
-                   + '<div class="ma-line-meta">' + esc(T.directory_note) + '</div></div>'
-                   + '<span class="ma-chip">' + esc(people(S.reports)) + '</span></div>';
-            } else {
-                h += '<div class="ma-empty">' + esc(T.directory_off) + '</div>';
-            }
-            const grants = S.lines.filter(l => !l.is_exclusion), excl = S.lines.filter(l => l.is_exclusion);
-            h += '<div class="ma-sec">' + esc(T.lines_heading) + '</div>';
-            h += grants.length ? grants.map(lineHtml).join('') : '<div class="ma-empty">' + esc(T.lines_none) + '</div>';
-            h += '<div class="ma-sec">' + esc(T.excl_heading) + ' <small>- ' + esc(T.excl_desc) + '</small></div>';
-            h += excl.length ? excl.map(lineHtml).join('') : '<div class="ma-empty">' + esc(T.excl_none) + '</div>';
-            $('maSources').innerHTML = h;
+            paintSources();
 
             paintTeam();
             // After a write, redraw the results we already have with their new
@@ -280,6 +291,38 @@ function managerAccessRender(int $managerId, string $backUrl): void
             // the list under the pointer and lost its scroll position (Ed: "things
             // jump about the page as you add/remove things").
             if (S.can_edit) { if (kind === 'other') paintOther(); else if (lastSearch) renderResults(lastSearch); else search(); }
+        }
+
+        // Panel 2: one tab per kind of line, each with its count, sorted by name;
+        // exclusions of that kind listed under their own heading in the same tab.
+        function paintSources() {
+            const tabs = [['user', T.tab_people], ['group', T.tab_groups], ['department', T.tab_departments], ['other', T.tab_other]];
+            const count = k => S.lines.filter(l => tabOf(l.grant_type) === k).length;
+            // Everyone / reporting line only when there is one, or it is open.
+            $('maLineTabs').innerHTML = tabs
+                .filter(([k]) => k !== 'other' || count('other') || lineKind === 'other')
+                .map(([k, label]) => '<button type="button" class="ma-tab' + (k === lineKind ? ' active' : '') + '" data-lkind="' + k + '">'
+                    + esc(label) + ' (' + count(k) + ')</button>').join('');
+
+            // Inside a tab the kind is already said, so a department is just its name.
+            const name = l => (l.grant_type === 'group' || l.grant_type === 'department')
+                ? (l.grant_type === 'group' ? (l.label ?? T.line_gone_group) : l.target_value)
+                : lineLabel(l);
+            const q = $('maLineQ').value.trim().toLowerCase();
+            const mine = S.lines
+                .filter(l => tabOf(l.grant_type) === lineKind)
+                .filter(l => !q || name(l).toLowerCase().includes(q))
+                .sort((x, y) => name(x).localeCompare(name(y), undefined, { sensitivity: 'base' }));
+            const row = l => lineHtml(Object.assign({}, l, { _name: name(l) }));
+            const grants = mine.filter(l => !l.is_exclusion), excl = mine.filter(l => l.is_exclusion);
+
+            let h = grants.length ? grants.map(row).join('')
+                  : '<div class="ma-empty">' + esc(q ? T.no_results : T.tab_empty) + '</div>';
+            if (excl.length) {
+                h += '<div class="ma-sec">' + esc(T.excl_heading) + ' <small>- ' + esc(T.excl_desc) + '</small></div>'
+                   + excl.map(row).join('');
+            }
+            $('maSources').innerHTML = h;
         }
 
         function paintTeam() {
@@ -357,6 +400,7 @@ function managerAccessRender(int $managerId, string $backUrl): void
         }
 
         async function write(body) {
+            if (body.action === 'add') { lineKind = tabOf(body.grant_type); $('maLineQ').value = ''; }
             const d = await call(null, body);
             if (!d.success) { toast(fmt(T.save_failed, { error: d.error || '' }), 'error'); return; }
             S = d;
@@ -366,9 +410,12 @@ function managerAccessRender(int $managerId, string $backUrl): void
         document.addEventListener('click', e => {
             const t = e.target.closest('button');
             if (!t) return;
+            if (t.dataset.lkind) { lineKind = t.dataset.lkind; paintSources(); return; }
             if (t.classList.contains('ma-tab')) {
-                document.querySelectorAll('.ma-tab').forEach(x => x.classList.toggle('active', x === t));
+                document.querySelectorAll('.ma-tab[data-kind]').forEach(x => x.classList.toggle('active', x === t));
                 kind = t.dataset.kind; page = 1;
+                // Looking for departments to add? Show the departments they have.
+                lineKind = kind; $('maLineQ').value = ''; if (S) paintSources();
                 $('maSearchBar').hidden = kind === 'other';
                 $('maResults').hidden = kind === 'other';
                 $('maOtherPane').hidden = kind !== 'other';
@@ -391,6 +438,7 @@ function managerAccessRender(int $managerId, string $backUrl): void
         });
         $('maQ').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { page = 1; search(); }, 250); });
         $('maTeamFilter').addEventListener('input', paintTeam);
+        $('maLineQ').addEventListener('input', paintSources);
 
         (async function () {
             try {
