@@ -11,6 +11,29 @@ $_um_initials = strtoupper(substr($_um_parts[0], 0, 1));
 if (count($_um_parts) > 1) {
     $_um_initials .= strtoupper(substr(end($_um_parts), 0, 1));
 }
+
+/**
+ * Does this portal user have a matching active analyst account?
+ * Mirrors the portal account check in includes/waffle-menu.php.
+ * If they are already signed in as an analyst ($_SESSION['analyst_id']) OR
+ * if an active analyst with their verified email exists in the database,
+ * offer them the jump to the analyst console.
+ */
+$__hasAnalystAccount = !empty($_SESSION['analyst_id']);
+if (!$__hasAnalystAccount && !empty($ss_user_email)) {
+    try {
+        if (!function_exists('connectToDatabase')) {
+            require_once __DIR__ . '/../../includes/functions.php';
+        }
+        $__aa = connectToDatabase()->prepare(
+            "SELECT 1 FROM analysts WHERE LOWER(email) = LOWER(?) AND is_active = 1 LIMIT 1"
+        );
+        $__aa->execute([$ss_user_email]);
+        $__hasAnalystAccount = (bool)$__aa->fetchColumn();
+    } catch (Throwable $e) {
+        $__hasAnalystAccount = false;
+    }
+}
 ?>
 <style>
     /* Avatar & User Menu */
@@ -83,15 +106,27 @@ if (count($_um_parts) > 1) {
         padding: 11px 16px;
         cursor: pointer;
         font-size: 13px;
-        color: var(--text, #333);
+        color: var(--text) !important;
+        text-decoration: none !important;
         transition: background 0.15s;
         border: none;
         background: none;
         width: 100%;
         text-align: left;
+        box-sizing: border-box;
     }
-    .ss-menu-item:hover { background: var(--surface-hover, #f5f5f5); }
-    .ss-menu-item svg { width: 16px; height: 16px; color: var(--text-muted, #666); flex-shrink: 0; }
+    .ss-menu-item span {
+        color: var(--text) !important;
+    }
+    .ss-menu-item:hover, .ss-menu-item:focus {
+        background: var(--surface-hover);
+        color: var(--text) !important;
+        text-decoration: none !important;
+    }
+    .ss-menu-item:hover span, .ss-menu-item:focus span {
+        color: var(--text) !important;
+    }
+    .ss-menu-item svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
     .ss-menu-divider { height: 1px; background: var(--border-soft, #eee); margin: 0; }
     .ss-menu-item.logout-item { color: var(--danger-accent, #d32f2f); }
     .ss-menu-item.logout-item svg { color: var(--danger-accent, #d32f2f); }
@@ -338,11 +373,20 @@ if (count($_um_parts) > 1) {
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             <span><?php echo htmlspecialchars(t('self-service.menu.my_account')); ?></span>
         </button>
+        <?php if (empty($_SESSION['ss_sso_provider_id'])): ?>
         <button class="ss-menu-item" onclick="ssOpenMfaModal()">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
             <span><?php echo htmlspecialchars(t('self-service.menu.mfa')); ?></span>
             <span class="ss-mfa-badge disabled" id="ssMfaBadge"><?php echo htmlspecialchars(t('self-service.menu.mfa_off')); ?></span>
         </button>
+        <?php endif; ?>
+        <?php if (!empty($__hasAnalystAccount)): ?>
+        <button class="ss-menu-item" onclick="window.open('../index.php', '_blank', 'noopener');">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            <span><?php echo htmlspecialchars(t('self-service.menu.analyst_console')); ?></span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;width:12px;height:12px;opacity:0.6;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </button>
+        <?php endif; ?>
         <div class="ss-menu-divider"></div>
         <button class="ss-menu-item logout-item" onclick="ssConfirmLogout()">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -423,6 +467,7 @@ if (count($_um_parts) > 1) {
                 <div class="ss-form-hint"><?php echo htmlspecialchars(t('self-service.account.appearance_hint')); ?></div>
             </div>
 
+            <?php if (empty($_SESSION['ss_sso_provider_id'])): ?>
             <div style="border-top:1px solid var(--border, #e0e0e0); padding-top:20px;">
                 <div style="font-size:15px;font-weight:600;color:var(--text,#333);margin-bottom:16px;"><?php echo htmlspecialchars(t('self-service.account.change_password')); ?></div>
                 <div id="ssPwMsg" class="ss-msg"></div>
@@ -440,6 +485,7 @@ if (count($_um_parts) > 1) {
                 </div>
                 <button class="ss-btn ss-btn-primary" id="ssPwSaveBtn" onclick="ssSavePassword()"><?php echo htmlspecialchars(t('self-service.account.change')); ?></button>
             </div>
+            <?php endif; ?>
         </div>
         <div class="ss-modal-footer">
             <button class="ss-btn ss-btn-secondary" onclick="ssCloseAccountModal()"><?php echo htmlspecialchars(t('self-service.account.close')); ?></button>
@@ -498,17 +544,20 @@ function ssCloseMenu() {
 let _ssMfaEnabled = false;
 
 async function ssLoadMfaBadge() {
+    const badge = document.getElementById('ssMfaBadge');
+    if (!badge) return;
     try {
         const resp = await fetch(_mfaApi + 'get_mfa_status.php?ctx=user');
         const data = await resp.json();
-        const badge = document.getElementById('ssMfaBadge');
         _ssMfaEnabled = data.success && data.mfa_enabled;
-        if (_ssMfaEnabled) {
-            badge.className = 'ss-mfa-badge enabled';
-            badge.textContent = window.t('self-service.menu.mfa_on');
-        } else {
-            badge.className = 'ss-mfa-badge disabled';
-            badge.textContent = window.t('self-service.menu.mfa_off');
+        if (badge) {
+            if (_ssMfaEnabled) {
+                badge.className = 'ss-mfa-badge enabled';
+                badge.textContent = window.t('self-service.menu.mfa_on');
+            } else {
+                badge.className = 'ss-mfa-badge disabled';
+                badge.textContent = window.t('self-service.menu.mfa_off');
+            }
         }
     } catch (e) {}
 }
@@ -516,12 +565,18 @@ async function ssLoadMfaBadge() {
 /* --- Account Modal --- */
 function ssOpenAccountModal() {
     ssCloseMenu();
-    document.getElementById('ssAcctMsg').className = 'ss-msg';
-    document.getElementById('ssPwMsg').className = 'ss-msg';
-    document.getElementById('ssPwCurrent').value = '';
-    document.getElementById('ssPwNew').value = '';
-    document.getElementById('ssPwConfirm').value = '';
-    document.getElementById('ssAccountModal').classList.add('active');
+    const acctMsg = document.getElementById('ssAcctMsg');
+    if (acctMsg) acctMsg.className = 'ss-msg';
+    const pwMsg = document.getElementById('ssPwMsg');
+    if (pwMsg) pwMsg.className = 'ss-msg';
+    const pwCur = document.getElementById('ssPwCurrent');
+    if (pwCur) pwCur.value = '';
+    const pwNew = document.getElementById('ssPwNew');
+    if (pwNew) pwNew.value = '';
+    const pwConf = document.getElementById('ssPwConfirm');
+    if (pwConf) pwConf.value = '';
+    const modal = document.getElementById('ssAccountModal');
+    if (modal) modal.classList.add('active');
     ssLoadProfile();
 }
 
