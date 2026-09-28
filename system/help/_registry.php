@@ -189,6 +189,7 @@ function getHelpTopics() {
                 ['id' => 'carddav-diagnostics', 'label' => 'Checking it is working'],
                 ['id' => 'carddav-safety', 'label' => 'Safety, leavers & scheduling'],
                 ['id' => 'carddav-faq',    'label' => 'CardDAV troubleshooting'],
+                ['id' => 'jit-rules',      'label' => 'JIT provisioning & role separation'],
                 ['id' => 'experience', 'label' => 'What people see'],
                 ['id' => 'breakglass', 'label' => 'Break-glass & safety'],
                 ['id' => 'faq',        'label' => 'Troubleshooting'],
@@ -208,6 +209,7 @@ function getHelpTopics() {
                      . ' read-only permission privilege etag conflict changed since'
                      . ' add to address book new contact create card not in address book link person'
                      . ' log logging troubleshoot diagnose health check drift compare d015 d016'
+                     . ' jit just-in-time auto-create auto create provision analyst portal fallback groups filter permissions'
                      . ' not writing failed unreachable server response refused',
         ],
         'api' => [

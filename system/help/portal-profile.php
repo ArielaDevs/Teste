@@ -56,6 +56,7 @@ require __DIR__ . '/_top.php';
     </div>
     <ul>
         <li><strong>People imported from LDAP or Active Directory:</strong> those details are shown read-only in the portal, with a note to ask IT. The next directory run would put back anything typed here, so the portal does not pretend otherwise.</li>
+        <li><strong>People whose account uses SSO with Profile Sync:</strong> when a sign-in provider is set to <em>Always sync</em>, profile contact details are authoritative in the Identity Provider and locked in the portal.</li>
         <li><strong>A CardDAV address book:</strong> the same, <em>unless</em> you tick <strong>Let them change these too, and send their change to the address book</strong>.</li>
     </ul>
     <div class="help-note warn"><strong>That setting lets your customers write into your address book.</strong> It is off by default for that reason. It only affects address books that already have <strong>Write changes back</strong> switched on under <a href="sso.php">Authentication</a>; the page lists which ones.</div>

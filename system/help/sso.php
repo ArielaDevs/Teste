@@ -67,7 +67,7 @@ require __DIR__ . '/_top.php';
     <div class="help-steps">
         <div class="help-step"><div class="help-step-num">1</div><div><strong>Register an app in your identity provider.</strong> Create an app/registration in Entra, Okta, Google, etc. Set its redirect URI to the address below, and note the <strong>issuer URL</strong>, <strong>client ID</strong> and a <strong>client secret</strong>.<br><br>Redirect URI to register: <code><?php echo htmlspecialchars($redirectUri); ?></code></div></div>
         <div class="help-step"><div class="help-step-num">2</div><div><strong>Add the provider here.</strong> System &rarr; Single Sign-On &rarr; <em>Add provider</em>. Paste the issuer URL, client ID and secret, give it a display name (e.g. “Sign in with Microsoft”), tick <strong>Enabled</strong>, and use <strong>Test</strong> to confirm the issuer is reachable. Turn on the master <strong>Enable single sign-on</strong> switch.</div></div>
-        <div class="help-step"><div class="help-step-num">3</div><div><strong>Decide who uses it.</strong> For <strong>analysts</strong>, set their <em>Sign-in method</em> to this provider in System &rarr; Analysts. For <strong>portal users</strong>, turn on the provider's <em>auto-create users</em> toggle and they're created on first sign-in — or they're matched to an existing record by verified email.</div></div>
+        <div class="help-step"><div class="help-step-num">3</div><div><strong>Choose auto-create (JIT) rules.</strong> Configure <em>Auto-create self-service users</em> and <em>Auto-create IT analysts</em> independently. If auto-create is off, users or analysts must exist first before signing in via SSO. For analysts, you can also restrict JIT creation to specific IdP groups and assign default module permissions.</div></div>
     </div>
 
     <div class="help-note ok"><strong>That's it.</strong> The login pages now lead with your provider's button, with the password form tucked behind a “local account” link. Nothing else to configure — there are no companies to think about.</div>
@@ -403,6 +403,52 @@ require __DIR__ . '/_top.php';
     </ul>
 </div>
 
+<!-- 4k. Just-in-Time Provisioning & Fallbacks -->
+<div class="help-section" id="jit-rules">
+    <div class="help-section-header"><?php echo helpSectionNum('jit-rules'); ?>
+        <div>
+            <h3>Just-in-Time (JIT) Provisioning &amp; Role Separation</h3>
+        </div>
+    </div>
+    <p>FreeITSM allows fine-grained control over which accounts are automatically provisioned when people sign in through an identity provider:</p>
+    <ul>
+        <li><strong>Auto-create self-service users (Portal)</strong> &mdash; Creates a portal customer/requester profile on their first sign-in. Turn this off if only existing ticket-contacts should access the portal.</li>
+        <li><strong>Auto-create IT analysts</strong> &mdash; Automatically creates an IT analyst staff account on first sign-in.</li>
+        <li><strong>Default analyst permissions</strong> &mdash; Choose the default module capabilities assigned to newly created analysts so they don't unintentionally gain administrative privileges.</li>
+        <li><strong>Non-analyst fallback mode</strong> &mdash; Controls what happens when a person without an analyst account signs in on the staff analyst login screen:
+            <ul>
+                <li><em>Warn &amp; confirm</em> &mdash; Shows a branded prompt giving them the option to continue to the Self-Service Portal or sign out.</li>
+                <li><em>Automatically switch</em> &mdash; Instantly redirects them to the Self-Service Portal without prompting.</li>
+                <li><em>Block</em> &mdash; Denies access and prevents login.</li>
+            </ul>
+        </li>
+    </ul>
+    <!-- 4l. Profile Attribute Sync & Field Locking -->
+<div class="help-section" id="profile-sync">
+    <div class="help-section-header"><?php echo helpSectionNum('profile-sync'); ?>
+        <div>
+            <h3>Profile Attribute Sync &amp; Field Locking</h3>
+        </div>
+    </div>
+    <p>FreeITSM can automatically synchronize user profile details (full name, job title, department, office/location, phone, and mobile) from claims passed by your Identity Provider (via ID tokens or the OIDC <code>userinfo</code> endpoint):</p>
+    <ul>
+        <li><strong>Always (Every sign-in)</strong> &mdash; Re-syncs profile attributes on every login. When active, profile fields in both the <em>Self-Service Portal</em> (<strong>My Account</strong>) and the <em>Staff Preferences</em> (<strong>System &rarr; Preferences &rarr; My details</strong>) are locked from manual editing to prevent local drift from the directory of record.</li>
+        <li><strong>Initial only (First sign-in)</strong> &mdash; Populates profile details when the account is initially created via JIT. Subsequent local edits by the user or analysts are retained.</li>
+        <li><strong>Never (Do not sync)</strong> &mdash; Only the minimum identity claims (subject, name, and verified email) are used for authentication; extra profile attributes are neither populated nor overwritten.</li>
+    </ul>
+    <div class="help-note">
+        <strong>Scopes vs. Optional Claims:</strong>
+        <p style="margin-top:6px;margin-bottom:6px;">Keep the <strong>Scopes</strong> field in FreeITSM set to standard OIDC scopes (<code>openid email profile</code>). Do not add attribute names into the scopes box. To emit profile attributes, configure optional claims in your identity provider:</p>
+        <ul style="margin-bottom:0;">
+            <li><strong>Microsoft Entra ID (Azure AD):</strong> In the Azure Portal, go to <em>App registrations &rarr; [Your App] &rarr; Token configuration &rarr; Add optional claim</em>, select <strong>ID</strong> token, and check <code>department</code>, <code>job_title</code>, and <code>phone_number</code>.</li>
+            <li><strong>Okta / Auth0:</strong> Under <em>API &rarr; Authorization Servers &rarr; Claims</em>, add claims mapped to <code>user.department</code>, <code>user.title</code>, and <code>user.primaryPhone</code>.</li>
+            <li><strong>Keycloak:</strong> In <em>Client Scopes &rarr; profile &rarr; Mappers</em>, add User Attribute mappers for <code>department</code>, <code>job_title</code>, and <code>phone_number</code>.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="help-note ok"><strong>Identity-Managed Authentication:</strong> Passwords, MFA, and device trust are handled directly by your IdP, so local password and TOTP options are cleanly hidden from user menus during SSO sessions.</div>
+</div>
 <!-- 5. Experience -->
 <div class="help-section" id="experience">
     <div class="help-section-header"><?php echo helpSectionNum('experience'); ?>
@@ -468,6 +514,13 @@ require __DIR__ . '/_top.php';
     <h4>A client's provider button is showing on the analyst login</h4>
     <p>Set the provider's <strong>Company</strong> to that client (not “Global”). Global providers are the only ones offered to analysts; company-owned ones are portal-only.</p>
 
+    <h4>Profile details (job title, department, phone) are not updating on SSO login</h4>
+    <p>Check the following in your identity provider configuration:</p>
+    <ul>
+        <li>Verify that <strong>Profile attribute sync</strong> on the sign-in provider is set to <strong>Always</strong> or <strong>Initial</strong>.</li>
+        <li>In your Identity Provider (e.g. Microsoft Entra ID / Azure AD App Registration &rarr; Token configuration), ensure optional claims for <code>department</code>, <code>job_title</code> / <code>title</code>, and <code>phone_number</code> / <code>businessPhones</code> are added to the ID and Access Tokens.</li>
+        <li>Verify that your configured <strong>Scopes</strong> list in FreeITSM includes the required scopes for your provider (e.g. <code>openid email profile</code>).</li>
+    </ul>
     <h4>Discovery test fails</h4>
     <p>The issuer URL is wrong or unreachable from the server. It should be the base issuer (no <code>/.well-known/…</code> on the end) — e.g. <code>https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0</code> for Entra. Use the <strong>Test</strong> button to confirm before saving.</p>
 </div>
