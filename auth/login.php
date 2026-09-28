@@ -80,6 +80,9 @@ function tr(string $key, string $english, array $params = []): string {
 // An SSO sign-in attempt that failed bounces back here with a message.
 $sso_error = $_SESSION['sso_error'] ?? null;
 unset($_SESSION['sso_error']);
+if (isset($_GET['cancel_sso'])) {
+    unset($_SESSION['sso_pending_portal'], $_SESSION['sso_portal_csrf']);
+}
 
 /**
  * Get a security setting from system_settings (returns string or null)
@@ -713,32 +716,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transform: translateY(0);
         }
 
+        .login-links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .login-links a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .login-links a:hover { text-decoration: underline; }
+
+        .login-links .divider {
+            color: #ccc;
+            margin: 0 8px;
+        }
+
         .forgot-link {
             display: block;
             text-align: center;
             margin-top: 16px;
-            color: #999;
-            text-decoration: none;
-            font-size: 13px;
-        }
-
-        .forgot-link:hover { color: #666; }
-
-        /* The way across to the self-service portal (#82). Sits below the form and
-           any Forgot password link, separated by a rule so it reads as "you are on
-           the wrong page" rather than as another sign-in option. */
-        .portal-link {
-            margin-top: 22px;
-            padding-top: 16px;
-            border-top: 1px solid #eee;
-            text-align: center;
-            font-size: 13px;
-        }
-        .portal-link a {
             color: #667eea;
             text-decoration: none;
+            font-size: 14px;
         }
-        .portal-link a:hover { text-decoration: underline; }
+
+        .forgot-link:hover { text-decoration: underline; }
 
         /* MFA challenge styles */
         .mfa-icon {
@@ -1097,23 +1102,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <button type="submit" class="login-button"><?php echo htmlspecialchars(tr('sign_in', 'Sign In')); ?></button>
                 </form>
-                <a href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>auth/forgot-password.php" class="forgot-link"><?php echo htmlspecialchars(tr('forgot', 'Forgot password?')); ?></a>
             <?php endif; ?>
         <?php endif; ?>
 
-        <!--
-            The way back to the self-service portal (discussion #82). The portal's
-            own login has offered the reverse link to here since it was built; this
-            side never did, so somebody who followed a bookmark or a link in an
-            email to the wrong one of the two had no way across but the address bar.
-
-            Deliberately OUTSIDE both branches above: it must show whether or not
-            single sign-on is configured and whether or not local login is allowed,
-            because a person on the wrong page cannot sign in here by ANY method
-            and getting them to the right page is the whole point.
-        -->
-        <div class="portal-link">
-            <a href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>self-service/login.php"><?php echo htmlspecialchars(tr('portal_link', 'Go to the Self-Service Portal')); ?></a>
+        <div class="login-links">
+            <a href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>auth/forgot-password.php"><?php echo htmlspecialchars(tr('forgot', 'Forgot password?')); ?></a>
+            <span class="divider">|</span>
+            <a href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>self-service/login.php"><?php echo htmlspecialchars(tr('portal_link', 'Self-Service Portal')); ?></a>
         </div>
     </div>
 <?php if ($brand && $brand['footer_text'] !== ''): ?>
