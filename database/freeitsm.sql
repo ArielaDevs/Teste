@@ -199,7 +199,10 @@ CREATE TABLE IF NOT EXISTS `auth_providers` (
 
     `enabled`                TINYINT(1) NOT NULL DEFAULT 1,
     `auto_create_users`      TINYINT(1) NOT NULL DEFAULT 0,
+    `auto_create_analysts`   TINYINT(1) NOT NULL DEFAULT 0,
+    `analyst_fallback_mode`  ENUM('confirm','redirect','block') NOT NULL DEFAULT 'confirm',
     `require_verified_email` TINYINT(1) NOT NULL DEFAULT 0,
+    `profile_sync_mode`      ENUM('always','initial','never') NOT NULL DEFAULT 'always',
     `default_modules`        VARCHAR(500) NULL,
     `sort_order`             INT NOT NULL DEFAULT 0,
     `tenant_id`              INT NULL,

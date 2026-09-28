@@ -29,7 +29,7 @@ try {
         $ssoTenants = $ssoAdminConn->query("SELECT id, name FROM tenants WHERE is_active = 1 ORDER BY is_default DESC, name")->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Exception $e) { $ssoTenants = []; $ssoMultiTenant = false; }
-$ssoColspan = $ssoMultiTenant ? 7 : 6; // providers table column count (Company col only at N>1; Type always)
+$ssoColspan = $ssoMultiTenant ? 8 : 7; // providers table column count (Company col only at N>1; Type always)
 
 // The redirect URI the admin must register in their IdP. Built from the
 // deployment's BASE_URL so it's correct whatever path the app is served at.
@@ -133,6 +133,10 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         .status-badge.on { background: #e8f5e9; color: #2e7d32; }
         .status-badge.off { background: #f0f0f0; color: #999; }
         .badge-jit { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: #e3f2fd; color: #1565c0; }
+        .badge-sync { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .badge-sync.always { background: #e0f2fe; color: #0369a1; }
+        .badge-sync.initial { background: #fef3c7; color: #b45309; }
+        .badge-sync.never { background: #f3f4f6; color: #6b7280; }
         /* Row actions are ICONS, matching System → Integrations and the rest of
            the settings screens. Three words per row ("Configure Delete") read as
            prose competing with the data; three small glyphs read as controls.
@@ -222,6 +226,9 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         [data-theme-mode="dark"] .status-badge.on { background: #16331f; color: #86efac; }
         [data-theme-mode="dark"] .status-badge.off { background: #2a3039; color: #8b95a3; }
         [data-theme-mode="dark"] .badge-jit { background: #14324a; color: #7fc4f5; }
+        [data-theme-mode="dark"] .badge-sync.always { background: #0c2d48; color: #7dd3fc; }
+        [data-theme-mode="dark"] .badge-sync.initial { background: #3b2a0c; color: #fde68a; }
+        [data-theme-mode="dark"] .badge-sync.never { background: #262930; color: #9ca3af; }
         [data-theme-mode="dark"] .jit-off { color: #6b7280; }
         [data-theme-mode="dark"] .table-action-btn { color: #90a4ae; }
         [data-theme-mode="dark"] .table-action-btn.danger:hover { background: #3a1a1d; color: #fca5a5; }
@@ -289,7 +296,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
             </div>
             <table class="providers">
                 <thead>
-                    <tr><th><?php echo htmlspecialchars(t('system.sso.col_name')); ?></th><?php if ($ssoMultiTenant): ?><th><?php echo htmlspecialchars(t('system.sso.col_company')); ?></th><?php endif; ?><th><?php echo htmlspecialchars(t('system.sso.col_type')); ?></th><th><?php echo htmlspecialchars(t('system.sso.col_issuer')); ?></th><th><?php echo htmlspecialchars(t('system.sso.col_status')); ?></th><th><?php echo htmlspecialchars(t('system.sso.col_auto_create')); ?></th><th style="text-align:right;"><?php echo htmlspecialchars(t('system.sso.col_actions')); ?></th></tr>
+                    <tr><th><?php echo htmlspecialchars(t('system.sso.col_name')); ?></th><?php if ($ssoMultiTenant): ?><th><?php echo htmlspecialchars(t('system.sso.col_company')); ?></th><?php endif; ?><th><?php echo htmlspecialchars(t('system.sso.col_type')); ?></th><th><?php echo htmlspecialchars(t('system.sso.col_issuer')); ?></th><th><?php echo htmlspecialchars(t('system.sso.col_status')); ?></th><th><?php echo htmlspecialchars(t('system.sso.col_sync')); ?></th><th><?php echo htmlspecialchars(t('system.sso.col_auto_create')); ?></th><th style="text-align:right;"><?php echo htmlspecialchars(t('system.sso.col_actions')); ?></th></tr>
                 </thead>
                 <tbody id="providersBody">
                     <tr class="empty-row"><td colspan="<?php echo $ssoColspan; ?>"><?php echo htmlspecialchars(t('system.sso.loading')); ?></td></tr>
@@ -526,19 +533,41 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                          "create the person the first time they sign in" describes
                          something that cannot happen — an address book signs
                          nobody in. */ ?>
-                <div class="checkbox-field" id="autoCreateField">
-                    <input type="checkbox" id="fAutoCreate">
-                    <div class="cb-label"><strong><?php echo htmlspecialchars(t('system.sso.cb_autocreate')); ?></strong><span><?php echo htmlspecialchars(t('system.sso.cb_autocreate_desc')); ?></span></div>
-                </div>
                 <!-- OIDC-only: LDAP has no email_verified claim to require. -->
                 <div class="checkbox-field" id="requireVerifiedField">
                     <input type="checkbox" id="fRequireVerified">
                     <div class="cb-label"><strong><?php echo htmlspecialchars(t('system.sso.cb_verified')); ?></strong><span><?php echo t('system.sso.cb_verified_desc', ['claim' => '<code>email_verified: true</code>', 'claim_false' => '<code>email_verified: false</code>']); ?></span></div>
                 </div>
+                <div class="form-field" id="profileSyncModeField">
+                    <label><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode')); ?></label>
+                    <div class="hint"><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode_hint')); ?></div>
+                    <select id="fProfileSyncMode" style="width:100%;padding:8px;border:1px solid var(--border,#ccc);border-radius:4px;background:var(--surface,#fff);color:var(--text,#333);">
+                        <option value="always"><?php echo htmlspecialchars(t('system.sso.profile_sync_always')); ?></option>
+                        <option value="initial"><?php echo htmlspecialchars(t('system.sso.profile_sync_initial')); ?></option>
+                        <option value="never"><?php echo htmlspecialchars(t('system.sso.profile_sync_never')); ?></option>
+                    </select>
+                </div>
+                <div class="checkbox-field" id="autoCreateField">
+                    <input type="checkbox" id="fAutoCreate">
+                    <div class="cb-label"><strong><?php echo htmlspecialchars(t('system.sso.cb_autocreate')); ?></strong><span><?php echo htmlspecialchars(t('system.sso.cb_autocreate_desc')); ?></span></div>
+                </div>
+                <div class="checkbox-field" id="autoCreateAnalystsField">
+                    <input type="checkbox" id="fAutoCreateAnalysts">
+                    <div class="cb-label"><strong><?php echo htmlspecialchars(t('system.sso.cb_autocreate_analysts')); ?></strong><span><?php echo htmlspecialchars(t('system.sso.cb_autocreate_analysts_desc')); ?></span></div>
+                </div>
                 <div class="form-field" id="defaultModulesField">
                     <label><?php echo htmlspecialchars(t('system.sso.field_default_modules')); ?></label>
                     <div class="hint"><?php echo t('system.sso.field_default_modules_hint', ['example' => '<code>tickets, knowledge</code>', 'strong' => '<strong>' . htmlspecialchars(t('system.sso.field_default_modules_strong')) . '</strong>']); ?></div>
                     <input type="text" id="fDefaultModules" placeholder="<?php echo htmlspecialchars(t('system.sso.field_default_modules_placeholder')); ?>">
+                </div>
+                <div class="form-field" id="analystFallbackField">
+                    <label><?php echo htmlspecialchars(t('system.sso.field_fallback_mode')); ?></label>
+                    <div class="hint"><?php echo htmlspecialchars(t('system.sso.field_fallback_mode_hint')); ?></div>
+                    <select id="fAnalystFallbackMode" style="width:100%;padding:8px;border:1px solid var(--border,#ccc);border-radius:4px;background:var(--surface,#fff);color:var(--text,#333);">
+                        <option value="confirm"><?php echo htmlspecialchars(t('system.sso.fallback_mode_confirm')); ?></option>
+                        <option value="redirect"><?php echo htmlspecialchars(t('system.sso.fallback_mode_redirect')); ?></option>
+                        <option value="block"><?php echo htmlspecialchars(t('system.sso.fallback_mode_block')); ?></option>
+                    </select>
                 </div>
                 <?php if ($ssoMultiTenant): ?>
                 <div class="form-field" id="tenantField">
@@ -674,13 +703,27 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                 <td><span class="proto-badge">${badge}</span></td>
                 <td class="issuer-cell" title="${esc(target)}">${esc(target)}</td>
                 <td><span class="status-badge ${p.enabled ? 'on' : 'off'}">${p.enabled ? window.t('system.sso.enabled') : window.t('system.sso.disabled')}</span></td>
+                <td>${isCardDav ? '<span class="jit-off">' + window.t('system.sso.jit_na') + '</span>' : (() => {
+                    const mode = p.profile_sync_mode || 'always';
+                    const label = mode === 'never' ? window.t('system.sso.sync_pill_never')
+                                : mode === 'initial' ? window.t('system.sso.sync_pill_initial')
+                                : window.t('system.sso.sync_pill_always');
+                    return '<span class="badge-sync ' + esc(mode) + '">' + esc(label) + '</span>';
+                })()}</td>
                 <?php /* "Auto-create on first sign-in" cannot apply to something
                          nobody signs in through, so a CardDAV row says "not
                          applicable" rather than "Off" — Off implies a setting
                          somebody could turn on. */ ?>
                 <td>${isCardDav
                         ? '<span class="jit-off">' + window.t('system.sso.jit_na') + '</span>'
-                        : (p.auto_create_users ? '<span class="badge-jit">' + window.t('system.sso.jit_on') + '</span>' : '<span class="jit-off">' + window.t('system.sso.jit_off') + '</span>')}</td>
+                        : (() => {
+                            const u = !!p.auto_create_users;
+                            const a = !!p.auto_create_analysts;
+                            if (u && a) return '<span class="badge-jit">' + window.t('system.sso.jit_both') + '</span>';
+                            if (a)      return '<span class="badge-jit">' + window.t('system.sso.jit_analyst') + '</span>';
+                            if (u)      return '<span class="badge-jit">' + window.t('system.sso.jit_user') + '</span>';
+                            return '<span class="jit-off">' + window.t('system.sso.jit_none') + '</span>';
+                        })()}</td>
                 <td style="text-align:right;">
                     ${(isLdap || isCardDav)
                         /* A directory has a connection, a sign-in scope, group gating, an
@@ -757,6 +800,8 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         // sign anybody in, so offering the toggle would promise something that
         // can never happen.
         $('autoCreateField').style.display = isCardDav ? 'none' : '';
+        $('autoCreateAnalystsField').style.display = isCardDav ? 'none' : '';
+        $('analystFallbackField').style.display = isCardDav ? 'none' : '';
         // "Default module access for auto-created users" describes the accounts
         // JIT sign-in creates. Nothing signs in through an address book, so
         // there are none — the field is meaningless rather than merely unused.
@@ -774,6 +819,16 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
     }
     $('fProtocol').addEventListener('change', syncProtocolFields);
 
+    function syncAnalystFields() {
+        const cb = document.getElementById('fAutoCreateAnalysts');
+        const autoAnalyst = cb ? cb.checked : false;
+        const fallbackField = document.getElementById('analystFallbackField');
+        const defaultModulesField = document.getElementById('defaultModulesField');
+        if (fallbackField) fallbackField.style.display = autoAnalyst ? 'none' : 'block';
+        if (defaultModulesField) defaultModulesField.style.display = autoAnalyst ? 'block' : 'none';
+    }
+    const aca = document.getElementById('fAutoCreateAnalysts');
+    if (aca) aca.addEventListener('change', syncAnalystFields);
     function openModal(p) {
         document.getElementById('testResult').className = 'test-result';
         $('ldapTestResult').className = 'test-result';
@@ -839,7 +894,11 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         document.getElementById('fScopes').value = p ? (p.scopes || 'openid email profile') : 'openid email profile';
         document.getElementById('fEnabled').checked = p ? !!p.enabled : true;
         document.getElementById('fAutoCreate').checked = p ? !!p.auto_create_users : false;
+        document.getElementById('fAutoCreateAnalysts').checked = p ? !!p.auto_create_analysts : false;
+        syncAnalystFields();
+        document.getElementById('fAnalystFallbackMode').value = (p && p.analyst_fallback_mode) ? p.analyst_fallback_mode : 'confirm';
         document.getElementById('fRequireVerified').checked = p ? !!p.require_verified_email : false;
+        document.getElementById('fProfileSyncMode').value = (p && p.profile_sync_mode) ? p.profile_sync_mode : 'always';
         document.getElementById('fDefaultModules').value = p ? (p.default_modules || '') : '';
         const tenantSel = document.getElementById('fTenant');
         if (tenantSel) tenantSel.value = (p && p.tenant_id) ? String(p.tenant_id) : '';
@@ -1058,7 +1117,10 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
             scopes: document.getElementById('fScopes').value.trim(),
             enabled: document.getElementById('fEnabled').checked ? 1 : 0,
             auto_create_users: document.getElementById('fAutoCreate').checked ? 1 : 0,
+            auto_create_analysts: document.getElementById('fAutoCreateAnalysts').checked ? 1 : 0,
+            analyst_fallback_mode: document.getElementById('fAnalystFallbackMode').value || 'confirm',
             require_verified_email: document.getElementById('fRequireVerified').checked ? 1 : 0,
+            profile_sync_mode: document.getElementById('fProfileSyncMode').value || 'always',
             default_modules: document.getElementById('fDefaultModules').value.trim(),
             tenant_id: (document.getElementById('fTenant') ? (document.getElementById('fTenant').value || null) : null)
         };

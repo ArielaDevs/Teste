@@ -302,7 +302,8 @@ function portalProfileAccess(PDO $conn, int $userId): ?array
 {
     $cols = implode(', ', array_map(function ($f) { return 'u.' . $f; }, USER_PERSON_FIELDS));
     $st = $conn->prepare(
-        "SELECT u.is_managed, u.display_name, p.protocol, p.carddav_write_back, $cols
+        "SELECT u.is_managed, u.display_name, p.protocol, p.carddav_write_back, p.profile_sync_mode,
+                u.auth_provider_id, $cols
            FROM users u
       LEFT JOIN auth_providers p ON p.id = u.auth_provider_id
           WHERE u.id = ?"
@@ -312,7 +313,7 @@ function portalProfileAccess(PDO $conn, int $userId): ?array
     if ($row === false) return null;
 
     $fields  = portalProfileEditableFields($conn);
-    $managed = (int)($row['is_managed'] ?? 0) === 1;
+    $managed = ((int)($row['is_managed'] ?? 0) === 1) || (!empty($row['protocol']) && ($row['profile_sync_mode'] ?? 'always') === 'always');
     $isCardDav = strtolower((string)($row['protocol'] ?? '')) === 'carddav';
 
     // 🔴 Write-back on the address book is NOT enough on its own. That switch

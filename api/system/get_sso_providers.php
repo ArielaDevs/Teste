@@ -25,7 +25,7 @@ try {
 
     $stmt = $conn->query(
         "SELECT p.id, p.display_name, p.protocol, p.issuer_url, p.client_id, p.client_secret,
-                p.scopes, p.enabled, p.auto_create_users, p.require_verified_email,
+                p.scopes, p.enabled, p.auto_create_users, p.auto_create_analysts, p.analyst_fallback_mode, p.require_verified_email, p.profile_sync_mode,
                 p.default_modules, p.sort_order, p.tenant_id, t.name AS tenant_name,
                 p.ldap_host, p.ldap_port, p.ldap_encryption, p.ldap_bind_dn, p.ldap_bind_password,
                 p.ldap_base_dn, p.ldap_user_filter, p.ldap_attr_username, p.ldap_attr_email,
@@ -50,7 +50,10 @@ try {
             'scopes'            => $r['scopes'],
             'enabled'           => (int)$r['enabled'],
             'auto_create_users' => (int)$r['auto_create_users'],
+            'auto_create_analysts' => (int)($r['auto_create_analysts'] ?? 0),
+            'analyst_fallback_mode' => $r['analyst_fallback_mode'] ?? 'confirm',
             'require_verified_email' => (int)$r['require_verified_email'],
+            'profile_sync_mode'      => $r['profile_sync_mode'] ?? 'always',
             'default_modules'   => $r['default_modules'],
             'sort_order'        => (int)$r['sort_order'],
             // Which client company owns this IdP (null = global / MSP-internal).

@@ -28,6 +28,18 @@ try {
     };
 
     $conn = connectToDatabase();
+    $chkStmt = $conn->prepare(
+        "SELECT a.auth_provider_id, p.profile_sync_mode
+           FROM analysts a
+      LEFT JOIN auth_providers p ON p.id = a.auth_provider_id
+          WHERE a.id = ?"
+    );
+    $chkStmt->execute([(int)$_SESSION['analyst_id']]);
+    $chk = $chkStmt->fetch(PDO::FETCH_ASSOC);
+    if (!empty($chk['auth_provider_id']) && ($chk['profile_sync_mode'] ?? 'always') === 'always') {
+        echo json_encode(['success' => false, 'error' => 'Your profile details are managed by your sign-in provider.']);
+        exit;
+    }
     $stmt = $conn->prepare("UPDATE analysts
                                SET job_title = ?, department = ?, phone = ?, mobile = ?,
                                    last_modified_datetime = UTC_TIMESTAMP()

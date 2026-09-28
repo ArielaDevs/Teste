@@ -22,7 +22,7 @@ return [
     'username_or_email' => 'Username or email',
     'password'      => 'Password',
     'sign_in'       => 'Sign In',
-    'forgot'        => 'Forgot password?',
+    'forgot'        => 'Forgot your password?',
 
     // Email-first form, shown when single sign-on is configured
     'email'             => 'Email',
@@ -47,7 +47,7 @@ return [
     'mfa_cancel'      => 'Cancel and return to login',
 
     // The way across to the requester portal (discussion #82)
-    'portal_link'   => 'Go to the Self-Service Portal',
+    'portal_link'   => 'Self-Service Login',
 
     // --- Messages -----------------------------------------------------------
     'err_missing'   => 'Please enter both username and password',
@@ -115,4 +115,12 @@ return [
     'back_to_login'       => 'Back to login',
     'new_password'        => 'New Password',
     'err_generic'         => 'Something went wrong. Please try again.',
+
+    // ── SSO Fallback to Self-Service (auth/sso_confirm_portal.php) ──────
+    'sso_fallback_title'         => 'Analyst Account Not Found',
+    'sso_fallback_heading'       => 'Analyst Account Not Found',
+    'sso_fallback_desc'          => 'You signed in as <strong>{email}</strong>. This account does not have IT Analyst permissions.',
+    'sso_fallback_prompt'        => 'Would you like to proceed to the Self-Service Portal to submit or view support tickets, access assigned equipment, or complete training?',
+    'sso_fallback_btn_continue'  => 'Continue to Self-Service Portal',
+    'sso_fallback_btn_signout'   => 'Sign out',
 ];
