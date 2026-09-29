@@ -32,6 +32,7 @@ const CRON_TOKENS = [
     'webhook'     => ['webhook_cron_token',     'cron/webhook_deliveries.php'],
     'workflow'    => ['workflow_cron_token',    'cron/workflow_scheduled.php'],
     'integration' => ['integration_cron_token', 'cron/integration_poll.php'],
+    'domains'     => ['domain_cron_token',      'cron/domains.php'],
 ];
 
 $args    = array_slice($argv, 1);

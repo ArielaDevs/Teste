@@ -69,6 +69,8 @@ return [
         'card_contracts_desc'      => 'Contracts expiring and notice periods running out.',
         'card_software'            => 'Software',
         'card_software_desc'       => 'Licence renewals coming up and notice periods running out.',
+        'card_domains'             => 'Domains',
+        'card_domains_desc'        => 'Domain registrations and certificates about to lapse, and domains without a transfer lock.',
         'card_knowledge'           => 'Knowledge',
         'card_knowledge_desc'      => 'Recent articles and reviews now overdue.',
         'card_assets'              => 'Assets',
@@ -84,6 +86,7 @@ return [
         // lines are the signpost: one place to look, still one place to set.
         'configured_elsewhere_assets'   => 'Warranty and lease figures are set in Assets → Settings → Expiry alerts',
         'configured_elsewhere_software' => 'Renewal figures are set in Software → Settings → Renewals',
+        'configured_elsewhere_domains'  => 'Whether this card shows is set in Domains → Settings → Alerts',
     ],
 
     'nav' => [
@@ -106,6 +109,7 @@ return [
         'service_status' => 'Service Status',
         'contracts'      => 'Contracts',
         'software'       => 'Software',
+        'domains'        => 'Domains',
         'knowledge'      => 'Knowledge',
         'assets'         => 'Assets',
         'tasks'          => 'Tasks',
@@ -205,6 +209,19 @@ return [
         // Not the same as all_clear: nothing is due BECAUSE nothing is recorded.
         // Reporting "all clear" on an empty list is how a dashboard lies quietly.
         'none'           => 'No renewal dates recorded against your licences',
+    ],
+
+    // Domains card (#154).
+    'domains' => [
+        'metric_30d' => '30 days',
+        'metric_90d' => '90 days',
+        'metric_ssl' => 'Certificates',
+        'expired'    => '<span class="wt-attention-bold">{count}</span> domain(s) have EXPIRED',
+        'expiring'   => '<span class="wt-attention-bold">{count}</span> domain(s) expiring within 30 days',
+        'unlocked'   => '<span class="wt-attention-bold">{count}</span> domain(s) without a transfer lock',
+        'weak'       => '<span class="wt-attention-bold">{count}</span> domain(s) with a D or F security grade',
+        'all_clear'  => 'All {count} domains in good order',
+        'none'       => 'No domains in the register yet',
     ],
 
     // Knowledge card.

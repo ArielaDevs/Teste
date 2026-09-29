@@ -550,6 +550,21 @@ try {
                 <div class="wt-card-body"><div class="wt-card-loading"><div class="wt-spinner"></div></div></div>
             </div>
 
+            <!-- Domains (#154): registrations and certificates about to lapse,
+                 and domains left without a transfer lock. -->
+            <div class="wt-card" id="wtDomains">
+                <div class="wt-card-header">
+                    <div class="wt-card-header-left">
+                        <div class="wt-card-icon" style="background:#4d7c0f;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20.9 13.5A10 10 0 1 0 12 22"></path><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10"></path><path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"></path><rect x="15" y="17" width="7" height="5" rx="1"></rect><path d="M16.5 17v-1.5a2 2 0 0 1 4 0V17"></path></svg>
+                        </div>
+                        <div class="wt-card-name"><a href="../domains/"><?php echo htmlspecialchars(t('watchtower.cards.domains')); ?></a></div>
+                    </div>
+                    <div class="wt-status-dot" id="wtDmDot"></div>
+                </div>
+                <div class="wt-card-body"><div class="wt-card-loading"><div class="wt-spinner"></div></div></div>
+            </div>
+
             <!-- Knowledge -->
             <div class="wt-card" id="wtKnowledge">
                 <div class="wt-card-header">
@@ -651,7 +666,7 @@ try {
     const WT_CARD_ELEMENTS = {
         morning_checks: 'wtMorningChecks', tickets: 'wtTickets', changes: 'wtChanges',
         calendar: 'wtCalendar', service_status: 'wtServiceStatus', contracts: 'wtContracts',
-        software: 'wtSoftware',
+        software: 'wtSoftware', domains: 'wtDomains',
         knowledge: 'wtKnowledge', assets: 'wtAssets', tasks: 'wtTasks', workflows: 'wtWorkflows',
     };
 
@@ -954,6 +969,36 @@ try {
         setBody('wtSoftware', html);
     }
 
+    // Domains (#154). Red for anything lapsed or lapsing within 30 days, amber
+    // for 90 days, certificates, missing transfer locks and weak grades.
+    function renderDomains(d) {
+        const dm = d.domains;
+        const card = document.getElementById('wtDomains');
+        if (!dm || dm.allowed === false) { if (card) card.style.display = 'none'; return; }
+        const T = (k, p) => window.t('watchtower.domains.' + k, p);
+        if (!dm.show) {
+            setDot('wtDmDot', 'green');
+            setBody('wtDomains', '<div class="wt-attention">' + attentionItem('green', T('none')) + '</div>');
+            return;
+        }
+        const red = dm.expired + dm.expiring_30d;
+        const amber = dm.expiring_90d + dm.ssl_expiring + dm.unlocked + dm.weak;
+        setDot('wtDmDot', red > 0 ? 'red' : (amber > 0 ? 'amber' : 'green'));
+
+        let html = '<div class="wt-metrics">';
+        html += metric(dm.expiring_30d, T('metric_30d'), dm.expiring_30d > 0 ? '#ef4444' : '#94a3b8');
+        html += metric(dm.expiring_90d, T('metric_90d'), dm.expiring_90d > 0 ? '#f59e0b' : '#94a3b8');
+        html += metric(dm.ssl_expiring, T('metric_ssl'), dm.ssl_expiring > 0 ? '#f59e0b' : '#94a3b8');
+        html += '</div><div class="wt-attention">';
+        if (dm.expired > 0)      html += attentionItem('red', T('expired', { count: dm.expired }));
+        if (dm.expiring_30d > 0) html += attentionItem('red', T('expiring', { count: dm.expiring_30d }));
+        if (dm.unlocked > 0)     html += attentionItem('amber', T('unlocked', { count: dm.unlocked }));
+        if (dm.weak > 0)         html += attentionItem('amber', T('weak', { count: dm.weak }));
+        if (red === 0 && amber === 0) html += attentionItem('green', T('all_clear', { count: dm.total }));
+        html += '</div>';
+        setBody('wtDomains', html);
+    }
+
     function renderKnowledge(d) {
         const kb = d.knowledge;
 
@@ -1213,6 +1258,7 @@ try {
                 renderServiceStatus(d);
                 renderContracts(d);
                 renderSoftware(d);
+                renderDomains(d);
                 renderKnowledge(d);
                 renderAssets(d);
                 renderTasks(d);

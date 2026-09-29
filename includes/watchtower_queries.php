@@ -572,6 +572,54 @@ function getWatchtowerData($conn, $analystId = 0, $scope = WT_SCOPE_ALL) {
         'show'               => $swShow
     ];
 
+    // -- Domains (#154) --
+    //
+    // The first card here that is scoped by company AND by module access, both of
+    // which the other cards leave to the page (see the note on Knowledge below):
+    // domains are a client's property on an MSP install, and "3 of our clients'
+    // domains lapse this week" is not something another client's analyst should
+    // be told. $analystId 0 (the browser-extension API with no analyst) is
+    // unscoped, as Knowledge treats it.
+    //
+    // Honours domain_expiry_surface exactly as Software honours its own setting.
+    $dm = ['total' => 0, 'expired' => 0, 'expiring_30d' => 0, 'expiring_90d' => 0, 'ssl_expiring' => 0, 'unlocked' => 0, 'weak' => 0, 'show' => false];
+    try {
+        $dmSurface = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'domain_expiry_surface'")->fetchColumn();
+        $dmSurface = ($dmSurface === false || $dmSurface === null || $dmSurface === '') ? 'dashboard' : (string)$dmSurface;
+        $dmAllowed = $analystId <= 0 || analystCanAccessModule($conn, $analystId, 'domains');
+        if ($dmAllowed && in_array($dmSurface, ['dashboard', 'both'], true)) {
+            [$dmT, $dmA] = $analystId > 0 ? activeTenantFilter($conn, $analystId, 'd') : ['', []];
+            // A status with alerts off ("Letting lapse") and "Do not renew" are
+            // somebody's deliberate decision, not something to shout about.
+            $live = "(s.id IS NULL OR s.alerts_enabled = 1) AND d.renewal_mode <> 'do_not_renew'";
+            $st = $conn->prepare(
+                "SELECT COUNT(*) AS total,
+                        SUM($live AND d.expiry_date < {$todaySql}) AS expired,
+                        SUM($live AND d.expiry_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)) AS exp30,
+                        SUM($live AND d.expiry_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 90 DAY)) AS exp90,
+                        SUM(d.ssl_expiry_date IS NOT NULL AND d.ssl_expiry_date <= DATE_ADD({$todaySql}, INTERVAL 21 DAY)) AS ssl_expiring,
+                        SUM(d.transfer_lock = 0) AS unlocked,
+                        SUM(d.security_grade IN ('D', 'F')) AS weak
+                   FROM domains d LEFT JOIN domain_statuses s ON s.id = d.status_id
+                  WHERE 1=1{$dmT}"
+            );
+            $st->execute($dmA);
+            $r = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+            $dm = [
+                'total' => (int)($r['total'] ?? 0), 'expired' => (int)($r['expired'] ?? 0),
+                'expiring_30d' => (int)($r['exp30'] ?? 0), 'expiring_90d' => (int)($r['exp90'] ?? 0),
+                'ssl_expiring' => (int)($r['ssl_expiring'] ?? 0), 'unlocked' => (int)($r['unlocked'] ?? 0),
+                'weak' => (int)($r['weak'] ?? 0), 'show' => ((int)($r['total'] ?? 0)) > 0,
+            ];
+        }
+    } catch (Exception $e) {
+        $dm['show'] = false;   // tables not there yet — draw nothing rather than zeroes
+    }
+    // `allowed` lets the page hide the card from somebody who cannot open Domains
+    // rather than tell them "no domains", which would be a false all-clear.
+    $dm['allowed'] = $dmAllowed ?? true;
+    $domainsWt = $dm;
+
     // -- Knowledge --
 
     // Company scope. NOTE: Knowledge is currently the ONLY card here that scopes
@@ -825,6 +873,7 @@ function getWatchtowerData($conn, $analystId = 0, $scope = WT_SCOPE_ALL) {
         'service_status' => $serviceStatus,
         'contracts'      => $contracts,
         'software'       => $software,
+        'domains'        => $domainsWt,
         'knowledge'      => $knowledge,
         'assets'         => $assets,
         'tasks'          => $tasksWt,
@@ -832,6 +881,7 @@ function getWatchtowerData($conn, $analystId = 0, $scope = WT_SCOPE_ALL) {
         // Which cards this installation wants on screen. Every card is visible
         // unless somebody has said otherwise, so an install that never opens
         // Watchtower → Settings sees exactly what it saw before.
-        'cards'          => wtVisibleCards($conn)
+        // Domains is hidden outright from anybody who cannot open the module.
+        'cards'          => array_merge(wtVisibleCards($conn), ($dmAllowed ?? true) ? [] : ['domains' => false])
     ];
 }

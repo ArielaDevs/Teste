@@ -215,6 +215,19 @@ return [
     ['DELETE', '#^/network-diagrams/(\d+)/connectors/(\d+)$#', ['network_diagrams', 'update'], 'apiNmConnectorsDelete'],
     ['GET',    '#^/cmdb-icons$#',                              ['reference', 'read'],          'apiCmdbIconsList'],
 
+    // Domains (#154) — company-scoped; auth codes never cross the API.
+    ['GET',    '#^/domains$#',                             ['domains', 'read'],               'apiDomainsList'],
+    ['POST',   '#^/domains$#',                             ['domains', 'create'],             'apiDomainsCreate'],
+    ['GET',    '#^/domains/(\d+)$#',                       ['domains', 'read'],               'apiDomainsGet'],
+    ['PATCH',  '#^/domains/(\d+)$#',                       ['domains', 'update'],             'apiDomainsUpdate'],
+    ['DELETE', '#^/domains/(\d+)$#',                       ['domains', 'delete'],             'apiDomainsDelete'],
+    ['POST',   '#^/domains/(\d+)/lookup$#',                ['domains', 'update'],             'apiDomainsLookup'],
+    ['POST',   '#^/domains/(\d+)/check$#',                 ['domains', 'update'],             'apiDomainsCheck'],
+    ['GET',    '#^/domains/(\d+)/findings$#',              ['domains', 'read'],               'apiDomainsFindings'],
+    ['GET',    '#^/domains/(\d+)/history$#',               ['domains', 'read'],               'apiDomainsHistory'],
+    ['GET',    '#^/domain-statuses$#',                     ['domains', 'read'],               'apiDomainStatusesList'],
+    ['GET',    '#^/domain-registrar-accounts$#',           ['domains', 'read'],               'apiDomainAccountsList'],
+
     ['GET',    '#^/users$#',                               ['users', 'read'],                 'apiUsersList'],
     ['POST',   '#^/users$#',                               ['users', 'create'],               'apiUsersCreate'],
     ['GET',    '#^/users/(\d+)$#',                         ['users', 'read'],                 'apiUsersGet'],

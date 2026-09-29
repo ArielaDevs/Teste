@@ -189,6 +189,18 @@ final class Cap
     // NOT sensitive: it decides where a date is SHOWN, never who may see it.
     const SOFTWARE_RENEWALS = 'software.renewals';
 
+    // ---- Domains (#154) ----------------------------------------------------
+    // Four very different grants. STATUSES is a list of words. ALERTS decides who is
+    // emailed and whether tickets/tasks are raised. MONITORING switches on outbound
+    // lookups against registries, DNS, crt.sh. AUTH_CODES is the dangerous one: a
+    // registrar auth code is the secret that lets whoever holds it transfer the
+    // domain away, so seeing or changing one is its own sensitive capability.
+    const DOMAINS_MANAGE     = 'domains.manage';       // umbrella
+    const DOMAINS_STATUSES   = 'domains.statuses';
+    const DOMAINS_ALERTS     = 'domains.alerts';
+    const DOMAINS_MONITORING = 'domains.monitoring';
+    const DOMAINS_AUTH_CODES = 'domains.auth_codes';   // reveal / change transfer secrets
+
     // ---- Tickets -----------------------------------------------------------
     // The module the whole per-tab design was argued FOR. Fourteen tabs, and they are
     // emphatically not the same kind of thing: MAILBOXES holds the OAuth credentials and

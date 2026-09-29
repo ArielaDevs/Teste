@@ -44,6 +44,7 @@ const RECORD_PREVIEW_MODULES = [
     'asset'             => 'assets',
     'contract'          => 'contracts',
     'knowledge_article' => 'knowledge',
+    'domain'            => 'domains',
 ];
 
 /**
@@ -366,6 +367,39 @@ function recordPreviewContract(PDO $conn, int $analystId, int $id): ?array
             // Not in the promised list, and included anyway: on a contract the
             // notice date is the one that costs money to miss.
             rpField(t('common.preview.notice'),   $r['notice_date']),
+        ]),
+    ];
+}
+
+// ── Domain (#154) ───────────────────────────────────────────────────────────
+function recordPreviewDomain(PDO $conn, int $analystId, int $id): ?array
+{
+    // The domain's own record gate — never activeTenantFilter(), which is a list
+    // filter and would answer "is it in my ACTIVE company" rather than "may I see it".
+    if (!analystCanAccessDomain($conn, $analystId, $id)) return null;
+    $stmt = $conn->prepare(
+        "SELECT d.domain_name, d.display_name, d.expiry_date, d.security_grade, d.ssl_expiry_date,
+                d.registrar_name, s.name AS status, a.full_name AS owner,
+                COALESCE(NULLIF(sup.trading_name, ''), sup.legal_name) AS registrar
+           FROM domains d
+      LEFT JOIN domain_statuses s ON s.id = d.status_id
+      LEFT JOIN analysts a        ON a.id = d.owner_analyst_id
+      LEFT JOIN suppliers sup     ON sup.id = d.registrar_supplier_id
+          WHERE d.id = ?"
+    );
+    $stmt->execute([$id]);
+    $r = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$r) return null;
+
+    return [
+        'heading' => $r['display_name'] ?: $r['domain_name'],
+        'fields'  => rpFields([
+            rpField(t('common.preview.status'),      $r['status']),
+            rpField(t('common.preview.expires'),     $r['expiry_date']),
+            rpField(t('common.preview.grade'),       $r['security_grade']),
+            rpField(t('common.preview.registrar'),   $r['registrar'] ?: $r['registrar_name']),
+            rpField(t('common.preview.owner'),       $r['owner']),
+            rpField(t('common.preview.certificate'), $r['ssl_expiry_date']),
         ]),
     ];
 }

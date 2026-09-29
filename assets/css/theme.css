@@ -108,6 +108,11 @@
     --con-accent:      #f59e0b;  --con-accent-hover: #d97706;
     --con-accent-soft: #fef3c7;  --con-on-accent:    #ffffff;
 
+    /* Domains module (lime-olive) accents - register, dashboard, grades.
+       Olive is the module's registered brand colour (module-colors.php). */
+    --dom-accent:      #4d7c0f;  --dom-accent-hover: #3f6212;
+    --dom-accent-soft: #ecfccb;  --dom-on-accent:    #ffffff;
+
     /* War room module (amber) accents. Declared here rather than left to the
        inline fallbacks the module was using: a var() fallback works, but it is
        the same value in both palettes, so dark mode never adapted the accent. */
@@ -242,6 +247,11 @@
     /* Contracts module (amber) — accent nudged lighter to read on dark */
     --con-accent:      #fbbf24;  --con-accent-hover: #fcd34d;
     --con-accent-soft: #3a2e12;  --con-on-accent:    #ffffff;
+
+    /* Domains module (lime-olive) — accent nudged lighter to read on dark.
+       Bright lime cannot carry white text, so on-accent flips to near-black. */
+    --dom-accent:      #84cc16;  --dom-accent-hover: #a3e635;
+    --dom-accent-soft: #1f2a12;  --dom-on-accent:    #111111;
 
     /* Service Status module (emerald) — accent nudged lighter to read on dark */
     /* War room, dark: lifted so the amber reads against a dark surface. */

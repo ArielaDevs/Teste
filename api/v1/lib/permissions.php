@@ -217,6 +217,15 @@ function apiV1PermissionCatalog(): array {
                 'delete' => 'Permanently delete a contract and its term values',
             ],
         ],
+        'domains' => [
+            'label'   => 'Domains',
+            'actions' => [
+                'read'   => 'List and view domains, their check findings and history, statuses and registrar accounts (company-scoped). Never auth codes.',
+                'create' => 'Add domains to the register',
+                'update' => 'Change domain fields, and run a registry lookup or the health checks',
+                'delete' => 'Permanently delete a domain and its history',
+            ],
+        ],
         'contract_terms' => [
             'label'   => 'Contract terms',
             'actions' => [

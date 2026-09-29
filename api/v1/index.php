@@ -24,6 +24,7 @@ require_once __DIR__ . '/resources/knowledge.php';
 require_once __DIR__ . '/resources/tasks.php';
 require_once __DIR__ . '/resources/cmdb.php';
 require_once __DIR__ . '/resources/contracts.php';
+require_once __DIR__ . '/resources/domains.php';
 require_once __DIR__ . '/resources/calendar.php';
 require_once __DIR__ . '/resources/software.php';
 require_once __DIR__ . '/resources/service_status.php';
@@ -141,6 +142,9 @@ function apiHandleRoot(PDO $conn, array $apiKey, array $params, array $body): vo
             'PATCH /suppliers/{id}/contacts/{contact_id}', 'DELETE /suppliers/{id}/contacts/{contact_id}',
             'GET /contract-statuses', 'GET /payment-schedules', 'GET /supplier-types',
             'GET /supplier-statuses', 'GET /contract-term-tabs',
+            'GET /domains', 'POST /domains', 'GET /domains/{id}', 'PATCH /domains/{id}', 'DELETE /domains/{id}',
+            'POST /domains/{id}/lookup', 'POST /domains/{id}/check', 'GET /domains/{id}/findings', 'GET /domains/{id}/history',
+            'GET /domain-statuses', 'GET /domain-registrar-accounts',
             'GET /calendar/events', 'POST /calendar/events', 'GET /calendar/events/{id}',
             'PATCH /calendar/events/{id}', 'DELETE /calendar/events/{id}', 'GET /calendar-categories',
             'GET /software/apps', 'GET /software/apps/{id}', 'GET /software/apps/{id}/machines',

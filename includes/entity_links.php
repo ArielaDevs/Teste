@@ -80,6 +80,10 @@ function entityLink(string $type, int $id): ?string {
 
         case 'contract':
             return 'contracts/view.php?id=' . $id;
+
+        // ⚠️ ONLY `id` — domains/view.php reads exactly that.
+        case 'domain':
+            return 'domains/view.php?id=' . $id;
     }
 
     return null;
@@ -94,6 +98,6 @@ function entityLink(string $type, int $id): ?string {
 function entityLinkTypes(): array {
     return [
         'ticket', 'task', 'problem', 'change',
-        'asset', 'cmdb_object', 'knowledge_article', 'contract',
+        'asset', 'cmdb_object', 'knowledge_article', 'contract', 'domain',
     ];
 }

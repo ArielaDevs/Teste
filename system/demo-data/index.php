@@ -444,6 +444,16 @@ if (!isset($_SESSION['analyst_id'])) {
                 <div class="error-text" id="err-contracts" style="display:none"></div>
             </div>
 
+            <div class="module-card" data-module="domains">
+                <h4>Domains</h4>
+                <p class="module-desc">8 domains on the reserved .example ending, graded A to F, with 2 registrar accounts. Monitoring is off on them, so nothing is ever looked up.</p>
+                <div class="module-footer">
+                    <span class="record-count">~10 records</span>
+                    <button class="import-btn" id="btn-domains" onclick="importModule('domains', this)" disabled><?php echo htmlspecialchars(t('system.demo.import')); ?></button>
+                </div>
+                <div class="error-text" id="err-domains" style="display:none"></div>
+            </div>
+
             <div class="module-card" data-module="services">
                 <h4>Service Status</h4>
                 <p class="module-desc">5 services with 2 incidents showing resolved and monitoring states.</p>
@@ -627,7 +637,7 @@ if (!isset($_SESSION['analyst_id'])) {
         }
 
         function enableModuleButtons() {
-            const modules = ['tickets', 'assets', 'knowledge', 'changes', 'calendar', 'checks', 'checklists', 'contracts', 'services', 'software', 'forms', 'tasks', 'process-mapper', 'cmdb', 'lms', 'workflow', 'network-mapper'];
+            const modules = ['tickets', 'assets', 'knowledge', 'changes', 'calendar', 'checks', 'checklists', 'contracts', 'domains', 'services', 'software', 'forms', 'tasks', 'process-mapper', 'cmdb', 'lms', 'workflow', 'network-mapper'];
             modules.forEach(function(m) {
                 const btn = document.getElementById('btn-' + m);
                 if (btn && !btn.classList.contains('success')) {

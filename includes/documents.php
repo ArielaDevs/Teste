@@ -162,6 +162,19 @@ function documentEntityRegistry(): array {
             'can'    => null,
             'filter' => null,
         ],
+        'domain' => [
+            // Registrar invoices, transfer authorisations, the letter from the
+            // brand-protection agency (#154). Scoped data: the domain's company
+            // decides who sees its documents, like an asset's.
+            'module' => 'domains',
+            'table'  => 'domains',
+            'label'  => 'Domain',
+            'url'    => 'domains/view.php?id=%d',
+            'title'  => 'domain_name',
+            'alive'  => null,
+            'can'    => function (PDO $c, int $a, int $id) { return analystCanAccessDomain($c, $a, $id); },
+            'filter' => function (PDO $c, int $a, string $alias) { return activeTenantFilter($c, $a, $alias); },
+        ],
         'knowledge_article' => [
             // ⚠️ Knowledge is the module that does NOT follow the others:
             // NULL means SHARED here, the opposite of tickets and assets. Its own

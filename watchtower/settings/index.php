@@ -172,6 +172,7 @@ const CARD_MODULE = {
     morning_checks: 'morning-checks', tickets: 'tickets', changes: 'changes',
     calendar: 'calendar', service_status: 'service-status', contracts: 'contracts',
     software: 'software',
+    domains: 'domains',
     knowledge: 'knowledge', assets: 'assets', tasks: 'tasks', workflows: 'workflow',
 };
 
@@ -270,6 +271,7 @@ function cardSignpost(key) {
     const targets = {
         assets:   '../../asset-management/settings/index.php?tab=warranty',
         software: '../../software/settings/index.php?tab=renewals',
+        domains:  '../../domains/settings/index.php?tab=alerts',
     };
     const href = targets[key];
     if (!href) { return ''; }

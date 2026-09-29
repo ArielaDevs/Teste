@@ -15,6 +15,10 @@ requireModuleAccess('contracts');
 $current_page = 'suppliers';
 $path_prefix = '../../../';
 $translationNamespaces = ['common', 'contracts'];
+// Domains (#154): a registrar's page lists the domains it holds — only for
+// analysts who can open Domains, since the list is Domains' data.
+$showDomains = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'domains');
+if ($showDomains) $translationNamespaces[] = 'domains';
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
@@ -243,6 +247,13 @@ $translationNamespaces = ['common', 'contracts'];
                     <div class="empty-state"><?php echo htmlspecialchars(t('common.loading')); ?></div>
                 </div>
             </div>
+            <?php if ($showDomains): ?>
+            <div class="section-card" id="supplierDomains" style="margin-top:20px;display:none">
+                <div class="section-header"><h2><?php echo htmlspecialchars(t('domains.supplier.title')); ?></h2>
+                    <a href="<?php echo BASE_URL; ?>domains/" class="back-link"><?php echo htmlspecialchars(t('domains.title')); ?></a></div>
+                <div class="view-body" id="supplierDomainsBody"></div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -654,6 +665,26 @@ $translationNamespaces = ['common', 'contracts'];
             return div.innerHTML;
         }
     </script>
+    <?php if ($showDomains): ?>
+    <script>
+    // The domains this supplier holds as registrar (#154). Separate from the page's
+    // own script so the supplier view works exactly as before without Domains.
+    (async function () {
+        const id = parseInt(new URLSearchParams(location.search).get('id') || '0', 10);
+        if (!id) return;
+        try {
+            const d = await (await fetch(<?php echo json_encode(BASE_URL . 'api/domains/list.php?registrar_supplier_id='); ?> + id)).json();
+            if (!d.success || !d.domains.length) return;
+            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const pill = n => n === null ? '' : '<span class="status-badge ' + (n < 0 ? 'expired' : (n <= 30 ? 'expiring' : 'active')) + '">' + esc(n < 0 ? window.t('domains.days.expired_ago', {n: -n}) : window.t('domains.days.in', {n: n})) + '</span>';
+            document.getElementById('supplierDomainsBody').innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:14px">'
+                + d.domains.map(r => '<tr><td style="padding:8px 0"><a href="<?php echo BASE_URL; ?>domains/view.php?id=' + r.id + '">' + esc(r.display_name || r.domain_name) + '</a></td>'
+                    + '<td>' + esc(r.expiry_date || '') + '</td><td>' + pill(r.days_left) + '</td><td>' + esc(r.security_grade || '') + '</td></tr>').join('') + '</table>';
+            document.getElementById('supplierDomains').style.display = '';
+        } catch (e) { /* Domains unavailable: the supplier page is still whole */ }
+    })();
+    </script>
+    <?php endif; ?>
     <script src="../../../assets/js/mobile.js?v=65"></script>
 </body>
 </html>

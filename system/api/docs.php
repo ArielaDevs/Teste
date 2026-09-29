@@ -224,7 +224,7 @@ $__extrasJson = $__spec ? json_encode($__spec['extras']) : '{}';
         'Changes': 'REST-API-Changes', 'Change comments, history & CAB': 'REST-API-Changes',
         'Knowledge base': 'REST-API-Knowledge', 'Tasks': 'REST-API-Tasks', 'CMDB': 'REST-API-CMDB',
         'Contracts': 'REST-API-Contracts', 'Suppliers & contacts': 'REST-API-Contracts',
-        'Calendar': 'REST-API-Calendar', 'Software': 'REST-API-Software',
+        'Calendar': 'REST-API-Calendar', 'Software': 'REST-API-Software', 'Domains': 'REST-API-Domains',
         'Service status': 'REST-API-Service-Status', 'Morning checks': 'REST-API-Morning-Checks',
         'Forms': 'REST-API-Forms', 'Workflows': 'REST-API-Workflow',
         'Network Mapper': 'REST-API-Network-Mapper', 'Requesters': 'REST-API-Tickets',

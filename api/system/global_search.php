@@ -318,6 +318,31 @@ try {
         } catch (Exception $e) { /* table not ready — no contract results */ }
     }
 
+    // --- Domains (#154): by name, registrar or tag -------------------------
+    // Scoped data: the analyst's active company, as the register's own list.
+    if ($can('domains')) {
+        try {
+            [$tSql, $tArgs] = activeTenantFilter($conn, $analystId, 'd');
+            $sql = "SELECT d.id, d.domain_name, d.display_name, d.expiry_date, d.registrar_name
+                      FROM domains d
+                     WHERE (d.domain_name LIKE ? OR d.display_name LIKE ? OR d.registrar_name LIKE ? OR d.tags LIKE ?)" . $tSql . "
+                     ORDER BY d.domain_name
+                     LIMIT " . $perType;
+            $stmt = $conn->prepare($sql);
+            $stmt->execute(array_merge([$like, $like, $like, $like], $tArgs));
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $results[] = [
+                    'type'     => 'domain',
+                    'module'   => 'domains',
+                    'id'       => (int) $r['id'],
+                    'title'    => $r['display_name'] ?: $r['domain_name'],
+                    'subtitle' => trim(($r['registrar_name'] ?? '') . ($r['expiry_date'] ? ' · ' . $r['expiry_date'] : ''), ' ·'),
+                    'url'      => entityLink('domain', (int) $r['id']),
+                ];
+            }
+        } catch (Exception $e) { /* table not ready — no domain results */ }
+    }
+
     // --- Attached documents (discussion #76) -----------------------------
     //
     // ⚠️ THE ONLY SOURCE HERE WHOSE PERMISSION IS NOT ITS OWN. Every block above

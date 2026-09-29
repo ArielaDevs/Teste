@@ -713,6 +713,22 @@ try {
     // above (GitHub #42): a fresh install landed with an empty Type dropdown because
     // types were only ever created by the demo data. Global defaults (tenant_id NULL);
     // only ever seeded into an empty table, so a deliberately-cleared list is respected.
+    // Seed default domain statuses (#154) into an empty table only, the same rule
+    // as ticket types below. "Letting lapse" and "Cancelled" carry
+    // alerts_enabled = 0: choosing them is how an operator stops the reminders.
+    if ($tableExists('domain_statuses')) {
+        $cnt = (int) $conn->query("SELECT COUNT(*) FROM domain_statuses")->fetchColumn();
+        if ($cnt === 0) {
+            $conn->exec("INSERT INTO domain_statuses (name, colour, alerts_enabled, display_order) VALUES
+                ('Active',               '#16a34a', 1, 1),
+                ('Transfer in progress', '#2563eb', 1, 2),
+                ('Parked',               '#64748b', 1, 3),
+                ('Letting lapse',        '#d97706', 0, 4),
+                ('Cancelled',            '#dc2626', 0, 5)");
+            $results[] = ['table' => 'domain_statuses', 'status' => 'seeded', 'details' => ['Inserted 5 default domain statuses']];
+        }
+    }
+
     if ($tableExists('ticket_types')) {
         $cnt = (int) $conn->query("SELECT COUNT(*) FROM ticket_types")->fetchColumn();
         if ($cnt === 0) {
@@ -1669,6 +1685,9 @@ try {
             // (sla.warning / sla.breached come from the SLA cron instead.)
             'workflow_cron_token'             => bin2hex(random_bytes(16)),
             'workflow_cron_min_interval_seconds' => '300',
+            // Domains (cron/domains.php, #154): registry lookups, checks, alerts.
+            // Its own lock (GET_LOCK) stops overlapping runs, so no interval floor.
+            'domain_cron_token'               => bin2hex(random_bytes(16)),
             // External issue trackers (cron/integration_poll.php): refreshes the
             // cached status of every linked issue. A 60s floor rather than the
             // webhook worker's 20s because this makes an outbound API call per
@@ -2625,6 +2644,32 @@ try {
         ['contract_term_values', 'fk_ctv_term_tab',               "ALTER TABLE contract_term_values ADD CONSTRAINT fk_ctv_term_tab FOREIGN KEY (term_tab_id) REFERENCES contract_term_tabs (id) ON DELETE CASCADE"],
     ];
     foreach ($contractFks as [$tbl, $name, $sql]) {
+        if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;
+        try { $conn->exec($sql); } catch (Exception $e) {}
+    }
+
+    // Domains-module foreign keys (#154). Names + rules match freeitsm.sql. Every
+    // reference out of `domains` is SET NULL — removing a supplier, an analyst or a
+    // company must never take a domain record with it — and the child tables
+    // cascade, although DomainsService::deleteDomain() also deletes them by hand
+    // because an install whose FKs failed to add has no cascade to rely on.
+    $domainFks = [
+        ['domain_registrar_accounts', 'fk_dra_tenant',              "ALTER TABLE domain_registrar_accounts ADD CONSTRAINT fk_dra_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE SET NULL"],
+        ['domain_registrar_accounts', 'fk_dra_supplier',            "ALTER TABLE domain_registrar_accounts ADD CONSTRAINT fk_dra_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE SET NULL"],
+        ['domain_registrar_accounts', 'fk_dra_owner',               "ALTER TABLE domain_registrar_accounts ADD CONSTRAINT fk_dra_owner FOREIGN KEY (owner_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_tenant',          "ALTER TABLE domains ADD CONSTRAINT fk_domains_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_status',          "ALTER TABLE domains ADD CONSTRAINT fk_domains_status FOREIGN KEY (status_id) REFERENCES domain_statuses (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_registrar',       "ALTER TABLE domains ADD CONSTRAINT fk_domains_registrar FOREIGN KEY (registrar_supplier_id) REFERENCES suppliers (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_account',         "ALTER TABLE domains ADD CONSTRAINT fk_domains_account FOREIGN KEY (registrar_account_id) REFERENCES domain_registrar_accounts (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_owner',           "ALTER TABLE domains ADD CONSTRAINT fk_domains_owner FOREIGN KEY (owner_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_tech_contact',    "ALTER TABLE domains ADD CONSTRAINT fk_domains_tech_contact FOREIGN KEY (tech_contact_id) REFERENCES contacts (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_contract',        "ALTER TABLE domains ADD CONSTRAINT fk_domains_contract FOREIGN KEY (contract_id) REFERENCES contracts (id) ON DELETE SET NULL"],
+        ['domain_audit',              'fk_domain_audit_domain',     "ALTER TABLE domain_audit ADD CONSTRAINT fk_domain_audit_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_alerts_sent',        'fk_domain_alerts_domain',    "ALTER TABLE domain_alerts_sent ADD CONSTRAINT fk_domain_alerts_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_lookalikes',         'fk_domain_lookalikes_domain', "ALTER TABLE domain_lookalikes ADD CONSTRAINT fk_domain_lookalikes_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_certificates',       'fk_domain_certificates_domain', "ALTER TABLE domain_certificates ADD CONSTRAINT fk_domain_certificates_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+    ];
+    foreach ($domainFks as [$tbl, $name, $sql]) {
         if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;
         try { $conn->exec($sql); } catch (Exception $e) {}
     }

@@ -20,6 +20,9 @@ $defaultModuleColors = [
     'software'       => ['#5c6bc0', '#3f51b5'],
     'forms'          => ['#00897b', '#00695c'],
     'contracts'      => ['#f59e0b', '#d97706'],
+    // Domains: a deep lime-olive, distinct from Assets' green and Service
+    // Status' emerald, and dark enough to carry white text in the header.
+    'domains'        => ['#4d7c0f', '#3f6212'],
     'service-status' => ['#10b981', '#059669'],
     'war-room'       => ['#ea580c', '#c2410c'],
     'wiki'           => ['#c62828', '#b71c1c'],

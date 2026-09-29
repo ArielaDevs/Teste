@@ -1471,6 +1471,35 @@
                 },
                 {
                     "m": "GET",
+                    "p": "\/assets\/{id}\/physical-disks",
+                    "perm": "asset_inventory.read",
+                    "s": "Physical disks",
+                    "d": "The physical drives the inventory agent reported (model, serial, size, media and interface type), largest first. Empty until Database Verification has created the table.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Asset id",
+                            "req": true
+                        }
+                    ],
+                    "section": "Asset assignments, history & inventory",
+                    "slug": "get-assets-id-physical-disks",
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Drive serials for an asset",
+                                "note": "For warranty claims and disposal records.",
+                                "path": {
+                                    "id": "42"
+                                }
+                            }
+                        ],
+                        "errors": []
+                    }
+                },
+                {
+                    "m": "GET",
                     "p": "\/assets\/{id}\/network-adapters",
                     "perm": "asset_inventory.read",
                     "s": "Network adapters",
@@ -5669,6 +5698,524 @@
                             }
                         ]
                     }
+                }
+            ]
+        },
+        {
+            "section": "Domains",
+            "items": [
+                {
+                    "m": "GET",
+                    "p": "\/domains",
+                    "perm": "domains.read",
+                    "s": "List \/ search domains",
+                    "d": "The domain register, scoped to the key's companies. Each domain carries its registry details (dates, registrar, locks, name servers), its owner and status, its security grade from the last check, and days_remaining until expiry. Auth codes are never returned - only auth_code_set.",
+                    "params": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "desc": "Search domain name, registrar and tags",
+                            "req": false
+                        },
+                        {
+                            "name": "domain_name",
+                            "in": "query",
+                            "desc": "Exact name (tidied the same way as on input, so \"https:\/\/www.Example.com\" matches example.com)",
+                            "req": false
+                        },
+                        {
+                            "name": "status_id \/ owner_analyst_id \/ registrar_supplier_id \/ registrar_account_id",
+                            "in": "query",
+                            "desc": "Id filters",
+                            "req": false
+                        },
+                        {
+                            "name": "purpose",
+                            "in": "query",
+                            "desc": "primary, secondary, redirect, email_only, defensive, parked or campaign",
+                            "req": false
+                        },
+                        {
+                            "name": "tag",
+                            "in": "query",
+                            "desc": "Domains carrying this tag",
+                            "req": false
+                        },
+                        {
+                            "name": "expiring_within_days",
+                            "in": "query",
+                            "desc": "Registration expires within N days (includes already expired)",
+                            "req": false
+                        },
+                        {
+                            "name": "expired",
+                            "in": "query",
+                            "desc": "true = expiry date already passed",
+                            "req": false
+                        },
+                        {
+                            "name": "transfer_lock",
+                            "in": "query",
+                            "desc": "true \/ false",
+                            "req": false
+                        },
+                        {
+                            "name": "grade",
+                            "in": "query",
+                            "desc": "Comma-separated security grades, e.g. D,F",
+                            "req": false
+                        },
+                        {
+                            "name": "company_id",
+                            "in": "query",
+                            "desc": "Narrow to one company inside the key's scope",
+                            "req": false
+                        },
+                        {
+                            "name": "sort",
+                            "in": "query",
+                            "desc": "expiry_date (default), domain_name, security_score, ssl_expiry_date, created_at, id - prefix \"-\" for descending",
+                            "req": false
+                        },
+                        {
+                            "name": "page \/ per_page",
+                            "in": "query",
+                            "desc": "Pagination (default 1 \/ 25, max per_page 100)",
+                            "req": false
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Everything expiring in the next 60 days",
+                                "note": "The shape a monthly renewals report calls.",
+                                "query": {
+                                    "expiring_within_days": 60,
+                                    "sort": "expiry_date"
+                                }
+                            },
+                            {
+                                "title": "Weakly protected domains",
+                                "note": "Every domain graded D or F at its last check.",
+                                "query": {
+                                    "grade": "D,F"
+                                }
+                            },
+                            {
+                                "title": "Find one domain by name",
+                                "note": "A web address works too - it is tidied into the domain name.",
+                                "query": {
+                                    "domain_name": "example.com"
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 400,
+                                "slug": "invalid_parameter",
+                                "when": "'sort' or 'purpose' is not one of the listed values."
+                            },
+                            {
+                                "code": 403,
+                                "slug": "forbidden",
+                                "when": "company_id is outside the key's company scope."
+                            }
+                        ]
+                    },
+                    "section": "Domains",
+                    "slug": "get-domains"
+                },
+                {
+                    "m": "POST",
+                    "p": "\/domains",
+                    "perm": "domains.create",
+                    "s": "Add a domain",
+                    "d": "Only domain_name is required. It is tidied (scheme, path, \"www.\", case) and stored in the form the registry uses; an international name is kept as punycode with the Unicode form in display_name. The same name twice in one company is refused (409). Send \"lookup\": true to fill the registry details straight away, as the screen does; otherwise the scheduled run fills them in. auth_code is refused.",
+                    "params": [
+                        {
+                            "name": "domain_name",
+                            "in": "body",
+                            "desc": "The domain",
+                            "req": true
+                        },
+                        {
+                            "name": "company_id",
+                            "in": "body",
+                            "desc": "Company (default: the key's default company)",
+                            "req": false
+                        },
+                        {
+                            "name": "purpose",
+                            "in": "body",
+                            "desc": "primary (default), secondary, redirect, email_only, defensive, parked, campaign",
+                            "req": false
+                        },
+                        {
+                            "name": "status_id \/ owner_analyst_id \/ registrar_supplier_id \/ registrar_account_id \/ tech_contact_id \/ contract_id",
+                            "in": "body",
+                            "desc": "Lookups, validated (422 on an unknown id)",
+                            "req": false
+                        },
+                        {
+                            "name": "expiry_date \/ registration_date \/ last_renewed_date",
+                            "in": "body",
+                            "desc": "YYYY-MM-DD",
+                            "req": false
+                        },
+                        {
+                            "name": "renewal_mode",
+                            "in": "body",
+                            "desc": "auto, manual, do_not_renew or unknown",
+                            "req": false
+                        },
+                        {
+                            "name": "tags",
+                            "in": "body",
+                            "desc": "Comma-separated",
+                            "req": false
+                        },
+                        {
+                            "name": "cost \/ currency \/ billing_years \/ cost_centre",
+                            "in": "body",
+                            "desc": "Renewal cost, 3-letter currency, years per renewal",
+                            "req": false
+                        },
+                        {
+                            "name": "nameservers \/ ssl_hosts \/ dkim_selectors \/ dns_provider \/ hosting_provider \/ registrant_name \/ notes",
+                            "in": "body",
+                            "desc": "Free text; ssl_hosts must be this domain or its sub-domains",
+                            "req": false
+                        },
+                        {
+                            "name": "lookup",
+                            "in": "body",
+                            "desc": "true = ask the registry now",
+                            "req": false
+                        }
+                    ],
+                    "body": {
+                        "domain_name": "example.com",
+                        "purpose": "primary",
+                        "owner_analyst_id": 1,
+                        "renewal_mode": "auto",
+                        "tags": "brand",
+                        "lookup": true
+                    },
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Add and look up",
+                                "note": "The registry details are filled in before the response comes back.",
+                                "body": {
+                                    "domain_name": "example.com",
+                                    "lookup": true
+                                }
+                            },
+                            {
+                                "title": "A defensive registration",
+                                "note": "Checked for being locked down against email spoofing rather than for having email set up.",
+                                "body": {
+                                    "domain_name": "example-login.com",
+                                    "purpose": "defensive",
+                                    "renewal_mode": "auto"
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 409,
+                                "slug": "conflict",
+                                "when": "The domain is already in the register for that company."
+                            },
+                            {
+                                "code": 422,
+                                "slug": "invalid_field",
+                                "when": "Not a domain name, an unknown lookup id, a bad date - or the body contains auth_code."
+                            }
+                        ]
+                    },
+                    "section": "Domains",
+                    "slug": "post-domains"
+                },
+                {
+                    "m": "GET",
+                    "p": "\/domains\/{id}",
+                    "perm": "domains.read",
+                    "s": "Get a domain",
+                    "d": "One domain. 404 when it does not exist or belongs to a company outside the key's scope.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Domain id",
+                            "req": true
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "One domain",
+                                "note": "Including days_remaining and the last security grade.",
+                                "path": {
+                                    "id": 1
+                                }
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Domains",
+                    "slug": "get-domains-id"
+                },
+                {
+                    "m": "PATCH",
+                    "p": "\/domains\/{id}",
+                    "perm": "domains.update",
+                    "s": "Update a domain",
+                    "d": "Send only the fields to change; \"\" or null clears one. Every change is written to the domain's history with source \"api\" and fires the domain.updated workflow event. auth_code is refused; the company cannot be changed here.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Domain id",
+                            "req": true
+                        },
+                        {
+                            "name": "(any field from POST \/domains)",
+                            "in": "body",
+                            "desc": "Except auth_code and company_id",
+                            "req": false
+                        }
+                    ],
+                    "body": {
+                        "renewal_mode": "auto",
+                        "owner_analyst_id": 3,
+                        "tags": "brand, marketing"
+                    },
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Record the renewal cost",
+                                "note": "Feeds the dashboard's renewal forecast.",
+                                "path": {
+                                    "id": 1
+                                },
+                                "body": {
+                                    "cost": 11.99,
+                                    "currency": "GBP",
+                                    "billing_years": 1
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 422,
+                                "slug": "missing_field",
+                                "when": "The body names no fields to change."
+                            }
+                        ]
+                    },
+                    "section": "Domains",
+                    "slug": "patch-domains-id"
+                },
+                {
+                    "m": "DELETE",
+                    "p": "\/domains\/{id}",
+                    "perm": "domains.delete",
+                    "s": "Delete a domain",
+                    "d": "Removes the domain from the register with its history, alerts, look-alikes and certificate log. The registration itself is untouched.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Domain id",
+                            "req": true
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Delete",
+                                "note": "Permanent.",
+                                "path": {
+                                    "id": 1
+                                }
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Domains",
+                    "slug": "delete-domains-id"
+                },
+                {
+                    "m": "POST",
+                    "p": "\/domains\/{id}\/lookup",
+                    "perm": "domains.update",
+                    "s": "Refresh from the registry",
+                    "d": "Asks the domain's registry now (RDAP, or WHOIS where the registry has none) and applies the answer under the install's overwrite setting. Returns the domain plus a `changes` list. 502 lookup_failed when the registry cannot be reached or does not know the name.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Domain id",
+                            "req": true
+                        }
+                    ],
+                    "body": [],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "After renewing",
+                                "note": "Pick up the new expiry date at once rather than waiting for the schedule.",
+                                "path": {
+                                    "id": 1
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 502,
+                                "slug": "lookup_failed",
+                                "when": "The registry did not answer, rate-limited the request, or has no registration for the name."
+                            }
+                        ]
+                    },
+                    "section": "Domains",
+                    "slug": "post-domains-id-lookup"
+                },
+                {
+                    "m": "POST",
+                    "p": "\/domains\/{id}\/check",
+                    "perm": "domains.update",
+                    "s": "Run the checks now",
+                    "d": "Runs the DNS, email-security and certificate checks, stores the new grade, and compares with the last run. Returns the domain plus `findings` (with English title and advice) and `changes` (anything change detection saw move).",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Domain id",
+                            "req": true
+                        }
+                    ],
+                    "body": [],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Re-grade after fixing DMARC",
+                                "note": "The findings list what is still wrong.",
+                                "path": {
+                                    "id": 1
+                                }
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Domains",
+                    "slug": "post-domains-id-check"
+                },
+                {
+                    "m": "GET",
+                    "p": "\/domains\/{id}\/findings",
+                    "perm": "domains.read",
+                    "s": "The last check's findings",
+                    "d": "Every finding from the most recent check: key, area (registration, dns, email, web), level (pass, info, warn, fail), the points it cost, and English title and advice. meta.checked_at says when.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Domain id",
+                            "req": true
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "What to fix",
+                                "note": "Filter to level warn and fail on your side.",
+                                "path": {
+                                    "id": 1
+                                }
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Domains",
+                    "slug": "get-domains-id-findings"
+                },
+                {
+                    "m": "GET",
+                    "p": "\/domains\/{id}\/history",
+                    "perm": "domains.read",
+                    "s": "A domain's history",
+                    "d": "Every change, newest first: who (or which process - lookup, check, monitor, api, import) changed which field from what to what. Auth code changes and views are listed without the value.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Domain id",
+                            "req": true
+                        },
+                        {
+                            "name": "page \/ per_page",
+                            "in": "query",
+                            "desc": "Pagination",
+                            "req": false
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Recent changes",
+                                "note": "The last ten.",
+                                "path": {
+                                    "id": 1
+                                },
+                                "query": {
+                                    "per_page": 10
+                                }
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Domains",
+                    "slug": "get-domains-id-history"
+                },
+                {
+                    "m": "GET",
+                    "p": "\/domain-statuses",
+                    "perm": "domains.read",
+                    "s": "Domain statuses",
+                    "d": "The statuses a domain can have. alerts_enabled = false marks the ones that stop expiry reminders (for example \"Letting lapse\").",
+                    "params": [],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "All statuses",
+                                "note": "Use an id as status_id."
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Domains",
+                    "slug": "get-domain-statuses"
+                },
+                {
+                    "m": "GET",
+                    "p": "\/domain-registrar-accounts",
+                    "perm": "domains.read",
+                    "s": "Registrar accounts",
+                    "d": "The accounts at registrars that hold the domains, scoped to the key's companies, with how many domains each holds. No passwords are stored, so none are returned.",
+                    "params": [],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "All accounts",
+                                "note": "Use an id as registrar_account_id."
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Domains",
+                    "slug": "get-domain-registrar-accounts"
                 }
             ]
         },
@@ -15603,6 +16150,211 @@
                     }
                 }
             ]
+        },
+        "GET \/domains": {
+            "examples": [
+                {
+                    "title": "Everything expiring in the next 60 days",
+                    "note": "The shape a monthly renewals report calls.",
+                    "query": {
+                        "expiring_within_days": 60,
+                        "sort": "expiry_date"
+                    }
+                },
+                {
+                    "title": "Weakly protected domains",
+                    "note": "Every domain graded D or F at its last check.",
+                    "query": {
+                        "grade": "D,F"
+                    }
+                },
+                {
+                    "title": "Find one domain by name",
+                    "note": "A web address works too - it is tidied into the domain name.",
+                    "query": {
+                        "domain_name": "example.com"
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 400,
+                    "slug": "invalid_parameter",
+                    "when": "'sort' or 'purpose' is not one of the listed values."
+                },
+                {
+                    "code": 403,
+                    "slug": "forbidden",
+                    "when": "company_id is outside the key's company scope."
+                }
+            ]
+        },
+        "POST \/domains": {
+            "examples": [
+                {
+                    "title": "Add and look up",
+                    "note": "The registry details are filled in before the response comes back.",
+                    "body": {
+                        "domain_name": "example.com",
+                        "lookup": true
+                    }
+                },
+                {
+                    "title": "A defensive registration",
+                    "note": "Checked for being locked down against email spoofing rather than for having email set up.",
+                    "body": {
+                        "domain_name": "example-login.com",
+                        "purpose": "defensive",
+                        "renewal_mode": "auto"
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 409,
+                    "slug": "conflict",
+                    "when": "The domain is already in the register for that company."
+                },
+                {
+                    "code": 422,
+                    "slug": "invalid_field",
+                    "when": "Not a domain name, an unknown lookup id, a bad date - or the body contains auth_code."
+                }
+            ]
+        },
+        "GET \/domains\/{id}": {
+            "examples": [
+                {
+                    "title": "One domain",
+                    "note": "Including days_remaining and the last security grade.",
+                    "path": {
+                        "id": 1
+                    }
+                }
+            ],
+            "errors": []
+        },
+        "PATCH \/domains\/{id}": {
+            "examples": [
+                {
+                    "title": "Record the renewal cost",
+                    "note": "Feeds the dashboard's renewal forecast.",
+                    "path": {
+                        "id": 1
+                    },
+                    "body": {
+                        "cost": 11.99,
+                        "currency": "GBP",
+                        "billing_years": 1
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 422,
+                    "slug": "missing_field",
+                    "when": "The body names no fields to change."
+                }
+            ]
+        },
+        "DELETE \/domains\/{id}": {
+            "examples": [
+                {
+                    "title": "Delete",
+                    "note": "Permanent.",
+                    "path": {
+                        "id": 1
+                    }
+                }
+            ],
+            "errors": []
+        },
+        "POST \/domains\/{id}\/lookup": {
+            "examples": [
+                {
+                    "title": "After renewing",
+                    "note": "Pick up the new expiry date at once rather than waiting for the schedule.",
+                    "path": {
+                        "id": 1
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 502,
+                    "slug": "lookup_failed",
+                    "when": "The registry did not answer, rate-limited the request, or has no registration for the name."
+                }
+            ]
+        },
+        "POST \/domains\/{id}\/check": {
+            "examples": [
+                {
+                    "title": "Re-grade after fixing DMARC",
+                    "note": "The findings list what is still wrong.",
+                    "path": {
+                        "id": 1
+                    }
+                }
+            ],
+            "errors": []
+        },
+        "GET \/domains\/{id}\/findings": {
+            "examples": [
+                {
+                    "title": "What to fix",
+                    "note": "Filter to level warn and fail on your side.",
+                    "path": {
+                        "id": 1
+                    }
+                }
+            ],
+            "errors": []
+        },
+        "GET \/domains\/{id}\/history": {
+            "examples": [
+                {
+                    "title": "Recent changes",
+                    "note": "The last ten.",
+                    "path": {
+                        "id": 1
+                    },
+                    "query": {
+                        "per_page": 10
+                    }
+                }
+            ],
+            "errors": []
+        },
+        "GET \/domain-statuses": {
+            "examples": [
+                {
+                    "title": "All statuses",
+                    "note": "Use an id as status_id."
+                }
+            ],
+            "errors": []
+        },
+        "GET \/domain-registrar-accounts": {
+            "examples": [
+                {
+                    "title": "All accounts",
+                    "note": "Use an id as registrar_account_id."
+                }
+            ],
+            "errors": []
+        },
+        "GET \/assets\/{id}\/physical-disks": {
+            "examples": [
+                {
+                    "title": "Drive serials for an asset",
+                    "note": "For warranty claims and disposal records.",
+                    "path": {
+                        "id": "42"
+                    }
+                }
+            ],
+            "errors": []
         }
     }
 }

@@ -107,6 +107,13 @@ $modules = [
         'path' => 'contracts/',
         'icon' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="12" y1="9" x2="8" y2="9"></line>'
     ],
+    'domains' => [
+        'name' => t('common.modules.domains.name'),
+        'path' => 'domains/',
+        // A globe with a padlock: the Wiki already has the plain globe, and a
+        // domain register here is as much about protecting names as listing them.
+        'icon' => '<path d="M20.9 13.5A10 10 0 1 0 12 22"></path><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10"></path><path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"></path><rect x="15" y="17" width="7" height="5" rx="1"></rect><path d="M16.5 17v-1.5a2 2 0 0 1 4 0V17"></path>'
+    ],
     'service-status' => [
         'name' => t('common.modules.service-status.name'),
         'path' => 'service-status/',
@@ -807,7 +814,7 @@ function renderWaffleMenuJS() {
         window.CP_BASE = <?php echo json_encode(BASE_URL); ?>;
         window.CP_MODULES = <?php echo json_encode($cpModules, JSON_UNESCAPED_SLASHES); ?>;
     </script>
-    <script src="<?php echo BASE_URL; ?>assets/js/command-palette.js?v=8"></script>
+    <script src="<?php echo BASE_URL; ?>assets/js/command-palette.js?v=9"></script>
     <?php
     // The palette can return documents, and a document row offers an ⓘ that opens
     // the "attached to" dialogue — which lives in the documents component. The

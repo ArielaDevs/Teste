@@ -7031,7 +7031,198 @@ CREATE TABLE IF NOT EXISTS `ticket_checklist_items` (
     CONSTRAINT `fk_ticket_chk_items_chk` FOREIGN KEY (`ticket_checklist_id`) REFERENCES `ticket_checklists` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ----------------------------------------------------------
+-- Domains module (GitHub #154)
+-- ----------------------------------------------------------
+-- A register of the web domains an organisation (or each client company of an
+-- MSP) holds: who registered them, when they expire, how they are protected,
+-- and whether their DNS and certificates look healthy. SCOPED DATA: a domain
+-- belongs to one company, and tenant_id NULL means the Default company.
+
+-- The operator's own words for where a domain has got to. Global, like ticket
+-- statuses: a status has to MEAN the same in a cross-company report.
+-- alerts_enabled = 0 is how "we are letting this one lapse" stops the reminders.
+CREATE TABLE IF NOT EXISTS `domain_statuses` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `name`             VARCHAR(100) NOT NULL,
+    `colour`           VARCHAR(7) NULL,
+    `alerts_enabled`   TINYINT(1) NOT NULL DEFAULT 1,
+    `is_active`        TINYINT(1) NOT NULL DEFAULT 1,
+    `display_order`    INT NOT NULL DEFAULT 0,
+    `created_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `is_demo`          TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The account at a registrar that holds some of the domains: which login, who
+-- owns it, who holds its second factor. NEVER a password - that belongs in a
+-- password manager, and the notes field says where.
+CREATE TABLE IF NOT EXISTS `domain_registrar_accounts` (
+    `id`                  INT NOT NULL AUTO_INCREMENT,
+    `tenant_id`           INT NULL,                  -- NULL = the Default company
+    `supplier_id`         INT NULL,                  -- the registrar, as a Contracts supplier
+    `account_name`        VARCHAR(150) NOT NULL,
+    `account_reference`   VARCHAR(150) NULL,         -- account number / login name at the registrar
+    `login_url`           VARCHAR(500) NULL,
+    `owner_analyst_id`    INT NULL,
+    `two_factor_holder`   VARCHAR(255) NULL,
+    `notes`               TEXT NULL,
+    `created_by`          INT NULL,
+    `created_datetime`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `is_demo`             TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_dra_tenant` (`tenant_id`),
+    KEY `idx_dra_supplier` (`supplier_id`),
+    CONSTRAINT `fk_dra_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_dra_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_dra_owner` FOREIGN KEY (`owner_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `domains` (
+    `id`                     INT NOT NULL AUTO_INCREMENT,
+    `tenant_id`              INT NULL,               -- NULL = the Default company
+    `domain_name`            VARCHAR(253) NOT NULL,  -- lower-case ASCII (punycode for IDNs)
+    `display_name`           VARCHAR(253) NULL,      -- the Unicode form, only when it differs
+    `status_id`              INT NULL,
+    `purpose`                VARCHAR(20) NOT NULL DEFAULT 'primary',
+    `registrar_supplier_id`  INT NULL,
+    `registrar_account_id`   INT NULL,
+    `registrar_name`         VARCHAR(255) NULL,      -- as the registry reports it
+    `registration_date`      DATE NULL,
+    `expiry_date`            DATE NULL,
+    `last_renewed_date`      DATE NULL,
+    `registry_updated_date`  DATE NULL,
+    `renewal_mode`           VARCHAR(20) NOT NULL DEFAULT 'unknown',
+    `transfer_lock`          TINYINT(1) NULL,        -- NULL = not known
+    `registry_lock`          TINYINT(1) NULL,
+    `dnssec`                 TINYINT(1) NULL,
+    `registry_statuses`      VARCHAR(500) NULL,
+    `auth_code`              TEXT NULL,              -- encrypted at rest (encryptValue); never returned by a list
+    `registrant_name`        VARCHAR(255) NULL,
+    `owner_analyst_id`       INT NULL,
+    `tech_contact_id`        INT NULL,               -- a Contracts contact (the agency, the host)
+    `nameservers`            TEXT NULL,              -- one per line
+    `dns_provider`           VARCHAR(255) NULL,
+    `hosting_provider`       VARCHAR(255) NULL,
+    `ssl_hosts`              VARCHAR(500) NULL,      -- extra host names to check certificates on
+    `dkim_selectors`         VARCHAR(255) NULL,
+    `cost`                   DECIMAL(10,2) NULL,
+    `currency`               VARCHAR(3) NULL,
+    `billing_years`          TINYINT NOT NULL DEFAULT 1,
+    `cost_centre`            VARCHAR(100) NULL,
+    `contract_id`            INT NULL,
+    `tags`                   VARCHAR(500) NULL,
+    `notes`                  TEXT NULL,
+    `monitoring_enabled`     TINYINT(1) NOT NULL DEFAULT 1,
+    `lookup_source`          VARCHAR(10) NULL,       -- rdap | whois | manual
+    `last_lookup_datetime`   DATETIME NULL,
+    `last_lookup_error`      VARCHAR(255) NULL,
+    `last_check_datetime`    DATETIME NULL,
+    `ssl_expiry_date`        DATE NULL,              -- the soonest-expiring certificate checked
+    `ssl_issuer`             VARCHAR(255) NULL,
+    `security_score`         TINYINT NULL,
+    `security_grade`         VARCHAR(2) NULL,
+    `check_results`          LONGTEXT NULL,          -- JSON: the last posture checks
+    `watch_baseline`         LONGTEXT NULL,          -- JSON: what change detection compares against
+    `created_by`             INT NULL,
+    `created_datetime`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime`       DATETIME NULL,
+    `is_demo`                TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_domains_tenant` (`tenant_id`),
+    KEY `idx_domains_name` (`domain_name`),
+    KEY `idx_domains_expiry` (`expiry_date`),
+    KEY `idx_domains_status` (`status_id`),
+    CONSTRAINT `fk_domains_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_status` FOREIGN KEY (`status_id`) REFERENCES `domain_statuses` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_registrar` FOREIGN KEY (`registrar_supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_account` FOREIGN KEY (`registrar_account_id`) REFERENCES `domain_registrar_accounts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_owner` FOREIGN KEY (`owner_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_tech_contact` FOREIGN KEY (`tech_contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Field-level history, the same shape as task_audit. analyst_id is NULL when
+-- nobody did it: a lookup, a nightly check or change detection wrote the row,
+-- and `source` says which.
+CREATE TABLE IF NOT EXISTS `domain_audit` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `domain_id`        INT NOT NULL,
+    `analyst_id`       INT NULL,
+    `field_name`       VARCHAR(100) NOT NULL,
+    `old_value`        VARCHAR(1000) NULL,
+    `new_value`        VARCHAR(1000) NULL,
+    `source`           VARCHAR(20) NOT NULL DEFAULT 'app',   -- app | api | lookup | check | monitor | import
+    `created_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_domain_audit_domain` (`domain_id`, `created_datetime`),
+    CONSTRAINT `fk_domain_audit_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Fire-once ledger for alerts: one row per (domain, kind, fingerprint). The
+-- fingerprint carries the date the alert is about, so renewing a domain (a new
+-- expiry date) re-arms every window without anybody clearing anything.
+CREATE TABLE IF NOT EXISTS `domain_alerts_sent` (
+    `id`             INT NOT NULL AUTO_INCREMENT,
+    `domain_id`      INT NOT NULL,
+    `alert_kind`     VARCHAR(30) NOT NULL,
+    `fingerprint`    VARCHAR(100) NOT NULL,
+    `sent_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_alert` (`domain_id`, `alert_kind`, `fingerprint`),
+    CONSTRAINT `fk_domain_alerts_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Look-alike domains found by the typo-squat scanner: somebody else's
+-- registration of a name one keystroke from yours. has_mx matters most - a
+-- look-alike that can receive mail can catch misaddressed invoices.
+CREATE TABLE IF NOT EXISTS `domain_lookalikes` (
+    `id`                  INT NOT NULL AUTO_INCREMENT,
+    `domain_id`           INT NOT NULL,
+    `lookalike`           VARCHAR(253) NOT NULL,
+    `technique`           VARCHAR(30) NOT NULL,
+    `has_a`               TINYINT(1) NOT NULL DEFAULT 0,
+    `has_mx`              TINYINT(1) NOT NULL DEFAULT 0,
+    `first_seen_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `last_seen_datetime`  DATETIME NULL,
+    `dismissed`           TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_lookalike` (`domain_id`, `lookalike`),
+    CONSTRAINT `fk_domain_lookalikes_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Certificates the public Certificate Transparency logs say were issued for a
+-- domain (via crt.sh). An unexpected issuer or host name is how you learn that
+-- somebody obtained a certificate for your name.
+CREATE TABLE IF NOT EXISTS `domain_certificates` (
+    `id`                  INT NOT NULL AUTO_INCREMENT,
+    `domain_id`           INT NOT NULL,
+    `crtsh_id`            BIGINT NOT NULL,
+    `common_name`         VARCHAR(255) NULL,
+    `name_value`          TEXT NULL,
+    `issuer`              VARCHAR(500) NULL,
+    `not_before`          DATETIME NULL,
+    `not_after`           DATETIME NULL,
+    `first_seen_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `acknowledged`        TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_certificate` (`domain_id`, `crtsh_id`),
+    CONSTRAINT `fk_domain_certificates_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Seed: the domain statuses a fresh install starts with. Only into an empty
+-- table, so a deliberately edited list is never put back.
+INSERT INTO `domain_statuses` (`name`, `colour`, `alerts_enabled`, `display_order`)
+SELECT * FROM (
+    SELECT 'Active' AS n, '#16a34a' AS c, 1 AS a, 1 AS o UNION ALL
+    SELECT 'Transfer in progress', '#2563eb', 1, 2 UNION ALL
+    SELECT 'Parked', '#64748b', 1, 3 UNION ALL
+    SELECT 'Letting lapse', '#d97706', 0, 4 UNION ALL
+    SELECT 'Cancelled', '#dc2626', 0, 5
+) s
+WHERE NOT EXISTS (SELECT 1 FROM `domain_statuses` LIMIT 1);
 
 -- ----------------------------------------------------------
 -- Seed: Default admin account

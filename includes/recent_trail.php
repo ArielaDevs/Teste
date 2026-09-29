@@ -103,6 +103,7 @@ const RECENT_TRAIL_MODULES = [
     'cmdb_object'       => 'cmdb',
     'knowledge_article' => 'knowledge',
     'contract'          => 'contracts',
+    'domain'            => 'domains',
 ];
 
 /**
@@ -456,6 +457,11 @@ function recentTrailLabelsForType(PDO $conn, int $analystId, string $type, array
         case 'cmdb_object':
             $sql  = "SELECT id, name AS label FROM cmdb_objects WHERE id IN ($in)";
             $gate = fn($id) => analystCanAccessCmdbObject($conn, $analystId, $id);
+            break;
+
+        case 'domain':
+            $sql  = "SELECT id, COALESCE(NULLIF(display_name, ''), domain_name) AS label FROM domains WHERE id IN ($in)";
+            $gate = fn($id) => analystCanAccessDomain($conn, $analystId, $id);
             break;
 
         case 'contract':

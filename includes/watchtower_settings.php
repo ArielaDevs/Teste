@@ -34,7 +34,7 @@ const WT_INSTALL_SCOPE = 0;
 function wtCardKeys(): array
 {
     return ['morning_checks', 'tickets', 'changes', 'calendar', 'service_status',
-            'contracts', 'software', 'knowledge', 'assets', 'tasks', 'workflows'];
+            'contracts', 'software', 'domains', 'knowledge', 'assets', 'tasks', 'workflows'];
 }
 
 // ─── Whose work am I looking at? (discussion #58) ───────────────────────────
@@ -90,6 +90,10 @@ function wtImpersonalCards(): array
         // renewal belongs to. Same reasoning as contracts above, and the same
         // consequence: scoping it would hide a £12k renewal from everybody.
         'software',
+        // Domains DO have an owner, but a lapsing domain takes the website and the
+        // email down for everybody: it is the whole team's problem, not the
+        // owner's alone. Same reasoning as contracts.
+        'domains',
     ];
 }
 

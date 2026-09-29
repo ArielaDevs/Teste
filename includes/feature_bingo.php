@@ -87,6 +87,7 @@ function featureBingoModules(): array
         'tasks'          => 'Tasks',
         'calendar'       => 'Calendar',
         'contracts'      => 'Contracts',
+        'domains'        => 'Domains',
         'software'       => 'Software',
         'forms'          => 'Forms',
         'lms'            => 'LMS',

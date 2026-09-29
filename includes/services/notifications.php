@@ -174,6 +174,13 @@ class NotificationsService
             'ticket.created'          => ['default' => false, 'entity' => 'ticket'],
             'task.created'            => ['default' => false, 'entity' => 'task'],
             'task.completed'          => ['default' => false, 'entity' => 'task'],
+            // Domains (#154) — to the domain's OWNER. On by default: a domain
+            // about to lapse, a certificate about to expire, or a name-server /
+            // registrar / lock change nobody made is exactly what a bell is for,
+            // and all three are caused by time or by somebody else, never by you.
+            'domain.expiring'         => ['default' => true,  'entity' => 'domain'],
+            'domain.ssl_expiring'     => ['default' => true,  'entity' => 'domain'],
+            'domain.changed'          => ['default' => true,  'entity' => 'domain'],
         ];
     }
 

@@ -469,6 +469,34 @@ function analystCanAssignTenant(PDO $conn, int $analystId, $tenantId): bool {
 }
 
 /**
+ * May this analyst access this *domain* (#154)? The Domains-module twin of
+ * analystCanAccessAsset() below: single-company → always true; NULL tenant =
+ * the Default company; unknown id → false; part-migrated table → true. A domain
+ * is SCOPED DATA, never shared between companies.
+ */
+function analystCanAccessDomain(PDO $conn, int $analystId, $domainId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    $domainId = (int) $domainId;
+    if ($domainId <= 0) {
+        return false;
+    }
+    try {
+        $stmt = $conn->prepare("SELECT tenant_id FROM domains WHERE id = ?");
+        $stmt->execute([$domainId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        $tid = ($row['tenant_id'] === null) ? getDefaultTenantId($conn) : (int) $row['tenant_id'];
+        return analystCanAccessTenant($conn, $analystId, $tid);
+    } catch (Exception $e) {
+        return tenancyDegradeAllowed($e);
+    }
+}
+
+/**
  * May this analyst access this *asset* (by its owning company)? The Asset
  * Management twin of analystCanAccessChange() — same rules (single-company →
  * always true; NULL tenant treated as Default-owned; unknown id → false;

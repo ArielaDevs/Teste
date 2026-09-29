@@ -42,6 +42,7 @@ require __DIR__ . '/_top.php';
         <tr><td><strong>Calendar</strong></td><td>3 categories and 8 events — maintenance windows, meetings, releases.</td><td>~11</td></tr>
         <tr><td><strong>Morning Checks</strong></td><td>6 checks with 30 days of OK / Warning / Fail results.</td><td>~186</td></tr>
         <tr><td><strong>Contracts</strong></td><td>3 suppliers, 5 contacts, 3 contracts with SLA terms, plus lookups.</td><td>~25</td></tr>
+        <tr><td><strong>Domains</strong></td><td>8 domains on the reserved .example ending, graded A to F, and 2 registrar accounts. Never looked up.</td><td>~10</td></tr>
         <tr><td><strong>Service Status</strong></td><td>5 services with 2 incidents in resolved and monitoring states.</td><td>~11</td></tr>
         <tr><td><strong>Software</strong></td><td>20 applications with 13 licences (subscription, perpetual, expired, bundled).</td><td>~33</td></tr>
         <tr><td><strong>Forms</strong></td><td>2 forms (New Starter, Equipment Return) with fields and 3 submissions.</td><td>~22</td></tr>

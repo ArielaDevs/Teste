@@ -169,6 +169,13 @@ class WorkflowEngine
             'sla.breached'             => 'A ticket\'s SLA has been breached (time-based)',
             'contract.expiring'        => 'A contract is approaching its end date (time-based)',
             'asset.warranty_expiring'  => 'An asset\'s warranty is approaching expiry (time-based)',
+            // Domains (#154). Found by the Domains scheduled run (cron/domains.php, or
+            // a short run when somebody opens the module), fire-once per window.
+            'domain.expiring'          => 'A domain is approaching its expiry date (time-based)',
+            'domain.ssl_expiring'      => 'A certificate on a domain is approaching expiry (time-based)',
+            'domain.changed'           => 'Something important changed on a domain - name servers, registrar, locks, mail records (found by the daily check)',
+            'domain.certificate_issued'=> 'A new certificate was issued for a domain (Certificate Transparency watch)',
+            'domain.lookalike_found'   => 'A look-alike of a domain was found (look-alike scan)',
             // ── Issue trackers. NOT time-based: something genuinely happened —
             // a developer moved the issue or wrote a comment. The poll is only
             // how we find out, because a self-hosted install cannot be called.
@@ -203,6 +210,7 @@ class WorkflowEngine
         return [
             // Domain entities
             'contract'          => ['A contract', ['contract.id', 'contract.title', 'contract.status_id', 'contract.supplier_id']],
+            'domain'            => ['A domain', ['domain.id', 'domain.name', 'domain.expiry_date', 'domain.status_id', 'domain.purpose', 'domain.owner_analyst_id', 'domain.registrar', 'domain.company_id', 'domain.security_grade']],
             'supplier'          => ['A supplier', ['supplier.id', 'supplier.name', 'supplier.status_id', 'supplier.type_id']],
             'supplier_contact'  => ['A supplier contact', ['supplier_contact.id', 'supplier_contact.name', 'supplier_contact.supplier_id']],
             'calendar_event'    => ['A calendar event', ['calendar_event.id', 'calendar_event.title', 'calendar_event.category_id']],
@@ -231,6 +239,7 @@ class WorkflowEngine
             'cmdb_property'     => ['A CMDB class property', ['cmdb_property.id', 'cmdb_property.name']],
             'cmdb_relationship_type' => ['A CMDB relationship type', ['cmdb_relationship_type.id', 'cmdb_relationship_type.name']],
             'contract_status'   => ['A contract status', ['contract_status.id', 'contract_status.name']],
+            'domain_status'     => ['A domain status', ['domain_status.id', 'domain_status.name']],
             'contract_term_tab' => ['A contract term tab', ['contract_term_tab.id', 'contract_term_tab.name']],
             'payment_schedule'  => ['A payment schedule', ['payment_schedule.id', 'payment_schedule.name']],
             'supplier_status'   => ['A supplier status', ['supplier_status.id', 'supplier_status.name']],
@@ -403,6 +412,23 @@ class WorkflowEngine
                 'asset.id', 'asset.hostname', 'asset.warranty_end', 'asset.days_remaining',
                 'window_days',
             ],
+            // Domains (#154). days_remaining is negative once a domain has lapsed
+            // (the chase), and `expired` says so without arithmetic.
+            'domain.expiring' => [
+                'domain.id', 'domain.name', 'domain.expiry_date', 'domain.status_id', 'domain.purpose',
+                'domain.owner_analyst_id', 'domain.registrar', 'domain.company_id', 'days_remaining', 'expired',
+            ],
+            'domain.ssl_expiring' => [
+                'domain.id', 'domain.name', 'domain.ssl_expiry_date', 'domain.owner_analyst_id', 'domain.company_id',
+                'days_remaining', 'expired',
+            ],
+            // `serious` is 1 when a lock was lost or the name/mail servers or the
+            // registrar moved — what a hijack looks like; `summary` is the list.
+            'domain.changed' => [
+                'domain.id', 'domain.name', 'domain.owner_analyst_id', 'domain.company_id', 'serious', 'summary',
+            ],
+            'domain.certificate_issued' => ['domain.id', 'domain.name', 'count', 'issuers', 'names'],
+            'domain.lookalike_found'    => ['domain.id', 'domain.name', 'count', 'lookalikes'],
         ];
         if (isset($byTrigger[$trigger])) {
             return $byTrigger[$trigger];

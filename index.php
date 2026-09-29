@@ -461,6 +461,22 @@ $translationNamespaces = ['common'];
             </a>
             <?php endif; ?>
 
+            <?php if ($allowed_modules === null || in_array('domains', $allowed_modules)): ?>
+            <a href="domains/" class="module-card domains" title="<?php echo htmlspecialchars(t('common.modules.domains.description')); ?>">
+                <div class="module-icon domains">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.9 13.5A10 10 0 1 0 12 22"></path>
+                        <path d="M2 12h20"></path>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10"></path>
+                        <path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"></path>
+                        <rect x="15" y="17" width="7" height="5" rx="1"></rect>
+                        <path d="M16.5 17v-1.5a2 2 0 0 1 4 0V17"></path>
+                    </svg>
+                </div>
+                <div class="module-name"><?php echo htmlspecialchars(t('common.modules.domains.name')); ?></div>
+            </a>
+            <?php endif; ?>
+
             <?php if ($allowed_modules === null || in_array('service-status', $allowed_modules)): ?>
             <a href="service-status/" class="module-card service-status" title="<?php echo htmlspecialchars(t('common.modules.service-status.description')); ?>">
                 <div class="module-icon service-status">

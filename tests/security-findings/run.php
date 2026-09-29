@@ -576,7 +576,7 @@ if ($conn === null) {
     skipped("secrets survive a full encrypt/decrypt round-trip", 'no database connection');
 } else {
     $roundTripKeys = ['sla_cron_token', 'webhook_cron_token', 'workflow_cron_token',
-                      'integration_cron_token', 'csat_token_secret'];
+                      'integration_cron_token', 'domain_cron_token', 'csat_token_secret'];
     $raw = [];
     $in  = implode(',', array_fill(0, count($roundTripKeys), '?'));
     $st  = $conn->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($in)");

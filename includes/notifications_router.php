@@ -222,6 +222,11 @@ function notificationsRecipientFor(string $event, array $payload): int
     if (isset($payload['task']['assignee_id'])) {
         return (int)$payload['task']['assignee_id'];
     }
+    // Domains (#154): whoever owns the domain. An ownerless domain has no bell
+    // to ring — the alert e-mail list is what covers those.
+    if (isset($payload['domain']['owner_analyst_id'])) {
+        return (int)$payload['domain']['owner_analyst_id'];
+    }
     return 0;
 }
 
@@ -232,6 +237,21 @@ function notificationsEntityFor(string $event, array $payload, string $entityTyp
         $id = isset($payload['task']['id']) ? (int)$payload['task']['id'] : 0;
         if ($id <= 0) return null;
         return ['id' => $id, 'ref' => null, 'title' => $payload['task']['title'] ?? null];
+    }
+
+    if ($entityType === 'domain') {
+        $id = isset($payload['domain']['id']) ? (int)$payload['domain']['id'] : 0;
+        if ($id <= 0) return null;
+        // The title says what happened, because the domain name alone does not.
+        $name = (string)($payload['domain']['name'] ?? '');
+        if ($event === 'domain.changed') {
+            $title = $name . ': ' . mb_substr((string)($payload['summary'] ?? 'changed'), 0, 200);
+        } else {
+            $d = (int)($payload['days_remaining'] ?? 0);
+            $what = $event === 'domain.ssl_expiring' ? 'certificate' : 'registration';
+            $title = $name . ' - ' . $what . ($d < 0 ? ' expired ' . (-$d) . ' day(s) ago' : ($d === 0 ? ' expires today' : ' expires in ' . $d . ' day(s)'));
+        }
+        return ['id' => $id, 'ref' => mb_substr($name, 0, 64), 'title' => $title];
     }
 
     $id = isset($payload['ticket']['id']) ? (int)$payload['ticket']['id'] : 0;

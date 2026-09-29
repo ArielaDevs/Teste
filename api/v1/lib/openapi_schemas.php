@@ -3128,6 +3128,1359 @@ return array (
         ),
       ),
     ),
+    // Domains (#154)
+    'Domain' => 
+    array (
+      'type' => 'object',
+      'description' => 'A domain in the register. Auth codes are never returned - see auth_code_set.',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'domain_name' => 
+        array (
+          'type' => 'string',
+        ),
+        'display_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'company' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'status' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'purpose' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'primary',
+            1 => 'secondary',
+            2 => 'redirect',
+            3 => 'email_only',
+            4 => 'defensive',
+            5 => 'parked',
+            6 => 'campaign',
+          ),
+        ),
+        'registrar' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'registrar_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'registrar_account' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'registration_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'expiry_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'days_remaining' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'last_renewed_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'registry_updated_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'renewal_mode' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'auto',
+            1 => 'manual',
+            2 => 'do_not_renew',
+            3 => 'unknown',
+          ),
+        ),
+        'transfer_lock' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'registry_lock' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'dnssec' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'registry_statuses' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'registrant_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'owner' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'nameservers' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'dns_provider' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'hosting_provider' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'ssl_hosts' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'dkim_selectors' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'cost' => 
+        array (
+          'type' => 'number',
+          'nullable' => true,
+        ),
+        'currency' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'billing_years' => 
+        array (
+          'type' => 'integer',
+        ),
+        'cost_centre' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'contract_id' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'tags' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'notes' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'monitoring_enabled' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'security_grade' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+          'enum' => 
+          array (
+            0 => 'A+',
+            1 => 'A',
+            2 => 'B',
+            3 => 'C',
+            4 => 'D',
+            5 => 'F',
+          ),
+        ),
+        'security_score' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'ssl_expiry_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'ssl_issuer' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'lookup_source' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+          'enum' => 
+          array (
+            0 => 'rdap',
+            1 => 'whois',
+            2 => 'manual',
+          ),
+        ),
+        'last_lookup_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'last_lookup_error' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'last_check_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'auth_code_set' => 
+        array (
+          'type' => 'boolean',
+          'description' => 'Whether an auth code is stored. The code itself is never returned by the API.',
+        ),
+        'created_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'updated_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+      ),
+    ),
+    'DomainWithChanges' => 
+    array (
+      'type' => 'object',
+      'description' => 'A domain after a registry lookup, with what the lookup changed.',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'domain_name' => 
+        array (
+          'type' => 'string',
+        ),
+        'display_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'company' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'status' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'purpose' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'primary',
+            1 => 'secondary',
+            2 => 'redirect',
+            3 => 'email_only',
+            4 => 'defensive',
+            5 => 'parked',
+            6 => 'campaign',
+          ),
+        ),
+        'registrar' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'registrar_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'registrar_account' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'registration_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'expiry_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'days_remaining' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'last_renewed_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'registry_updated_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'renewal_mode' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'auto',
+            1 => 'manual',
+            2 => 'do_not_renew',
+            3 => 'unknown',
+          ),
+        ),
+        'transfer_lock' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'registry_lock' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'dnssec' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'registry_statuses' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'registrant_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'owner' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'nameservers' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'dns_provider' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'hosting_provider' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'ssl_hosts' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'dkim_selectors' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'cost' => 
+        array (
+          'type' => 'number',
+          'nullable' => true,
+        ),
+        'currency' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'billing_years' => 
+        array (
+          'type' => 'integer',
+        ),
+        'cost_centre' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'contract_id' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'tags' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'notes' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'monitoring_enabled' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'security_grade' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+          'enum' => 
+          array (
+            0 => 'A+',
+            1 => 'A',
+            2 => 'B',
+            3 => 'C',
+            4 => 'D',
+            5 => 'F',
+          ),
+        ),
+        'security_score' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'ssl_expiry_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'ssl_issuer' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'lookup_source' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+          'enum' => 
+          array (
+            0 => 'rdap',
+            1 => 'whois',
+            2 => 'manual',
+          ),
+        ),
+        'last_lookup_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'last_lookup_error' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'last_check_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'auth_code_set' => 
+        array (
+          'type' => 'boolean',
+          'description' => 'Whether an auth code is stored. The code itself is never returned by the API.',
+        ),
+        'created_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'updated_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'changes' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            '$ref' => '#/components/schemas/DomainChange',
+          ),
+        ),
+      ),
+    ),
+    'DomainCheckResult' => 
+    array (
+      'type' => 'object',
+      'description' => 'A domain after its checks ran: the findings, and what change detection saw move.',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'domain_name' => 
+        array (
+          'type' => 'string',
+        ),
+        'display_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'company' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'status' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'purpose' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'primary',
+            1 => 'secondary',
+            2 => 'redirect',
+            3 => 'email_only',
+            4 => 'defensive',
+            5 => 'parked',
+            6 => 'campaign',
+          ),
+        ),
+        'registrar' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'registrar_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'registrar_account' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'registration_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'expiry_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'days_remaining' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'last_renewed_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'registry_updated_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'renewal_mode' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'auto',
+            1 => 'manual',
+            2 => 'do_not_renew',
+            3 => 'unknown',
+          ),
+        ),
+        'transfer_lock' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'registry_lock' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'dnssec' => 
+        array (
+          'type' => 'boolean',
+          'nullable' => true,
+        ),
+        'registry_statuses' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'registrant_name' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'owner' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'nameservers' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'dns_provider' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'hosting_provider' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'ssl_hosts' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'dkim_selectors' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'cost' => 
+        array (
+          'type' => 'number',
+          'nullable' => true,
+        ),
+        'currency' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'billing_years' => 
+        array (
+          'type' => 'integer',
+        ),
+        'cost_centre' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'contract_id' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'tags' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'string',
+          ),
+        ),
+        'notes' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'monitoring_enabled' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'security_grade' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+          'enum' => 
+          array (
+            0 => 'A+',
+            1 => 'A',
+            2 => 'B',
+            3 => 'C',
+            4 => 'D',
+            5 => 'F',
+          ),
+        ),
+        'security_score' => 
+        array (
+          'type' => 'integer',
+          'nullable' => true,
+        ),
+        'ssl_expiry_date' => 
+        array (
+          'type' => 'string',
+          'format' => 'date',
+          'nullable' => true,
+        ),
+        'ssl_issuer' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'lookup_source' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+          'enum' => 
+          array (
+            0 => 'rdap',
+            1 => 'whois',
+            2 => 'manual',
+          ),
+        ),
+        'last_lookup_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'last_lookup_error' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'last_check_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'auth_code_set' => 
+        array (
+          'type' => 'boolean',
+          'description' => 'Whether an auth code is stored. The code itself is never returned by the API.',
+        ),
+        'created_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'updated_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+        'findings' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            '$ref' => '#/components/schemas/DomainFinding',
+          ),
+        ),
+        'changes' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            '$ref' => '#/components/schemas/DomainChange',
+          ),
+        ),
+      ),
+    ),
+    'DomainFinding' => 
+    array (
+      'type' => 'object',
+      'properties' => 
+      array (
+        'key' => 
+        array (
+          'type' => 'string',
+        ),
+        'area' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'registration',
+            1 => 'dns',
+            2 => 'email',
+            3 => 'web',
+          ),
+        ),
+        'level' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'pass',
+            1 => 'info',
+            2 => 'warn',
+            3 => 'fail',
+          ),
+        ),
+        'points' => 
+        array (
+          'type' => 'integer',
+        ),
+        'title' => 
+        array (
+          'type' => 'string',
+        ),
+        'advice' => 
+        array (
+          'type' => 'string',
+        ),
+        'params' => 
+        array (
+          'type' => 'object',
+          'additionalProperties' => true,
+          'description' => 'The values the title and advice were filled from.',
+        ),
+      ),
+    ),
+    'DomainChange' => 
+    array (
+      'type' => 'object',
+      'properties' => 
+      array (
+        'field' => 
+        array (
+          'type' => 'string',
+        ),
+        'old' => 
+        array (
+          'description' => 'Previous value (string, number or null)',
+        ),
+        'new' => 
+        array (
+          'description' => 'New value (string, number or null)',
+        ),
+      ),
+    ),
+    'DomainHistoryEntry' => 
+    array (
+      'type' => 'object',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'field' => 
+        array (
+          'type' => 'string',
+        ),
+        'old_value' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'new_value' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'source' => 
+        array (
+          'type' => 'string',
+          'enum' => 
+          array (
+            0 => 'app',
+            1 => 'api',
+            2 => 'lookup',
+            3 => 'check',
+            4 => 'monitor',
+            5 => 'import',
+          ),
+        ),
+        'analyst' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'created_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+      ),
+    ),
+    'DomainStatus' => 
+    array (
+      'type' => 'object',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'name' => 
+        array (
+          'type' => 'string',
+        ),
+        'colour' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'alerts_enabled' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'is_active' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'display_order' => 
+        array (
+          'type' => 'integer',
+        ),
+      ),
+    ),
+    'DomainRegistrarAccount' => 
+    array (
+      'type' => 'object',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'account_name' => 
+        array (
+          'type' => 'string',
+        ),
+        'account_reference' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'login_url' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'two_factor_holder' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'registrar' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'owner' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'company' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'domain_count' => 
+        array (
+          'type' => 'integer',
+        ),
+      ),
+    ),
     'DeleteAck' => 
     array (
       'type' => 'object',
@@ -9621,6 +10974,70 @@ return array (
   ),
   'responses' => 
   array (
+    'DELETE /domains/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/DeleteAck',
+    ),
+    'GET /domain-registrar-accounts' => 
+    array (
+      'type' => 'array',
+      'items' => 
+      array (
+        '$ref' => '#/components/schemas/DomainRegistrarAccount',
+      ),
+    ),
+    'GET /domain-statuses' => 
+    array (
+      'type' => 'array',
+      'items' => 
+      array (
+        '$ref' => '#/components/schemas/DomainStatus',
+      ),
+    ),
+    'GET /domains' => 
+    array (
+      'type' => 'array',
+      'items' => 
+      array (
+        '$ref' => '#/components/schemas/Domain',
+      ),
+    ),
+    'GET /domains/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/Domain',
+    ),
+    'GET /domains/{id}/findings' => 
+    array (
+      'type' => 'array',
+      'items' => 
+      array (
+        '$ref' => '#/components/schemas/DomainFinding',
+      ),
+    ),
+    'GET /domains/{id}/history' => 
+    array (
+      'type' => 'array',
+      'items' => 
+      array (
+        '$ref' => '#/components/schemas/DomainHistoryEntry',
+      ),
+    ),
+    'PATCH /domains/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/Domain',
+    ),
+    'POST /domains' => 
+    array (
+      '$ref' => '#/components/schemas/Domain',
+    ),
+    'POST /domains/{id}/check' => 
+    array (
+      '$ref' => '#/components/schemas/DomainCheckResult',
+    ),
+    'POST /domains/{id}/lookup' => 
+    array (
+      '$ref' => '#/components/schemas/DomainWithChanges',
+    ),
     'DELETE /assets/{id}/assignments/{user_id}' => 
     array (
       '$ref' => '#/components/schemas/AssetAssignmentDeleted',
@@ -10476,6 +11893,14 @@ return array (
                   array (
                     'type' => 'string',
                     'nullable' => true,
+                  ),
+                ),
+                'domains' => 
+                array (
+                  'type' => 'array',
+                  'items' => 
+                  array (
+                    'type' => 'string',
                   ),
                 ),
                 'contracts' => 

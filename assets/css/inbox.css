@@ -112,6 +112,7 @@ body {
 .changes-header .header-nav,
 .cmdb-header .header-nav,
 .contracts-header .header-nav,
+.domains-header .header-nav,
 .forms-header .header-nav,
 .knowledge-header .header-nav,
 .lms-header .header-nav,
@@ -138,6 +139,7 @@ body {
    nav doesn't overflow on standard laptop widths. */
 .assets-header .header-nav .nav-btn,
 .changes-header .header-nav .nav-btn,
+.domains-header .header-nav .nav-btn,
 .knowledge-header .header-nav .nav-btn,
 .lms-header .header-nav .nav-btn,
 .morning-checks-header .header-nav .nav-btn,
