@@ -56,7 +56,7 @@ $translationNamespaces = ['common', 'domains'];
     <?php include 'includes/header.php'; ?>
 
     <div style="height:calc(100vh - 62px);overflow-y:auto;background:var(--app-bg,#f5f5f5)">
-    <div style="max-width:1280px;margin:0 auto;padding:20px 24px 40px">
+    <div style="padding:20px 26px 40px">
         <div style="margin-bottom:10px"><a href="./" class="dom-sub" style="text-decoration:none">← <?php echo htmlspecialchars(t('domains.page.back')); ?></a></div>
 
         <?php if (!$exists): ?>

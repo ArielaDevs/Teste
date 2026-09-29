@@ -41,7 +41,7 @@ $translationNamespaces = ['common', 'domains'];
 <body data-mobile-module="domains" data-mobile-page="domains-accounts">
     <?php include '../includes/header.php'; ?>
     <div style="height:calc(100vh - 62px);overflow-y:auto;background:var(--app-bg,#f5f5f5)">
-        <div style="padding:20px 26px 40px;max-width:1300px;margin:0 auto">
+        <div style="padding:20px 26px 40px">
             <div class="dom-toolbar">
                 <div>
                     <h2 style="margin:0;font-size:20px"><?php echo htmlspecialchars(t('domains.acc.title')); ?></h2>

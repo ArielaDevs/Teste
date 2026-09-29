@@ -27,6 +27,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2040 | Integrations      | Feature     | Domains plugged into Watchtower (new card, company- and module-scoped), the Calendar (domain_expiry source), the notification bell (expiring / certificate / changed to the owner), workflow triggers, global search and the command palette, record previews, attached documents, the recent trail, and a "Domains registered here" card on a registrar's supplier page. |
 | 2041 | Domains           | Feature     | Demo data (8 .example domains graded A-F, 2 registrar accounts, never looked up) and 13 Feature Bingo cards. |
 | 2042 | REST API          | Fix         | GET /assets/{id}/physical-disks had no catalogue entry, so openapi_check.php failed its drift check; documented. |
+| 2043 | Domains           | Improvement | The domain page and Domains -> Accounts use the full screen width, like the register, instead of a centred 1280/1300px column. |
 
 
 
