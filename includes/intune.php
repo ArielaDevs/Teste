@@ -16,7 +16,7 @@ require_once __DIR__ . '/encryption.php';
 function intuneGetSettings(PDO $conn): ?array {
     $stmt = $conn->prepare(
         "SELECT setting_key, setting_value FROM system_settings
-          WHERE setting_key IN ('intune_tenant_id','intune_client_id','intune_client_secret','intune_verify_ssl','intune_php_exe')"
+          WHERE setting_key IN ('intune_tenant_id','intune_client_id','intune_client_secret','intune_verify_ssl','intune_php_exe','intune_company_id')"
     );
     $stmt->execute();
 
@@ -39,6 +39,7 @@ function intuneGetSettings(PDO $conn): ?array {
         'client_secret' => $values['intune_client_secret'],
         'verify_ssl'    => ($values['intune_verify_ssl'] ?? '1') !== '0',
         'php_exe'       => $values['intune_php_exe'] ?? null,
+        'company_id'    => (!empty($values['intune_company_id']) && is_numeric($values['intune_company_id'])) ? (int)$values['intune_company_id'] : null,
     ];
 }
 
@@ -250,22 +251,70 @@ function intuneUpsertDevice(PDO $conn, array $d): void {
 }
 
 /**
- * Link intune_devices to assets by hostname (case-insensitive), then create
- * stub asset rows for any intune_devices still unlinked. Returns counts so
- * the sync job message can show what happened.
+/**
+ * Link intune_devices to assets using the stable identity hierarchy:
+ *   1. Retain and validate existing explicit integration links (intune_devices.asset_id),
+ *      updating the asset's hostname if the device was renamed in Intune.
+ *   2. For unlinked devices, reconcile via clean, non-generic serial_number.
+ *   3. Fall back to matching by device_name (hostname).
+ *   4. Create stub asset rows for any still-unlinked devices.
+ *
+ * Returns counts so the sync job message can show what happened.
  */
-function intuneLinkDevicesToAssets(PDO $conn): array {
-    // Step 1: link any device whose name matches an existing asset hostname.
-    $conn->exec(
-        "UPDATE intune_devices id
-            JOIN assets a
-              ON LOWER(a.hostname) = LOWER(id.device_name)
-             SET id.asset_id = a.id
-           WHERE id.device_name IS NOT NULL
-             AND id.device_name <> ''"
-    );
+function intuneLinkDevicesToAssets(PDO $conn, ?int $companyId = null): array {
+    require_once __DIR__ . '/services/assets.php';
 
-    // Step 2: find still-unlinked devices with a usable name and create stubs.
+    if ($companyId === null) {
+        $settings = intuneGetSettings($conn);
+        if ($settings && array_key_exists('company_id', $settings)) {
+            $companyId = $settings['company_id'];
+        } else {
+            $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'intune_company_id' LIMIT 1");
+            $stmt->execute();
+            $rawCompany = $stmt->fetchColumn();
+            $companyId = (!empty($rawCompany) && is_numeric($rawCompany)) ? (int)$rawCompany : null;
+        }
+    }
+
+    $ignoredTags = AssetsService::getIgnoredServiceTags($conn);
+
+    // Step 1: Process devices that already have an explicit asset_id link.
+    // Ensure the link is preserved, and if device_name changed in Intune,
+    // update assets.hostname and write an automated audit log entry.
+    $linkedRows = $conn->query(
+        "SELECT id, asset_id, device_name, serial_number
+           FROM intune_devices
+          WHERE asset_id IS NOT NULL
+            AND device_name IS NOT NULL
+            AND device_name <> ''"
+    )->fetchAll(PDO::FETCH_ASSOC);
+
+    $updateLink = $conn->prepare("UPDATE intune_devices SET asset_id = :asset_id WHERE id = :id");
+
+    foreach ($linkedRows as $row) {
+        $res = AssetsService::reconcileAsset(
+            $conn,
+            [
+                'asset_id'    => (int)$row['asset_id'],
+                'service_tag' => $row['serial_number'] ?? null,
+                'hostname'    => $row['device_name'],
+            ],
+            $companyId, // Scoped to configured FreeITSM Company / tenant
+            'Intune',
+            true, // Authoritative explicit link (verified against $companyId)
+            $ignoredTags
+        );
+
+        if ($res['asset_id'] !== null && $res['asset_id'] !== (int)$row['asset_id']) {
+            // Stale cross-company link resolved to a valid asset in target company via serial/hostname
+            $updateLink->execute([':asset_id' => $res['asset_id'], ':id' => $row['id']]);
+        } elseif ($res['asset_id'] === null) {
+            // Stale cross-company link could not be matched in target company; clear stale link
+            $updateLink->execute([':asset_id' => null, ':id' => $row['id']]);
+        }
+    }
+
+    // Step 2: Reconcile still-unlinked devices or create stubs.
     $unlinked = $conn->query(
         "SELECT id, device_name, manufacturer, model, operating_system, last_sync_datetime, serial_number
            FROM intune_devices
@@ -276,44 +325,55 @@ function intuneLinkDevicesToAssets(PDO $conn): array {
 
     $stubsCreated = 0;
     if ($unlinked) {
-        // Multi-tenancy: Intune is a single MSP-level connection that can hold
-        // machines from several client companies, so there's no per-key company
-        // to derive here (unlike the agent ingest paths). Stubs are therefore
-        // created with tenant_id NULL = the Default company — the "needs a
-        // company" state. Assigning synced machines to their real company (per
-        // connection, by domain, or via a triage queue) is a deliberate later
-        // slice; see the multi-tenancy plan.
         $insert = $conn->prepare(
-            "INSERT INTO assets (hostname, manufacturer, model, operating_system, service_tag, first_seen, last_seen)
-             VALUES (:hostname, :manufacturer, :model, :operating_system, :service_tag, UTC_TIMESTAMP(), :last_seen)"
+            "INSERT INTO assets (hostname, manufacturer, model, operating_system, service_tag, tenant_id, first_seen, last_seen)
+             VALUES (:hostname, :manufacturer, :model, :operating_system, :service_tag, :tenant_id, UTC_TIMESTAMP(), :last_seen)"
         );
         $linkOne = $conn->prepare("UPDATE intune_devices SET asset_id = :asset_id WHERE id = :id");
 
         foreach ($unlinked as $row) {
-            // assets.hostname is VARCHAR(50); Intune device_name can be 256.
-            // Truncate to fit. Same goes for service_tag (VARCHAR(50)).
             $hostname  = substr((string)$row['device_name'], 0, 50);
             $serialTag = $row['serial_number'] !== null ? substr((string)$row['serial_number'], 0, 50) : null;
 
-            $insert->execute([
-                ':hostname'         => $hostname,
-                ':manufacturer'     => $row['manufacturer'] !== null ? substr((string)$row['manufacturer'], 0, 50) : null,
-                ':model'            => $row['model'] !== null ? substr((string)$row['model'], 0, 50) : null,
-                ':operating_system' => $row['operating_system'] !== null ? substr((string)$row['operating_system'], 0, 50) : null,
-                ':service_tag'      => $serialTag,
-                ':last_seen'        => $row['last_sync_datetime'],
-            ]);
-            $newAssetId = (int)$conn->lastInsertId();
-            $linkOne->execute([':asset_id' => $newAssetId, ':id' => $row['id']]);
-            $stubsCreated++;
+            // Reconcile via Tier 2 (serial) or Tier 3 (hostname) scoped to configured Company
+            $res = AssetsService::reconcileAsset(
+                $conn,
+                [
+                    'service_tag' => $serialTag,
+                    'hostname'    => $hostname,
+                ],
+                $companyId, // Scoped to configured FreeITSM Company / tenant
+                'Intune',
+                false,
+                $ignoredTags
+            );
+
+            if ($res['asset_id'] !== null) {
+                // Matched an existing asset! Link it without creating a duplicate stub.
+                $linkOne->execute([':asset_id' => $res['asset_id'], ':id' => $row['id']]);
+            } else {
+                // Tier 4: No reliable existing asset identified — create a new stub.
+                $insert->execute([
+                    ':hostname'         => $hostname,
+                    ':manufacturer'     => $row['manufacturer'] !== null ? substr((string)$row['manufacturer'], 0, 50) : null,
+                    ':model'            => $row['model'] !== null ? substr((string)$row['model'], 0, 50) : null,
+                    ':operating_system' => $row['operating_system'] !== null ? substr((string)$row['operating_system'], 0, 50) : null,
+                    ':service_tag'      => $serialTag,
+                    ':tenant_id'        => $companyId,
+                    ':last_seen'        => $row['last_sync_datetime'],
+                ]);
+                $newAssetId = (int)$conn->lastInsertId();
+                $linkOne->execute([':asset_id' => $newAssetId, ':id' => $row['id']]);
+                $stubsCreated++;
+            }
         }
     }
 
     // Recount how many ended up linked total for the message.
     $linked = (int)$conn->query("SELECT COUNT(*) FROM intune_devices WHERE asset_id IS NOT NULL")->fetchColumn();
-
     return ['linked' => $linked, 'stubs_created' => $stubsCreated];
 }
+
 
 /**
  * Map an Intune operating_system string to a sensible "drive" label for

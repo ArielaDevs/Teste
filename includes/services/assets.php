@@ -1046,4 +1046,309 @@ class AssetsService
         }
         return '#' . ($row['id'] ?? '?');
     }
+
+    /**
+     * Single authoritative default list of known generic / non-unique service tags and BIOS serial placeholders.
+     */
+    public const DEFAULT_IGNORED_SERVICE_TAGS = [
+        'TO BE FILLED BY O.E.M.',
+        'DEFAULT STRING',
+        'NONE',
+        'SYSTEM SERIAL NUMBER',
+        'NOT SPECIFIED',
+        '123456789'
+    ];
+
+    /**
+     * Load the map of ignored/blacklisted service tags from system_settings.
+     *
+     * @param PDO $conn Database connection
+     * @return array<string, bool> Lowercased lookup map [trimmed_tag => true]
+     */
+    public static function getIgnoredServiceTags(PDO $conn): array {
+        $ignoredMap = [];
+        foreach (self::DEFAULT_IGNORED_SERVICE_TAGS as $tag) {
+            $ignoredMap[mb_strtolower(trim($tag))] = true;
+        }
+
+        try {
+            $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'asset_reconciliation_ignored_serials' LIMIT 1");
+            $stmt->execute();
+            $val = $stmt->fetchColumn();
+            if ($val !== false && is_string($val) && trim($val) !== '') {
+                $lines = preg_split('/\r\n|\r|\n/', $val);
+                if (is_array($lines)) {
+                    $ignoredMap = [];
+                    foreach ($lines as $line) {
+                        $trimmed = mb_strtolower(trim($line));
+                        if ($trimmed !== '') {
+                            $ignoredMap[$trimmed] = true;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            // Fallback to defaults
+        }
+
+        return $ignoredMap;
+    }
+
+    /**
+     * Test whether a service tag or serial number is usable for stable device reconciliation.
+     *
+     * Rejects empty/whitespace strings and configured placeholder / generic values.
+     *
+     * @param string|null $tag Raw service tag
+     * @param array<string, bool>|null $ignoredMap Optional pre-loaded ignored map
+     * @return bool
+     */
+    public static function isUsableServiceTag(?string $tag, ?array $ignoredMap = null): bool {
+        if ($tag === null) {
+            return false;
+        }
+        $trimmed = trim($tag);
+        if ($trimmed === '') {
+            return false;
+        }
+        $lower = mb_strtolower($trimmed);
+        if ($ignoredMap !== null) {
+            return !isset($ignoredMap[$lower]);
+        }
+        foreach (self::DEFAULT_IGNORED_SERVICE_TAGS as $defaultTag) {
+            if ($lower === mb_strtolower(trim($defaultTag))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Pure resolution: Identifies which existing asset matches the given device identifiers.
+     *
+     * Reconciliation Hierarchy:
+     *   Tier 1: Explicit authoritative connector link (e.g. intune_devices.asset_id)
+     *   Tier 2: Clean, non-generic hardware serial_number / service_tag with ambiguity guard
+     *   Tier 3: Hostname match (scoped to company/tenant)
+     *   Tier 4: Genuine new device (returns asset_id = null)
+     *
+     * @param PDO $conn Database connection
+     * @param array $identifiers ['asset_id' => int|null, 'service_tag' => string|null, 'hostname' => string|null]
+     * @param int|null $tenantId Scoped tenant ID (or null for default company)
+     * @param bool $isExplicitLink True if $identifiers['asset_id'] comes from an authoritative link
+     * @param array|null $ignoredTags Pre-loaded ignored service tags map
+     * @return array ['asset_id' => int|null, 'matched_by' => string, 'ambiguous' => bool]
+     */
+    public static function resolveAssetIdentity(
+        PDO $conn,
+        array $identifiers,
+        ?int $tenantId = null,
+        bool $isExplicitLink = false,
+        ?array $ignoredTags = null
+    ): array {
+        $rawAssetId = !empty($identifiers['asset_id']) ? (int)$identifiers['asset_id'] : null;
+        $serviceTag = isset($identifiers['service_tag']) ? trim((string)$identifiers['service_tag']) : '';
+        $hostname   = isset($identifiers['hostname']) ? trim((string)$identifiers['hostname']) : '';
+
+        // ---------------------------------------------------------------------
+        // Tier 1: Authoritative explicit connector link
+        // ---------------------------------------------------------------------
+        if ($isExplicitLink && $rawAssetId !== null && $rawAssetId > 0) {
+            // Must strictly belong to the scoped company/tenant context
+            $stmt = $conn->prepare("SELECT id FROM assets WHERE id = ? AND tenant_id <=> ? LIMIT 1");
+            $stmt->execute([$rawAssetId, $tenantId]);
+            $existingId = $stmt->fetchColumn();
+            if ($existingId) {
+                return [
+                    'asset_id'   => (int)$existingId,
+                    'matched_by' => 'explicit_link',
+                    'ambiguous'  => false,
+                ];
+            }
+            // If the explicit link points to an asset belonging to another company (or non-existent),
+            // reject it as authoritative and fall through safely to Tier 2 / Tier 3 within $tenantId.
+        }
+
+        if ($ignoredTags === null) {
+            $ignoredTags = self::getIgnoredServiceTags($conn);
+        }
+
+        // ---------------------------------------------------------------------
+        // Tier 2: Clean hardware serial number / service tag with ambiguity guard
+        // ---------------------------------------------------------------------
+        if ($serviceTag !== '' && self::isUsableServiceTag($serviceTag, $ignoredTags)) {
+            $stmt = $conn->prepare("SELECT id FROM assets WHERE service_tag = ? AND tenant_id <=> ?");
+            $stmt->execute([$serviceTag, $tenantId]);
+            $matchingIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (count($matchingIds) === 1) {
+                return [
+                    'asset_id'   => (int)$matchingIds[0],
+                    'matched_by' => 'service_tag',
+                    'ambiguous'  => false,
+                ];
+            }
+            if (count($matchingIds) > 1) {
+                // Ambiguity guard: Multiple existing assets share this serial number.
+                // Do not guess blindly; fall through to Tier 3.
+                if ($hostname !== '') {
+                    $hostStmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ? LIMIT 1");
+                    $hostStmt->execute([$hostname, $tenantId]);
+                    $hostId = $hostStmt->fetchColumn();
+                    if ($hostId) {
+                        return [
+                            'asset_id'   => (int)$hostId,
+                            'matched_by' => 'hostname',
+                            'ambiguous'  => true,
+                        ];
+                    }
+                }
+                return [
+                    'asset_id'   => null,
+                    'matched_by' => 'none',
+                    'ambiguous'  => true,
+                ];
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Tier 3: Hostname match
+        // ---------------------------------------------------------------------
+        if ($hostname !== '') {
+            $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ? LIMIT 1");
+            $stmt->execute([$hostname, $tenantId]);
+            $hostId = $stmt->fetchColumn();
+            if ($hostId) {
+                return [
+                    'asset_id'   => (int)$hostId,
+                    'matched_by' => 'hostname',
+                    'ambiguous'  => false,
+                ];
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Tier 4: Genuine new device
+        // ---------------------------------------------------------------------
+        return [
+            'asset_id'   => null,
+            'matched_by' => 'none',
+            'ambiguous'  => false,
+        ];
+    }
+
+    /**
+     * Updates an asset's hostname with collision protection and an atomic audit log.
+     *
+     * If another active asset in the same tenant already claims $newHostname, the update is skipped
+     * and collision is flagged.
+     *
+     * @param PDO $conn Database connection
+     * @param int $assetId Target asset ID
+     * @param string $newHostname New hostname to apply
+     * @param int|null $tenantId Scoped tenant ID
+     * @param string $sourceLabel Integration label (e.g. 'Intune', 'system-info')
+     * @return array ['updated' => bool, 'conflict' => bool]
+     */
+    public static function updateAssetHostname(
+        PDO $conn,
+        int $assetId,
+        string $newHostname,
+        ?int $tenantId,
+        string $sourceLabel = 'system'
+    ): array {
+        $newHostname = trim($newHostname);
+        if ($newHostname === '') {
+            return ['updated' => false, 'conflict' => false];
+        }
+
+        // Fetch current asset details
+        $stmt = $conn->prepare("SELECT hostname, tenant_id FROM assets WHERE id = ? LIMIT 1");
+        $stmt->execute([$assetId]);
+        $curr = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$curr) {
+            return ['updated' => false, 'conflict' => false];
+        }
+
+        $oldHostname = (string)($curr['hostname'] ?? '');
+        if (strcasecmp($oldHostname, $newHostname) === 0) {
+            return ['updated' => false, 'conflict' => false]; // No change needed
+        }
+
+        $effectiveTenantId = $curr['tenant_id'] !== null ? (int)$curr['tenant_id'] : $tenantId;
+
+        // Collision Guard: Ensure newHostname is not already taken by another asset in the same company
+        $collisionStmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ? AND id != ? LIMIT 1");
+        $collisionStmt->execute([$newHostname, $effectiveTenantId, $assetId]);
+        if ($collisionStmt->fetchColumn()) {
+            return ['updated' => false, 'conflict' => true];
+        }
+
+        // Atomic update and audit trail
+        $inExistingTransaction = $conn->inTransaction();
+        if (!$inExistingTransaction) {
+            $conn->beginTransaction();
+        }
+
+        try {
+            $upd = $conn->prepare("UPDATE assets SET hostname = ?, last_seen = UTC_TIMESTAMP() WHERE id = ?");
+            $upd->execute([$newHostname, $assetId]);
+
+            $hist = $conn->prepare("INSERT INTO asset_history (asset_id, analyst_id, field_name, old_value, new_value, created_datetime) VALUES (?, NULL, 'hostname', ?, ?, UTC_TIMESTAMP())");
+            $hist->execute([$assetId, $oldHostname, $newHostname]);
+
+            if (!$inExistingTransaction) {
+                $conn->commit();
+            }
+            return ['updated' => true, 'conflict' => false];
+        } catch (Throwable $e) {
+            if (!$inExistingTransaction && $conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Reconciles an incoming device payload against the asset register and applies rename mutations.
+     *
+     * @param PDO $conn Database connection
+     * @param array $identifiers ['asset_id' => int|null, 'service_tag' => string|null, 'hostname' => string|null]
+     * @param int|null $tenantId Scoped tenant ID (or null for default company)
+     * @param string $sourceLabel Ingest source description
+     * @param bool $isExplicitLink True if $identifiers['asset_id'] is an authoritative link
+     * @param array|null $ignoredTags Pre-loaded ignored service tags map
+     * @return array Result containing asset_id, matched_by, ambiguous flag, hostname_updated flag, and hostname_conflict flag
+     */
+    public static function reconcileAsset(
+        PDO $conn,
+        array $identifiers,
+        ?int $tenantId = null,
+        string $sourceLabel = 'system',
+        bool $isExplicitLink = false,
+        ?array $ignoredTags = null
+    ): array {
+        $resolution = self::resolveAssetIdentity($conn, $identifiers, $tenantId, $isExplicitLink, $ignoredTags);
+        $assetId    = $resolution['asset_id'];
+        $matchedBy  = $resolution['matched_by'];
+        $hostnameUpdated  = false;
+        $hostnameConflict = false;
+
+        $newHostname = isset($identifiers['hostname']) ? trim((string)$identifiers['hostname']) : '';
+
+        // If matched by a stable identifier (Tier 1 or Tier 2), check for a hostname rename
+        if ($assetId !== null && ($matchedBy === 'explicit_link' || $matchedBy === 'service_tag') && $newHostname !== '') {
+            $mutation = self::updateAssetHostname($conn, $assetId, $newHostname, $tenantId, $sourceLabel);
+            $hostnameUpdated  = $mutation['updated'];
+            $hostnameConflict = $mutation['conflict'];
+        }
+
+        return [
+            'asset_id'          => $assetId,
+            'matched_by'        => $matchedBy,
+            'ambiguous'         => $resolution['ambiguous'],
+            'hostname_updated'  => $hostnameUpdated,
+            'hostname_conflict' => $hostnameConflict,
+        ];
+    }
 }

@@ -49,6 +49,15 @@ try {
     // else on the page still works.
 }
 
+$activeCompanies = [];
+try {
+    $activeCompanies = connectToDatabase()->query(
+        "SELECT id, name, is_default FROM tenants WHERE is_active = 1 ORDER BY is_default DESC, name ASC"
+    )->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    // Single-tenant
+}
+
 $current_page = 'settings';
 $path_prefix = '../../';
 $translationNamespaces = ['common', 'asset-management'];
@@ -1063,6 +1072,36 @@ $translationNamespaces = ['common', 'asset-management'];
 
         <?php endif; ?>
 
+        <?php if (settingsTabVisible($visibleTabs, 'reconciliation')): ?>
+        <!-- Discovery & Reconciliation Tab -->
+        <div class="tab-content<?php echo $activeTabId === 'reconciliation' ? ' active' : ''; ?>" id="reconciliation-tab" data-capability="<?php echo Cap::ASSETS_RECONCILIATION; ?>">
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        <path d="M11 8v6M8 11h6"></path>
+                    </svg>
+                    <h2><?php echo htmlspecialchars(t('asset-management.settings.reconciliation_heading')); ?></h2>
+                </div>
+                <div class="settings-section-body">
+                    <p class="settings-description">
+                        <?php echo htmlspecialchars(t('asset-management.settings.reconciliation_intro')); ?>
+                    </p>
+                    <form id="reconciliationForm" onsubmit="saveReconciliationSettings(event)">
+                        <div class="form-group">
+                            <label class="form-label" for="reconIgnoredSerials"><?php echo htmlspecialchars(t('asset-management.settings.ignored_serials_label')); ?></label>
+                            <textarea class="form-input" id="reconIgnoredSerials" rows="6" placeholder="<?php echo htmlspecialchars(t('asset-management.settings.ignored_serials_placeholder')); ?>" style="font-family: monospace; font-size: 12px;"></textarea>
+                            <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.ignored_serials_hint')); ?></div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="reconSaveBtn"><?php echo htmlspecialchars(t('asset-management.common.save')); ?></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         <?php if (settingsTabVisible($visibleTabs, 'intune')): ?>
         <!-- InTune Tab -->
         <div class="tab-content<?php echo $activeTabId === 'intune' ? ' active' : ''; ?>" id="intune-tab" data-capability="<?php echo Cap::ASSETS_INTUNE; ?>">
@@ -1080,6 +1119,20 @@ $translationNamespaces = ['common', 'asset-management'];
                         <?php echo htmlspecialchars(t('asset-management.settings.intune_intro')); ?>
                     </p>
                     <form id="intuneForm" onsubmit="saveIntuneSettings(event)">
+                        <?php if (!empty($activeCompanies)): ?>
+                        <div class="form-group">
+                            <label class="form-label" for="intuneCompanyId"><?php echo htmlspecialchars(t('asset-management.settings.intune_company_label')); ?></label>
+                            <select class="form-input" id="intuneCompanyId">
+                                <option value=""><?php echo htmlspecialchars(t('asset-management.settings.default_company')); ?></option>
+                                <?php foreach ($activeCompanies as $c): ?>
+                                    <?php if (empty($c['is_default'])): ?>
+                                        <option value="<?php echo (int)$c['id']; ?>"><?php echo htmlspecialchars($c['name']); ?></option>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.intune_company_hint')); ?></div>
+                        </div>
+                        <?php endif; ?>
                         <div class="form-group">
                             <label class="form-label" for="intuneTenantId"><?php echo htmlspecialchars(t('asset-management.settings.intune_tenant_id')); ?></label>
                             <input type="text" class="form-input" id="intuneTenantId" placeholder="<?php echo htmlspecialchars(t('asset-management.settings.intune_tenant_placeholder')); ?>">
@@ -1734,6 +1787,12 @@ $translationNamespaces = ['common', 'asset-management'];
                     // batch size: default to 30 if not stored
                     const batch = parseInt(data.settings.intune_app_batch_size, 10);
                     document.getElementById('intuneAppBatchSize').value = (batch > 0 ? batch : 30);
+                    if (document.getElementById('intuneCompanyId')) {
+                        document.getElementById('intuneCompanyId').value = data.settings.intune_company_id || '';
+                    }
+                    if (document.getElementById('reconIgnoredSerials')) {
+                        document.getElementById('reconIgnoredSerials').value = data.settings.asset_reconciliation_ignored_serials || '';
+                    }
 
                     // Warranty alert settings
                     document.getElementById('warrantySurface').value = data.settings.asset_warranty_surface || 'dashboard';
@@ -1845,6 +1904,33 @@ $translationNamespaces = ['common', 'asset-management'];
             saveBtn.textContent = window.t('asset-management.common.save');
         }
 
+        async function saveReconciliationSettings(e) {
+            if (e) e.preventDefault();
+            const btn = document.getElementById('reconSaveBtn');
+            if (btn) btn.disabled = true;
+            try {
+                const response = await fetch(`${API_BASE}/system/save_system_settings.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        settings: {
+                            asset_reconciliation_ignored_serials: document.getElementById('reconIgnoredSerials').value.trim()
+                        }
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast(window.t('asset-management.settings.saved_success'), 'success');
+                } else {
+                    showToast(data.message || window.t('asset-management.settings.error_saving'), 'error');
+                }
+            } catch (error) {
+                showToast(window.t('asset-management.settings.error_saving'), 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
         async function saveIntuneSettings(e) {
             e.preventDefault();
             const saveBtn = document.getElementById('intuneSaveBtn');
@@ -1860,7 +1946,8 @@ $translationNamespaces = ['common', 'asset-management'];
                             intune_tenant_id: document.getElementById('intuneTenantId').value.trim(),
                             intune_client_id: document.getElementById('intuneClientId').value.trim(),
                             intune_client_secret: document.getElementById('intuneClientSecret').value,
-                            intune_app_batch_size: String(Math.max(1, Math.min(500, parseInt(document.getElementById('intuneAppBatchSize').value, 10) || 30)))
+                            intune_app_batch_size: String(Math.max(1, Math.min(500, parseInt(document.getElementById('intuneAppBatchSize').value, 10) || 30))),
+                            intune_company_id: document.getElementById('intuneCompanyId') ? document.getElementById('intuneCompanyId').value.trim() : ''
                         }
                     })
                 });

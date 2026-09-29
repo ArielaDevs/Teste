@@ -2613,6 +2613,7 @@ CREATE TABLE IF NOT EXISTS `assets` (
     KEY `idx_assets_tenant` (`tenant_id`),
     -- Lookup only. See the asset_tag comment for why this one is NOT unique.
     KEY `idx_assets_tag` (`tenant_id`, `asset_tag`),
+    KEY `idx_assets_tenant_service_tag` (`tenant_id`, `service_tag`),
     -- This one IS safe to make unique: the token is install-wide and never NULL
     -- once minted, so there is no NULL-distinctness trap.
     UNIQUE KEY `uq_assets_qr_token` (`qr_token`),
@@ -2678,14 +2679,15 @@ CREATE TABLE IF NOT EXISTS `asset_checkout_log` (
 CREATE TABLE IF NOT EXISTS `asset_history` (
     `id`                INT NOT NULL AUTO_INCREMENT,
     `asset_id`          INT NOT NULL,
-    `analyst_id`        INT NOT NULL,
+    -- NULL = automated action (Intune sync, agent inventory, workflow) without a human analyst
+    `analyst_id`        INT NULL,
     `field_name`        VARCHAR(100) NOT NULL,
     `old_value`         VARCHAR(500) NULL,
     `new_value`         VARCHAR(500) NULL,
     `created_datetime`  DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_asset_history_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`),
-    CONSTRAINT `fk_asset_history_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`)
+    CONSTRAINT `fk_asset_history_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `asset_disks` (
@@ -6096,6 +6098,11 @@ INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
     ('date_format', 'd_mon_y'),
     ('time_format', '24h');
+
+-- Asset reconciliation: default list of generic/placeholder serial numbers to ignore
+INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
+    ('intune_company_id', NULL),
+    ('asset_reconciliation_ignored_serials', 'TO BE FILLED BY O.E.M.\nDEFAULT STRING\nNONE\nSYSTEM SERIAL NUMBER\nNOT SPECIFIED\n123456789');
 
 CREATE TABLE IF NOT EXISTS `trusted_devices` (
     `id`                 INT NOT NULL AUTO_INCREMENT,

@@ -148,14 +148,24 @@ if (!empty($data['tpm']) && is_array($data['tpm'])) {
 }
 
 try {
-    // Check if asset exists — scoped to this key's company (NULL-safe match, so a
-    // Default-company key matches NULL-tenant assets).
-    $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ?");
-    $stmt->execute([$hostname, $keyTenant]);
-    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    require_once __DIR__ . '/../../../../includes/services/assets.php';
 
-    if ($existing) {
-        $hostId = (int)$existing['id'];
+    // Reconcile asset using stable identity hierarchy (serial number first, then hostname)
+    // scoped to this key's company (NULL-safe match, so a Default-company key matches NULL-tenant assets).
+    $incomingSerial = strOrNull($data, 'service_tag', 50);
+    $reconcileRes = AssetsService::reconcileAsset(
+        $conn,
+        [
+            'service_tag' => $incomingSerial,
+            'hostname'    => $hostname,
+        ],
+        $keyTenant,
+        'system-info',
+        false
+    );
+
+    if ($reconcileRes['asset_id'] !== null) {
+        $hostId = (int)$reconcileRes['asset_id'];
 
         // Update all fields
         $stmt = $conn->prepare("

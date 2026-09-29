@@ -114,12 +114,19 @@ return [
             'setting_keys' => ['vcenter_server', 'vcenter_user', 'vcenter_password'],
         ],
         [
+            'id'           => 'reconciliation',
+            'cap'          => Cap::ASSETS_RECONCILIATION,
+            'label_key'    => 'asset-management.settings.tab_reconciliation',
+            'grant'        => 'Configure asset discovery, identity reconciliation and ignored serials',
+            'setting_keys' => ['asset_reconciliation_ignored_serials'],
+        ],
+        [
             'id'           => 'intune',
             'cap'          => Cap::ASSETS_INTUNE,
             'label_key'    => 'asset-management.settings.tab_intune',
             'grant'        => 'Configure the Intune connection and run syncs, including its credentials',
             'sensitive'    => true,
-            'setting_keys' => ['intune_tenant_id', 'intune_client_id', 'intune_client_secret', 'intune_verify_ssl', 'intune_app_batch_size'],
+            'setting_keys' => ['intune_tenant_id', 'intune_client_id', 'intune_client_secret', 'intune_verify_ssl', 'intune_app_batch_size', 'intune_company_id'],
         ],
         [
             // A per-analyst display preference — where your sidebar sits. Not

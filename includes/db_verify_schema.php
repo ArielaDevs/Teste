@@ -1806,7 +1806,7 @@ return [
     'asset_history' => [
         'id'                => 'INT NOT NULL AUTO_INCREMENT',
         'asset_id'          => 'INT NOT NULL',
-        'analyst_id'        => 'INT NOT NULL',
+        'analyst_id'        => 'INT NULL',
         'field_name'        => 'VARCHAR(100) NOT NULL',
         'old_value'         => 'VARCHAR(500) NULL',
         'new_value'         => 'VARCHAR(500) NULL',
