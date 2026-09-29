@@ -33,7 +33,7 @@ try {
     );
     $stmt->execute([$analystId]);
     $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-    $profile['is_managed'] = !empty($profile['auth_provider_id']) && (($profile['profile_sync_mode'] ?? 'always') === 'always');
+    $profile['is_managed'] = !empty($profile['auth_provider_id']) && (strtolower((string)($profile['protocol'] ?? '')) === 'oidc' && ($profile['profile_sync_mode'] ?? 'never') === 'always');
 
     // Rendered alongside the raw body so the editor can show a live preview without
     // reimplementing the substitution in the browser — the same reason the template

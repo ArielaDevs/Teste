@@ -440,14 +440,13 @@ require __DIR__ . '/_top.php';
         <strong>Scopes vs. Optional Claims:</strong>
         <p style="margin-top:6px;margin-bottom:6px;">Keep the <strong>Scopes</strong> field in FreeITSM set to standard OIDC scopes (<code>openid email profile</code>). Do not add attribute names into the scopes box. To emit profile attributes, configure optional claims in your identity provider:</p>
         <ul style="margin-bottom:0;">
-            <li><strong>Microsoft Entra ID (Azure AD):</strong> In the Azure Portal, go to <em>App registrations &rarr; [Your App] &rarr; Token configuration &rarr; Add optional claim</em>, select <strong>ID</strong> token, and check <code>department</code>, <code>job_title</code>, and <code>phone_number</code>.</li>
+            <li><strong>Microsoft Entra ID (Azure AD):</strong> In the Azure Portal, go to <em>App registrations &rarr; [Your App] &rarr; Token configuration &rarr; Add optional claim</em>, select <strong>ID</strong> token, and check <code>department</code>, <code>job_title</code>, and <code>phone_number</code>. (Note: Entra's <code>userinfo</code> endpoint only returns basic profile claims, so department and title must be configured as optional claims on the ID token).</li>
             <li><strong>Okta / Auth0:</strong> Under <em>API &rarr; Authorization Servers &rarr; Claims</em>, add claims mapped to <code>user.department</code>, <code>user.title</code>, and <code>user.primaryPhone</code>.</li>
             <li><strong>Keycloak:</strong> In <em>Client Scopes &rarr; profile &rarr; Mappers</em>, add User Attribute mappers for <code>department</code>, <code>job_title</code>, and <code>phone_number</code>.</li>
         </ul>
     </div>
 </div>
 
-<div class="help-note ok"><strong>Identity-Managed Authentication:</strong> Passwords, MFA, and device trust are handled directly by your IdP, so local password and TOTP options are cleanly hidden from user menus during SSO sessions.</div>
 </div>
 <!-- 5. Experience -->
 <div class="help-section" id="experience">

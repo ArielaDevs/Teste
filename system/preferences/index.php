@@ -215,7 +215,7 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
             border-radius: 6px;
             font-size: 13px;
             line-height: 1.4;
-            background: var(--accent-subtle, rgba(84, 110, 122, 0.1));
+            background: var(--surface-2, rgba(84, 110, 122, 0.1));
             color: var(--text, #333);
             border-left: 3px solid var(--sys-accent, #546e7a);
         }

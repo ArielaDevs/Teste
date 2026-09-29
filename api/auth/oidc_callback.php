@@ -162,29 +162,6 @@ try {
         }
         $conn->prepare("UPDATE analyst_sso_identities SET last_login_datetime = UTC_TIMESTAMP(), email = ? WHERE provider_id = ? AND subject = ?")
              ->execute([$email ?: null, $providerId, $sub]);
-        $syncMode = $provider['profile_sync_mode'] ?? 'always';
-        if ($syncMode === 'always') {
-            $profAttrs = oidcExtractProfileAttributes($claims);
-            $updates = [];
-            $params  = [];
-            if (!empty($name) && $analyst['full_name'] !== $name) {
-                $updates[] = "full_name = ?";
-                $params[]  = $name;
-                $analyst['full_name'] = $name;
-            }
-            foreach (['job_title', 'department', 'phone', 'mobile'] as $col) {
-                if (!empty($profAttrs[$col]) && ($analyst[$col] ?? null) !== $profAttrs[$col]) {
-                    $updates[] = "$col = ?";
-                    $params[]  = $profAttrs[$col];
-                    $analyst[$col] = $profAttrs[$col];
-                }
-            }
-            if (!empty($updates)) {
-                $params[] = (int)$analystId;
-                $conn->prepare("UPDATE analysts SET " . implode(", ", $updates) . ", last_modified_datetime = UTC_TIMESTAMP() WHERE id = ?")->execute($params);
-            }
-        }
-
     } else {
         // --- 2) Match an existing analyst by email ---
         $analyst = null;
@@ -199,28 +176,6 @@ try {
 
         if ($analyst) {
             $analystId = (int)$analyst['id'];
-            $syncMode = $provider['profile_sync_mode'] ?? 'always';
-            if ($syncMode === 'always') {
-                $profAttrs = oidcExtractProfileAttributes($claims);
-                $updates = [];
-                $params  = [];
-                if (!empty($name) && $analyst['full_name'] !== $name) {
-                    $updates[] = "full_name = ?";
-                    $params[]  = $name;
-                    $analyst['full_name'] = $name;
-                }
-                foreach (['job_title', 'department', 'phone', 'mobile'] as $col) {
-                    if (!empty($profAttrs[$col]) && ($analyst[$col] ?? null) !== $profAttrs[$col]) {
-                        $updates[] = "$col = ?";
-                        $params[]  = $profAttrs[$col];
-                        $analyst[$col] = $profAttrs[$col];
-                    }
-                }
-                if (!empty($updates)) {
-                    $params[] = (int)$analystId;
-                    $conn->prepare("UPDATE analysts SET " . implode(", ", $updates) . ", last_modified_datetime = UTC_TIMESTAMP() WHERE id = ?")->execute($params);
-                }
-            }
             if ((int)$analyst['is_active'] !== 1) {
                 ssoBail('Your account is inactive. Contact an administrator.');
             }
@@ -234,7 +189,7 @@ try {
                 if ($email === '') {
                     ssoBail('Cannot auto-create an account without an email from the provider.');
                 }
-                $analystId = oidcCreateAnalyst($conn, $providerId, $preferredUser, $name, $email, $provider['default_modules'], $claims, $provider['profile_sync_mode'] ?? 'always');
+                $analystId = oidcCreateAnalyst($conn, $providerId, $preferredUser, $name, $email, $provider['default_modules'], $claims, $provider['profile_sync_mode'] ?? 'never');
                 $analyst   = oidcLoadAnalyst($conn, $analystId);
             } else {
                 $fallbackMode = $provider['analyst_fallback_mode'] ?? 'confirm';
@@ -268,6 +223,10 @@ try {
              VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())"
         )->execute([$analystId, $providerId, $sub, $email ?: null]);
     }
+
+    // Every path above has now passed its access checks, so it is safe to write.
+    oidcSyncProfile($conn, $provider, 'analysts', $analyst, $claims, $name);
+    $analyst = oidcLoadAnalyst($conn, $analystId);   // pick up any new full_name for the session
 
     // --- Success: set the session directly (SSO bypasses local MFA) ---
     $conn->prepare("UPDATE analysts SET last_login_datetime = UTC_TIMESTAMP(), failed_login_count = 0 WHERE id = ?")
@@ -341,6 +300,59 @@ function ssLoadUser(PDO $conn, int $id): ?array {
 /**
  * Extract standard profile attributes from OIDC claims across Okta, Entra ID, Keycloak, Google.
  */
+/**
+ * Copy profile details from the identity provider onto a local account.
+ *
+ * 🔴 Call this ONLY after the account has passed every access check (active,
+ * assigned to this provider). Writing first and refusing afterwards lets a
+ * provider that is about to be turned away edit someone else's record.
+ *
+ * Only runs when the provider's profile_sync_mode is 'always'. 'initial' is
+ * handled at creation time (oidcCreateAnalyst / the requester INSERT), and
+ * 'never' does nothing.
+ *
+ * @param string $table 'analysts' or 'users' - never user input
+ */
+function oidcSyncProfile(PDO $conn, array $provider, string $table, array $record, array $claims, string $name): void {
+    if (($provider['profile_sync_mode'] ?? 'never') !== 'always') return;
+
+    if ($table === 'analysts') {
+        $nameCol = 'full_name';
+        $cols    = ['job_title', 'department', 'phone', 'mobile'];            // analysts has no office column
+        $stamp   = ', last_modified_datetime = UTC_TIMESTAMP()';
+    } elseif ($table === 'users') {
+        $nameCol = 'display_name';
+        $cols    = ['job_title', 'department', 'office', 'phone', 'mobile'];
+        $stamp   = '';
+    } else {
+        return;
+    }
+
+    $attrs   = oidcExtractProfileAttributes($claims);
+    $updates = [];
+    $params  = [];
+
+    // A requester's own preferred_name wins over the directory's display name.
+    $nameLocked = ($table === 'users' && !empty($record['preferred_name']));
+    if ($name !== '' && !$nameLocked && ($record[$nameCol] ?? null) !== $name) {
+        $updates[] = "$nameCol = ?";
+        $params[]  = $name;
+    }
+
+    foreach ($cols as $col) {
+        if (!empty($attrs[$col]) && ($record[$col] ?? null) !== $attrs[$col]) {
+            $updates[] = "$col = ?";
+            $params[]  = $attrs[$col];
+        }
+    }
+
+    if (!$updates) return;
+
+    $params[] = (int)$record['id'];
+    $conn->prepare("UPDATE $table SET " . implode(', ', $updates) . "$stamp WHERE id = ?")
+         ->execute($params);
+}
+
 function oidcExtractProfileAttributes(array $claims): array {
     $clean = function ($val, int $max = 100) {
         if ($val === null || $val === "") return null;
@@ -397,29 +409,6 @@ function completeSelfServiceSso(PDO $conn, array $provider, int $providerId, str
         }
         $conn->prepare("UPDATE user_sso_identities SET last_login_datetime = UTC_TIMESTAMP(), email = ? WHERE provider_id = ? AND subject = ?")
              ->execute([$email ?: null, $providerId, $sub]);
-        $syncMode = $provider["profile_sync_mode"] ?? "always";
-        if ($syncMode === "always") {
-            $profAttrs = oidcExtractProfileAttributes($claims);
-            $updates = [];
-            $params  = [];
-            if (!empty($name) && empty($user["preferred_name"]) && $user["display_name"] !== $name) {
-                $updates[] = "display_name = ?";
-                $params[]  = $name;
-                $user["display_name"] = $name;
-            }
-            foreach (["job_title", "department", "office", "phone", "mobile"] as $col) {
-                if (!empty($profAttrs[$col]) && ($user[$col] ?? null) !== $profAttrs[$col]) {
-                    $updates[] = "$col = ?";
-                    $params[]  = $profAttrs[$col];
-                    $user[$col] = $profAttrs[$col];
-                }
-            }
-            if (!empty($updates)) {
-                $params[] = $userId;
-                $conn->prepare("UPDATE users SET " . implode(", ", $updates) . " WHERE id = ?")->execute($params);
-            }
-        }
-
     } else {
         // --- 2) Match an existing requester by verified email ---
         $user = null;
@@ -434,28 +423,6 @@ function completeSelfServiceSso(PDO $conn, array $provider, int $providerId, str
 
         if ($user) {
             $userId   = (int)$user['id'];
-            $syncMode = $provider['profile_sync_mode'] ?? 'always';
-            if ($syncMode === 'always') {
-                $profAttrs = oidcExtractProfileAttributes($claims);
-                $updates = [];
-                $params  = [];
-                if (!empty($name) && empty($user['preferred_name']) && $user['display_name'] !== $name) {
-                    $updates[] = "display_name = ?";
-                    $params[]  = $name;
-                    $user['display_name'] = $name;
-                }
-                foreach (['job_title', 'department', 'office', 'phone', 'mobile'] as $col) {
-                    if (!empty($profAttrs[$col]) && ($user[$col] ?? null) !== $profAttrs[$col]) {
-                        $updates[] = "$col = ?";
-                        $params[]  = $profAttrs[$col];
-                        $user[$col] = $profAttrs[$col];
-                    }
-                }
-                if (!empty($updates)) {
-                    $params[] = $userId;
-                    $conn->prepare("UPDATE users SET " . implode(", ", $updates) . " WHERE id = ?")->execute($params);
-                }
-            }
             $assigned = (int)($user['auth_provider_id'] ?? 0);
             if ($assigned === 0) {
                 // Auto-claim an unassigned requester onto this provider.
@@ -467,7 +434,7 @@ function completeSelfServiceSso(PDO $conn, array $provider, int $providerId, str
         } else {
             // --- 3) Just-in-time provisioning (only if the provider allows it) ---
             if ((int)$provider['auto_create_users'] !== 1) {
-                ssoBail('No self-service account exists for ' . ($email ?: 'this user') . '.');
+                ssoBail('No self-service account exists for ' . ($email ?: 'this user') . '. Raise a ticket or register first.');
             }
             if ($email === '') {
                 ssoBail('Cannot create an account without an email from the provider.');
@@ -479,11 +446,10 @@ function completeSelfServiceSso(PDO $conn, array $provider, int $providerId, str
                 ? (int)$provider['tenant_id']
                 : resolveTenantForNewUser($conn, $email);
 
-            $profAttrs = oidcExtractProfileAttributes($claims);
-            $syncMode  = $provider["profile_sync_mode"] ?? "always";
-            if ($syncMode === "never") {
-                $profAttrs = ["job_title" => null, "department" => null, "office" => null, "phone" => null, "mobile" => null];
-            }
+            $syncMode  = $provider["profile_sync_mode"] ?? "never";
+            $profAttrs = ($syncMode !== "never")
+                ? oidcExtractProfileAttributes($claims)
+                : ["job_title" => null, "department" => null, "office" => null, "phone" => null, "mobile" => null];
             $stmt = $conn->prepare(
                 "INSERT INTO users (email, display_name, job_title, department, office, phone, mobile, auth_provider_id, tenant_id, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())"
@@ -505,6 +471,10 @@ function completeSelfServiceSso(PDO $conn, array $provider, int $providerId, str
         )->execute([$userId, $providerId, $sub, $email ?: null]);
     }
 
+    // Every path above has now passed its access checks, so it is safe to write.
+    oidcSyncProfile($conn, $provider, 'users', $user, $claims, $name);
+    $user = ssLoadUser($conn, $userId);
+
     // --- Success: set the self-service session (SSO bypasses local TOTP) ---
     $displayName = $user['preferred_name'] ?: $user['display_name'] ?: $user['email'];
     sessionPromoteToAuthenticated();   // rotate the session id — see includes/session_security.php
@@ -525,7 +495,7 @@ function completeSelfServiceSso(PDO $conn, array $provider, int $providerId, str
  * The local password is set to an unusable random hash (SSO users sign in
  * via the IdP, not a local password).
  */
-function oidcCreateAnalyst(PDO $conn, int $providerId, string $preferredUser, string $name, string $email, ?string $defaultModules, array $claims = [], string $syncMode = 'always'): int {
+function oidcCreateAnalyst(PDO $conn, int $providerId, string $preferredUser, string $name, string $email, ?string $defaultModules, array $claims = [], string $syncMode = 'never'): int {
     // Derive a unique username from the preferred username / email local-part.
     $base = strtolower(preg_replace('/[^a-zA-Z0-9._-]/', '', $preferredUser ?: explode('@', $email)[0]));
     if ($base === '') $base = 'ssouser';

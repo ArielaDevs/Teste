@@ -86,7 +86,7 @@ $autoCreateAnalysts = !empty($data['auto_create_analysts']) ? 1 : 0;
 $fallbackInput      = $data['analyst_fallback_mode'] ?? 'confirm';
 $analystFallback    = in_array($fallbackInput, ['confirm', 'redirect', 'block'], true) ? $fallbackInput : 'confirm';
 $requireVerified    = !empty($data['require_verified_email']) ? 1 : 0;
-$profileSyncMode   = in_array($data['profile_sync_mode'] ?? '', ['always', 'initial', 'never'], true) ? $data['profile_sync_mode'] : 'always';
+$profileSyncMode   = in_array($data['profile_sync_mode'] ?? '', ['always', 'initial', 'never'], true) ? $data['profile_sync_mode'] : 'never';
 $defaultModules  = isset($data['default_modules']) && trim($data['default_modules']) !== ''
                    ? trim($data['default_modules']) : null;
 $sortOrder       = (int)($data['sort_order'] ?? 0);

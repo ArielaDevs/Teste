@@ -373,15 +373,13 @@ if (!$__hasAnalystAccount && !empty($ss_user_email)) {
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             <span><?php echo htmlspecialchars(t('self-service.menu.my_account')); ?></span>
         </button>
-        <?php if (empty($_SESSION['ss_sso_provider_id'])): ?>
         <button class="ss-menu-item" onclick="ssOpenMfaModal()">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
             <span><?php echo htmlspecialchars(t('self-service.menu.mfa')); ?></span>
             <span class="ss-mfa-badge disabled" id="ssMfaBadge"><?php echo htmlspecialchars(t('self-service.menu.mfa_off')); ?></span>
         </button>
-        <?php endif; ?>
         <?php if (!empty($__hasAnalystAccount)): ?>
-        <button class="ss-menu-item" onclick="window.open('../index.php', '_blank', 'noopener');">
+        <button class="ss-menu-item" onclick="window.open('<?php echo BASE_URL; ?>', '_blank', 'noopener');">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
             <span><?php echo htmlspecialchars(t('self-service.menu.analyst_console')); ?></span>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;width:12px;height:12px;opacity:0.6;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
@@ -467,7 +465,6 @@ if (!$__hasAnalystAccount && !empty($ss_user_email)) {
                 <div class="ss-form-hint"><?php echo htmlspecialchars(t('self-service.account.appearance_hint')); ?></div>
             </div>
 
-            <?php if (empty($_SESSION['ss_sso_provider_id'])): ?>
             <div style="border-top:1px solid var(--border, #e0e0e0); padding-top:20px;">
                 <div style="font-size:15px;font-weight:600;color:var(--text,#333);margin-bottom:16px;"><?php echo htmlspecialchars(t('self-service.account.change_password')); ?></div>
                 <div id="ssPwMsg" class="ss-msg"></div>
@@ -485,7 +482,6 @@ if (!$__hasAnalystAccount && !empty($ss_user_email)) {
                 </div>
                 <button class="ss-btn ss-btn-primary" id="ssPwSaveBtn" onclick="ssSavePassword()"><?php echo htmlspecialchars(t('self-service.account.change')); ?></button>
             </div>
-            <?php endif; ?>
         </div>
         <div class="ss-modal-footer">
             <button class="ss-btn ss-btn-secondary" onclick="ssCloseAccountModal()"><?php echo htmlspecialchars(t('self-service.account.close')); ?></button>

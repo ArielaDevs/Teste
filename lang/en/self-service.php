@@ -101,7 +101,7 @@ return [
         'signing_in'         => 'Signing in...',
         'forgot_password'    => 'Forgot your password?',
         'create_account'     => 'Create an account',
-        'analyst_login'      => 'Analyst Login',
+        'analyst_login'      => 'Analyst login',
         'login_failed'       => 'Login failed. Please try again.',
         'mfa_desc'           => 'Enter the 6-digit code from your authenticator app',
         'verify'             => 'Verify',

@@ -542,14 +542,14 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                     <label><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode')); ?></label>
                     <div class="hint"><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode_hint')); ?></div>
                     <select id="fProfileSyncMode" style="width:100%;padding:8px;border:1px solid var(--border,#ccc);border-radius:4px;background:var(--surface,#fff);color:var(--text,#333);">
-                        <option value="always"><?php echo htmlspecialchars(t('system.sso.profile_sync_always')); ?></option>
-                        <option value="initial"><?php echo htmlspecialchars(t('system.sso.profile_sync_initial')); ?></option>
                         <option value="never"><?php echo htmlspecialchars(t('system.sso.profile_sync_never')); ?></option>
+                        <option value="initial"><?php echo htmlspecialchars(t('system.sso.profile_sync_initial')); ?></option>
+                        <option value="always"><?php echo htmlspecialchars(t('system.sso.profile_sync_always')); ?></option>
                     </select>
                 </div>
                 <div class="checkbox-field" id="autoCreateField">
                     <input type="checkbox" id="fAutoCreate">
-                    <div class="cb-label"><strong><?php echo htmlspecialchars(t('system.sso.cb_autocreate')); ?></strong><span><?php echo htmlspecialchars(t('system.sso.cb_autocreate_desc')); ?></span></div>
+                    <div class="cb-label"><strong><?php echo htmlspecialchars(t('system.sso.cb_autocreate_users')); ?></strong><span><?php echo htmlspecialchars(t('system.sso.cb_autocreate_users_desc')); ?></span></div>
                 </div>
                 <div class="checkbox-field" id="autoCreateAnalystsField">
                     <input type="checkbox" id="fAutoCreateAnalysts">
@@ -704,7 +704,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                 <td class="issuer-cell" title="${esc(target)}">${esc(target)}</td>
                 <td><span class="status-badge ${p.enabled ? 'on' : 'off'}">${p.enabled ? window.t('system.sso.enabled') : window.t('system.sso.disabled')}</span></td>
                 <td>${isCardDav ? '<span class="jit-off">' + window.t('system.sso.jit_na') + '</span>' : (() => {
-                    const mode = p.profile_sync_mode || 'always';
+                    const mode = p.profile_sync_mode || 'never';
                     const label = mode === 'never' ? window.t('system.sso.sync_pill_never')
                                 : mode === 'initial' ? window.t('system.sso.sync_pill_initial')
                                 : window.t('system.sso.sync_pill_always');
@@ -898,7 +898,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         syncAnalystFields();
         document.getElementById('fAnalystFallbackMode').value = (p && p.analyst_fallback_mode) ? p.analyst_fallback_mode : 'confirm';
         document.getElementById('fRequireVerified').checked = p ? !!p.require_verified_email : false;
-        document.getElementById('fProfileSyncMode').value = (p && p.profile_sync_mode) ? p.profile_sync_mode : 'always';
+        document.getElementById('fProfileSyncMode').value = (p && p.profile_sync_mode) ? p.profile_sync_mode : 'never';
         document.getElementById('fDefaultModules').value = p ? (p.default_modules || '') : '';
         const tenantSel = document.getElementById('fTenant');
         if (tenantSel) tenantSel.value = (p && p.tenant_id) ? String(p.tenant_id) : '';
@@ -1120,7 +1120,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
             auto_create_analysts: document.getElementById('fAutoCreateAnalysts').checked ? 1 : 0,
             analyst_fallback_mode: document.getElementById('fAnalystFallbackMode').value || 'confirm',
             require_verified_email: document.getElementById('fRequireVerified').checked ? 1 : 0,
-            profile_sync_mode: document.getElementById('fProfileSyncMode').value || 'always',
+            profile_sync_mode: document.getElementById('fProfileSyncMode').value || 'never',
             default_modules: document.getElementById('fDefaultModules').value.trim(),
             tenant_id: (document.getElementById('fTenant') ? (document.getElementById('fTenant').value || null) : null)
         };

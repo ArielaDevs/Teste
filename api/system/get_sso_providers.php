@@ -53,7 +53,7 @@ try {
             'auto_create_analysts' => (int)($r['auto_create_analysts'] ?? 0),
             'analyst_fallback_mode' => $r['analyst_fallback_mode'] ?? 'confirm',
             'require_verified_email' => (int)$r['require_verified_email'],
-            'profile_sync_mode'      => $r['profile_sync_mode'] ?? 'always',
+            'profile_sync_mode'      => $r['profile_sync_mode'] ?? 'never',
             'default_modules'   => $r['default_modules'],
             'sort_order'        => (int)$r['sort_order'],
             // Which client company owns this IdP (null = global / MSP-internal).

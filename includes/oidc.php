@@ -255,7 +255,6 @@ function oidcFetchUserInfo(string $userinfoEndpoint, string $accessToken): array
         curl_setopt_array($ch, [
             CURLOPT_URL            => $userinfoEndpoint,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_HTTPHEADER     => [
                 'Authorization: Bearer ' . $accessToken,

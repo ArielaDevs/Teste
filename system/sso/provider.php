@@ -409,9 +409,9 @@ function v($row, string $k): string { return htmlspecialchars((string)($row[$k] 
                 <label for="fProfileSyncMode" style="display:block;margin-bottom:6px;font-weight:500;"><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode')); ?></label>
                 <div class="hint" style="margin-bottom:6px;"><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode_hint')); ?></div>
                 <select id="fProfileSyncMode" style="width:100%;max-width:400px;padding:8px;border:1px solid var(--border,#ccc);border-radius:4px;background:var(--surface,#fff);color:var(--text,#333);">
-                    <option value="always"<?php echo ($p['profile_sync_mode'] ?? 'always') === 'always' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_always')); ?></option>
+                    <option value="never"<?php echo ($p['profile_sync_mode'] ?? 'never') === 'never' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_never')); ?></option>
                     <option value="initial"<?php echo ($p['profile_sync_mode'] ?? '') === 'initial' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_initial')); ?></option>
-                    <option value="never"<?php echo ($p['profile_sync_mode'] ?? '') === 'never' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_never')); ?></option>
+                    <option value="always"<?php echo ($p['profile_sync_mode'] ?? '') === 'always' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_always')); ?></option>
                 </select>
             </div>
             <div class="fld">
@@ -645,7 +645,7 @@ function payload() {
         protocol: 'ldap',
         display_name: $('fDisplayName').value.trim(),
         enabled: $('fEnabled').checked ? 1 : 0,
-        profile_sync_mode: $('fProfileSyncMode').value || 'always',
+        profile_sync_mode: $('fProfileSyncMode').value || 'never',
         auto_create_users: $('fAutoCreate').checked ? 1 : 0,
         auto_create_analysts: $('fAutoCreateAnalysts').checked ? 1 : 0,
         analyst_fallback_mode: $('fAnalystFallbackMode').value || 'confirm',

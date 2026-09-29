@@ -22,7 +22,7 @@ return [
     'username_or_email' => 'Username or email',
     'password'      => 'Password',
     'sign_in'       => 'Sign In',
-    'forgot'        => 'Forgot your password?',
+    'forgot'        => 'Forgot password?',
 
     // Email-first form, shown when single sign-on is configured
     'email'             => 'Email',
@@ -47,7 +47,7 @@ return [
     'mfa_cancel'      => 'Cancel and return to login',
 
     // The way across to the requester portal (discussion #82)
-    'portal_link'   => 'Self-Service Login',
+    'portal_link'   => 'Go to the Self-Service Portal',
 
     // --- Messages -----------------------------------------------------------
     'err_missing'   => 'Please enter both username and password',
