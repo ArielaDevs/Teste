@@ -11,12 +11,14 @@
  * downstream import code in check_mailbox_email.php needs no provider-specific handling.
  *
  * Reading uses PHP's `imap_*` extension. Sending uses a minimal, dependency-free
- * SMTP client (fsockopen) — the repo vendors no mail library, and outbound is
- * HTML-only (matching the Gmail send path), so a small self-contained sender is
- * proportional. See the Basic-IMAP-Mailboxes wiki page for the design.
+ * SMTP client (fsockopen) — the repo vendors no mail library, so a small
+ * self-contained sender is proportional. The message itself (HTML body, inline
+ * images, attachments) is built by includes/mime_message.php, shared with the
+ * Gmail send path. See the Basic-IMAP-Mailboxes wiki page for the design.
  */
 
 require_once __DIR__ . '/encryption.php';
+require_once __DIR__ . '/mime_message.php';
 
 /** True when the PHP IMAP extension is loaded (self-hosters must enable it). */
 function imapExtensionAvailable(): bool {
@@ -407,10 +409,11 @@ function imapHandleAfterProcessing(array $mailbox, int $uid, string $action, ?st
 /**
  * Send an HTML email via SMTP (with auth). Minimal, dependency-free.
  *
- * $to / $cc are semicolon/comma separated address strings. Outbound attachments
- * are not supported (parity with the Gmail send path) — replies are HTML only.
+ * $to / $cc are semicolon/comma separated address strings. $parts is the list of
+ * attachments and inline images, Graph-shaped — see includes/mime_message.php.
+ * Before GH #158 there was no $parts, and an analyst's attachment never left.
  */
-function imapSmtpSend(array $mailbox, string $to, string $cc, string $subject, string $htmlBody): void {
+function imapSmtpSend(array $mailbox, string $to, string $cc, string $subject, string $htmlBody, array $parts = []): void {
     $host = $mailbox['smtp_server'] ?? '';
     $port = (int) ($mailbox['smtp_port'] ?? 587);
     $enc  = strtolower($mailbox['smtp_encryption'] ?? 'tls');
@@ -486,7 +489,15 @@ function imapSmtpSend(array $mailbox, string $to, string $cc, string $subject, s
         }
 
         imapSmtpCommand($fp, 'DATA', [354]);
-        $message = imapSmtpBuildMessage($from, $mailbox['name'] ?? '', $toList, $ccList, $subject, $htmlBody);
+        $message = mimeBuildMessage([
+            'from'     => $from,
+            'fromName' => $mailbox['name'] ?? '',
+            'to'       => $toList,
+            'cc'       => $ccList,
+            'subject'  => $subject,
+            'html'     => $htmlBody,
+            'parts'    => $parts,
+        ]);
         // Dot-stuff and terminate.
         $message = preg_replace('/^\./m', '..', $message);
         fwrite($fp, $message . "\r\n.\r\n");
@@ -498,34 +509,6 @@ function imapSmtpSend(array $mailbox, string $to, string $cc, string $subject, s
     }
 }
 
-/** Assemble the raw RFC 2822 HTML message. */
-function imapSmtpBuildMessage(string $from, string $fromName, array $toList, array $ccList, string $subject, string $htmlBody): string {
-    $headers = [];
-    $fromHeader = $fromName !== ''
-        ? imapSmtpEncodeHeader($fromName) . ' <' . $from . '>'
-        : $from;
-    $headers[] = 'From: ' . $fromHeader;
-    $headers[] = 'To: ' . implode(', ', $toList);
-    if (!empty($ccList)) {
-        $headers[] = 'Cc: ' . implode(', ', $ccList);
-    }
-    $headers[] = 'Subject: ' . imapSmtpEncodeHeader($subject);
-    $headers[] = 'MIME-Version: 1.0';
-    $headers[] = 'Content-Type: text/html; charset=UTF-8';
-    $headers[] = 'Content-Transfer-Encoding: base64';
-
-    $encodedBody = chunk_split(base64_encode($htmlBody), 76, "\r\n");
-
-    return implode("\r\n", $headers) . "\r\n\r\n" . $encodedBody;
-}
-
-/** RFC 2047 encode a header value if it contains non-ASCII. */
-function imapSmtpEncodeHeader(string $value): string {
-    if (preg_match('/[\x80-\xFF]/', $value)) {
-        return '=?UTF-8?B?' . base64_encode($value) . '?=';
-    }
-    return $value;
-}
 
 /** Derive a sensible EHLO hostname from the sender address. */
 function imapSmtpClientHostname(string $from): string {

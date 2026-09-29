@@ -142,17 +142,21 @@ try {
     }
 
     try {
-        if ($provider === 'imap') {
-            // Send via SMTP (username/password). HTML body only — outbound attachments
-            // aren't supported on the basic-IMAP path (parity with the Gmail path).
-            imapSmtpSend($mailbox, $to, $cc, $subject, $bodyForSending);
-        } elseif ($provider === 'google') {
-            // Send via Gmail API
-            $fromAddress = $mailbox['target_mailbox'] ?? '';
-            gmailSendEmail($accessToken, $to, $subject, $bodyForSending, $fromAddress);
+        if ($provider === 'imap' || $provider === 'google') {
+            // SMTP and Gmail both take a finished MIME message, built by
+            // includes/mime_message.php from the same file list Graph gets.
+            // GH #158: both used to send the HTML alone - the attachments, the
+            // pasted images and (on Gmail) the CC list never left.
+            $inline = processInlineImages($bodyForSending, (int)$ticketId);
+            $parts  = array_merge($inline['attachments'], uploadedFileParts($attachments));
+            if ($provider === 'imap') {
+                imapSmtpSend($mailbox, $to, $cc, $subject, $inline['body'], $parts);
+            } else {
+                gmailSendEmail($accessToken, $to, $subject, $inline['body'], $mailbox['target_mailbox'] ?? '', $cc, $parts);
+            }
         } else {
             // Build the email message for Graph API (send assembled body with thread)
-            $message = buildEmailMessage($to, $cc, $subject, $bodyForSending, $attachments);
+            $message = buildEmailMessage($to, $cc, $subject, $bodyForSending, $attachments, (int)$ticketId);
 
             // Send the email via Graph API
             $result = sendEmailViaGraph($accessToken, $message);
@@ -299,13 +303,13 @@ function saveTokenData($conn, $mailboxId, $tokenData) {
 /**
  * Build email message structure for Graph API
  */
-function buildEmailMessage($to, $cc, $subject, $body, $attachments) {
+function buildEmailMessage($to, $cc, $subject, $body, $attachments, $ticketId) {
     // Parse recipients
     $toRecipients = parseRecipients($to);
     $ccRecipients = parseRecipients($cc);
 
     // Process inline images - convert internal URLs to CID references
-    $inlineResult = processInlineImages($body);
+    $inlineResult = processInlineImages($body, $ticketId);
     $body = $inlineResult['body'];
     $inlineAttachments = $inlineResult['attachments'];
 
@@ -326,20 +330,8 @@ function buildEmailMessage($to, $cc, $subject, $body, $attachments) {
         $message['message']['ccRecipients'] = $ccRecipients;
     }
 
-    // Start with inline attachments
-    $allAttachments = $inlineAttachments;
-
-    // Add user-uploaded attachments if any
-    if (!empty($attachments)) {
-        foreach ($attachments as $attachment) {
-            $allAttachments[] = [
-                '@odata.type' => '#microsoft.graph.fileAttachment',
-                'name' => $attachment['name'],
-                'contentType' => $attachment['type'] ?? 'application/octet-stream',
-                'contentBytes' => $attachment['content'] // Already base64 encoded
-            ];
-        }
-    }
+    // Inline images first, then the files the analyst attached
+    $allAttachments = array_merge($inlineAttachments, uploadedFileParts($attachments));
 
     // Add all attachments to message
     if (!empty($allAttachments)) {
@@ -350,36 +342,86 @@ function buildEmailMessage($to, $cc, $subject, $body, $attachments) {
 }
 
 /**
- * Process inline images in email body
- * Converts internal api/get_attachment.php URLs to proper CID references
+ * The files the analyst attached, in the Graph fileAttachment shape that all
+ * three providers' builders take (Graph directly; SMTP and Gmail through
+ * includes/mime_message.php).
  */
-function processInlineImages($body) {
+function uploadedFileParts($attachments) {
+    $parts = [];
+    foreach ((array)$attachments as $attachment) {
+        if (!is_array($attachment) || !isset($attachment['name'], $attachment['content'])) {
+            continue;
+        }
+        $parts[] = [
+            '@odata.type' => '#microsoft.graph.fileAttachment',
+            'name' => $attachment['name'],
+            'contentType' => $attachment['type'] ?? 'application/octet-stream',
+            'contentBytes' => $attachment['content'] // Already base64 encoded
+        ];
+    }
+    return $parts;
+}
+
+/**
+ * Process inline images in email body
+ * Converts image links the customer's mail client could never load into
+ * images carried inside the email itself (src="cid:...").
+ *
+ * Two kinds of image are converted:
+ *
+ * 1. Links to a file stored on this ticket. An inbound email's pictures are
+ *    saved with a link back into FreeITSM, and that link travels in the quoted
+ *    thread of every reply and forward. check_mailbox_email.php writes it as
+ *    "/api/tickets/get_attachment.php?cid=...&email_id=N" (older rows have
+ *    "../api/tickets/..."). GH #158: this used to match only
+ *    "api/get_attachment.php", a form nothing stores - it matched 0 rows, so
+ *    thread pictures went out as broken links on EVERY provider.
+ *    Only files belonging to THIS ticket are read, so a link typed into the
+ *    editor's source view cannot mail out another ticket's (or company's) file.
+ *    ⚠️ Capped at INLINE_THREAD_BUDGET bytes per email. Every reply re-sends the
+ *    whole thread's pictures, and Graph refuses a sendMail request over 4 MB -
+ *    uncapped, a picture-heavy thread would turn a send that used to work (with
+ *    broken pictures) into one that fails. Past the cap the link stays as it was.
+ *
+ * 2. data: images - what the editor produces when a screenshot is pasted.
+ *    Gmail and Outlook refuse to show a data: image in a received email.
+ */
+const INLINE_THREAD_BUDGET = 2 * 1024 * 1024;
+
+function processInlineImages($body, $ticketId) {
     $inlineAttachments = [];
     $cidCounter = 1;
+    $byAttachmentId = []; // the same picture quoted twice goes in once
+    $threadBytes = 0;
+    $stamp = time();
 
-    // Pattern to match our internal attachment URLs
-    // Matches: src="api/get_attachment.php?id=123" or src="api/get_attachment.php?cid=xxx&email_id=123"
-    $pattern = '/src=["\']api\/get_attachment\.php\?([^"\']+)["\']/i';
+    // Any RELATIVE link to get_attachment.php (a full http(s) URL is someone
+    // else's server and is left alone).
+    $pattern = '/src=(["\'])(?![a-z][a-z0-9+.\-]*:)[^"\']*?api\/(?:tickets\/)?get_attachment\.php\?([^"\']+)\1/i';
 
     // Use a wrapper to pass variables by reference into the callback
-    $callback = function($matches) use (&$inlineAttachments, &$cidCounter) {
+    $callback = function($matches) use (&$inlineAttachments, &$cidCounter, &$byAttachmentId, &$threadBytes, $stamp, $ticketId) {
         try {
-            $queryString = $matches[1];
+            $queryString = $matches[2];
             parse_str(html_entity_decode($queryString), $params);
 
             // Try to find the attachment
             $attachment = null;
 
             if (isset($params['id'])) {
-                $attachment = getAttachmentById($params['id']);
+                $attachment = getAttachmentById($params['id'], $ticketId);
             } elseif (isset($params['cid']) && isset($params['email_id'])) {
-                $attachment = getAttachmentByCid($params['cid'], $params['email_id']);
+                $attachment = getAttachmentByCid($params['cid'], $params['email_id'], $ticketId);
             }
 
             if (!$attachment) {
                 // Couldn't find attachment, leave URL as-is
                 error_log('Inline image: attachment not found for params: ' . json_encode($params));
                 return $matches[0];
+            }
+
+            if (isset($byAttachmentId[$attachment['id']])) {
+                return 'src="cid:' . $byAttachmentId[$attachment['id']] . '"';
             }
 
             // Read the file content - use DIRECTORY_SEPARATOR for Windows compatibility
@@ -391,6 +433,12 @@ function processInlineImages($body) {
                 return $matches[0];
             }
 
+            $size = (int)filesize($filePath);
+            if ($threadBytes + $size > INLINE_THREAD_BUDGET) {
+                return $matches[0];
+            }
+            $threadBytes += $size;
+
             $fileContent = file_get_contents($filePath);
             if ($fileContent === false) {
                 error_log('Inline image: failed to read file ' . $filePath);
@@ -398,8 +446,9 @@ function processInlineImages($body) {
             }
 
             // Generate a unique CID for this attachment
-            $newCid = 'inline_image_' . $cidCounter . '_' . time();
+            $newCid = 'inline_image_' . $cidCounter . '_' . $stamp;
             $cidCounter++;
+            $byAttachmentId[$attachment['id']] = $newCid;
 
             // Add to inline attachments array
             $inlineAttachments[] = [
@@ -421,6 +470,31 @@ function processInlineImages($body) {
 
     $body = preg_replace_callback($pattern, $callback, $body);
 
+    // Pasted screenshots: src="data:image/png;base64,...."
+    $body = preg_replace_callback(
+        '/src=(["\'])data:(image\/[a-z0-9.+\-]+);base64,([A-Za-z0-9+\/=\s]+)\1/i',
+        function ($m) use (&$inlineAttachments, &$cidCounter, $stamp) {
+            $bytes = preg_replace('/\s+/', '', $m[3]);
+            if (base64_decode($bytes, true) === false) {
+                return $m[0];
+            }
+            $type = strtolower($m[2]);
+            $ext = ['image/jpeg' => 'jpg', 'image/svg+xml' => 'svg'][$type] ?? preg_replace('/[^a-z0-9]/', '', substr($type, 6));
+            $newCid = 'inline_image_' . $cidCounter . '_' . $stamp;
+            $inlineAttachments[] = [
+                '@odata.type' => '#microsoft.graph.fileAttachment',
+                'name' => 'image' . $cidCounter . '.' . $ext,
+                'contentType' => $type,
+                'contentBytes' => $bytes,
+                'contentId' => $newCid,
+                'isInline' => true
+            ];
+            $cidCounter++;
+            return 'src="cid:' . $newCid . '"';
+        },
+        $body
+    );
+
     return [
         'body' => $body,
         'attachments' => $inlineAttachments
@@ -428,14 +502,17 @@ function processInlineImages($body) {
 }
 
 /**
- * Get attachment by ID from database
+ * Get attachment by ID from database - only if it belongs to this ticket
  */
-function getAttachmentById($id) {
+function getAttachmentById($id, $ticketId) {
     try {
         $conn = connectToDatabase();
-        $sql = "SELECT id, filename, content_type, file_path FROM email_attachments WHERE id = ?";
+        $sql = "SELECT a.id, a.filename, a.content_type, a.file_path
+                  FROM email_attachments a
+                  JOIN emails e ON e.id = a.email_id
+                 WHERE a.id = ? AND e.ticket_id = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->execute([$id]);
+        $stmt->execute([$id, $ticketId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
         error_log('Failed to get attachment by ID: ' . $e->getMessage());
@@ -444,24 +521,27 @@ function getAttachmentById($id) {
 }
 
 /**
- * Get attachment by CID and email_id from database
+ * Get attachment by CID and email_id from database - only if it belongs to this ticket
  */
-function getAttachmentByCid($cid, $emailId) {
+function getAttachmentByCid($cid, $emailId, $ticketId) {
     try {
         $conn = connectToDatabase();
         // CID might be URL-encoded, so try both
         $decodedCid = urldecode($cid);
 
-        $sql = "SELECT id, filename, content_type, file_path FROM email_attachments
-                WHERE (content_id = ? OR content_id = ? OR content_id = ? OR content_id = ?)
-                AND email_id = ?";
+        $sql = "SELECT a.id, a.filename, a.content_type, a.file_path
+                  FROM email_attachments a
+                  JOIN emails e ON e.id = a.email_id
+                 WHERE (a.content_id = ? OR a.content_id = ? OR a.content_id = ? OR a.content_id = ?)
+                   AND a.email_id = ? AND e.ticket_id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->execute([
             $cid,
             $decodedCid,
             '<' . $cid . '>',
             '<' . $decodedCid . '>',
-            $emailId
+            $emailId,
+            $ticketId
         ]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Exception $e) {

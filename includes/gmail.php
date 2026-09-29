@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__ . '/encryption.php';
+require_once __DIR__ . '/mime_message.php';
 
 /**
  * Refresh a Google access token using the refresh token.
@@ -84,19 +85,33 @@ function gmailGetValidAccessToken(PDO $conn, array $mailbox, array $tokenData): 
  * $subject  - email subject
  * $htmlBody - HTML body content
  * $from     - sender email address (the mailbox address)
+ * $cc       - CC addresses, semicolon/comma separated
+ * $parts    - attachments and inline images, Graph-shaped (includes/mime_message.php)
+ *
+ * GH #158: $cc and $parts are new. Before them an analyst's attachments, pasted
+ * images and CC list were all silently dropped on a Google mailbox.
  */
-function gmailSendEmail(string $accessToken, string $to, string $subject, string $htmlBody, string $from = ''): void {
-    // Build RFC 2822 message
-    $boundary = md5(uniqid(time()));
-    $headers = "MIME-Version: 1.0\r\n";
-    if ($from) {
-        $headers .= "From: $from\r\n";
+function gmailSendEmail(string $accessToken, string $to, string $subject, string $htmlBody, string $from = '', string $cc = '', array $parts = []): void {
+    // Valid addresses only - the same rule as the SMTP path, and it keeps a stray
+    // line break in the To box from ever becoming a header of its own.
+    $split = function (string $raw): array {
+        return array_values(array_filter(array_map('trim', preg_split('/[;,]/', $raw)), function ($a) {
+            return $a !== '' && filter_var($a, FILTER_VALIDATE_EMAIL);
+        }));
+    };
+    $toList = $split($to);
+    if (empty($toList)) {
+        throw new Exception('No valid recipient address to send to.');
     }
-    $headers .= "To: $to\r\n";
-    $headers .= "Subject: $subject\r\n";
-    $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-    $headers .= "\r\n";
-    $rawMessage = $headers . $htmlBody;
+    // Gmail sends to whoever the To / Cc headers name.
+    $rawMessage = mimeBuildMessage([
+        'from'    => $from,
+        'to'      => $toList,
+        'cc'      => $split($cc),
+        'subject' => $subject,
+        'html'    => $htmlBody,
+        'parts'   => $parts,
+    ]);
 
     // Base64url encode
     $encoded = rtrim(strtr(base64_encode($rawMessage), '+/', '-_'), '=');

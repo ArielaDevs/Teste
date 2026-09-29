@@ -15,6 +15,11 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
 | 2044 | Self-service      | Fix         | On a multi-company install the portal login hid global SSO providers, so a global IdP could not be reached from the portal at all; they now show as buttons, as on a single-company install and the analyst login (GH #156). |
+| 2045 | Tickets           | Fix         | Replies and forwards from an SMTP (basic IMAP) or Gmail mailbox now carry the analyst's attachments and inline pictures - they sent HTML alone, so the ticket showed files the customer never received (GH #158). |
+| 2046 | Tickets           | Fix         | Gmail replies and forwards now include the CC list, which was silently dropped. |
+| 2047 | Tickets           | Fix         | Pictures in the quoted thread of a reply or forward are carried inside the email (up to 2 MB per email) on every provider, including Microsoft; the converter's pattern matched no stored email, so they arrived as broken links. |
+| 2048 | Tickets           | Fix         | A pasted screenshot in a reply is sent as an inline picture rather than a data: image, which Gmail and Outlook will not display. |
+| 2049 | Tickets           | Improvement | Pictures embedded in an outgoing email are read only from the same ticket, so a hand-typed link cannot mail out another ticket's or company's file. |
 
 
 
