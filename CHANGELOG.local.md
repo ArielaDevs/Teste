@@ -14,6 +14,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
+| 2044 | Self-service      | Fix         | On a multi-company install the portal login hid global SSO providers, so a global IdP could not be reached from the portal at all; they now show as buttons, as on a single-company install and the analyst login (GH #156). |
 
 
 

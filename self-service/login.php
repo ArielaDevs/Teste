@@ -51,9 +51,10 @@ try {
     $ssoOn   = ($cfg['sso_enabled'] ?? '0') === '1';
     $localOn = ($cfg['local_login_enabled'] ?? '1') !== '0';
     if ($ssoOn) {
-        // Only GLOBAL providers are shown up front (single-company installs).
-        // On a multi-tenant install we never list providers up front — the
+        // Only GLOBAL providers are shown up front, on every install. A
+        // company-owned provider is never listed — on a multi-tenant install the
         // email-first router reveals only the requester's own company's IdP(s).
+        // A global one leaks nothing: the analyst login already shows it (GH #156).
         // protocol='oidc' ONLY — an LDAP provider has no button and nothing to
         // redirect to. Directory users type their password into the ordinary
         // form and api/self-service/login.php checks it by bind, so LDAP never
@@ -350,12 +351,15 @@ $localAllowed = $localOn || $forceLocal;
                 <!-- Multi-tenant: provider buttons for the resolved company are injected here. -->
                 <div id="ssoPicker"></div>
 
-                <?php if (!$multiTenant): ?>
-                    <!-- Single-company: providers are global, so show them up front. -->
+                <?php if (!empty($ssoProviders)): ?>
+                    <!-- Global providers serve every company, so show them up front
+                         on any install (GH #156 - multi-tenant used to hide them). -->
                     <div class="sso-divider"><span></span><?php echo htmlspecialchars(t('self-service.login.or')); ?><span></span></div>
                     <?php foreach ($ssoProviders as $p): ?>
                         <a class="sso-provider-btn" href="../api/auth/oidc_login.php?provider=<?php echo (int)$p['id']; ?>&amp;portal=self-service"><?php echo htmlspecialchars($p['display_name']); ?></a>
                     <?php endforeach; ?>
+                <?php endif; ?>
+                <?php if (!$multiTenant): ?>
                     <?php if ($localAllowed): ?>
                         <a href="#" id="showLocalLink" class="ss-text-link"><?php echo htmlspecialchars(t('self-service.login.use_local_account')); ?></a>
                     <?php endif; ?>
