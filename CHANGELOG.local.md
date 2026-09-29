@@ -14,20 +14,6 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
-| 2030 | Domains           | Feature     | New Domains module (GH #154): a company-scoped register of domain names - register page with views/filters/bulk edit, domain page, Table view on the shared data-table engine (saved views), Accounts, Settings (4 capability-gated tabs), Help; schema in freeitsm.sql + db_verify (7 tables, 14 FKs, seeded statuses), module registry, waffle, colours, landing card, theme tokens. |
-| 2031 | Domains           | Feature     | Registry lookups: RDAP via the cached IANA bootstrap, port-43 WHOIS fallback for TLDs without RDAP (.io, .co, .de...), filling registration/expiry dates, registrar, name servers, statuses, transfer/registry lock and DNSSEC under an "registry wins / fill blanks" setting; .uk treated as having no transfer lock unless a transfer status is present (Nominet uses registrar tags). |
-| 2032 | Domains           | Feature     | Daily health and security checks graded A+ to F with plain-English advice per finding: name servers, DNSSEC, CAA, SPF (incl. the 10-lookup limit), DKIM, DMARC, MTA-STS, TLS-RPT, certificates on the domain/www/extra sub-domains, plus lock-down checks for parked/defensive/redirect domains; DNS-over-HTTPS resolver on Windows where PHP's own resolver times out. |
-| 2033 | Domains           | Feature     | Change detection: registrar, live name servers, MX, SPF, DMARC and lock changes are recorded in the domain history and fire domain.changed; serious ones (possible hijack) are emailed at once when change alerts are on. |
-| 2034 | Domains           | Feature     | Alerts: expiry and certificate warnings as one digest per recipient (owner, list or both), fire-once per window with claim-before-send, a 45-day chase after lapsing, a dry-run preview, optional renewal task or ticket at the renewal window; off until switched on. |
-| 2035 | Domains           | Feature     | Optional outside-world watches: Certificate Transparency via crt.sh (new certificates flagged) and a typo-squat / look-alike scanner (omission, transposition, homoglyph, TLD swap...) flagging look-alikes that receive email. |
-| 2036 | Domains           | Feature     | Registrar accounts (login, owner, second-factor holder - never passwords) and encrypted auth codes behind their own capability, with every reveal recorded in the domain history. |
-| 2037 | Domains           | Feature     | Dashboard (12-month renewal forecast with cost, grade spread, email-security posture, spend by registrar/company, attention list); add one, paste a list, or import a CSV with on-screen column mapping, each looked up in batches with a progress bar. |
-| 2038 | Domains           | Feature     | Scheduled work in cron/domains.php (hourly, time-budgeted, GET_LOCK, token seeded by DB Verify and listed in scripts/cron_token.php) with a throttled page-load fallback for installs with no cron. |
-| 2039 | REST API          | Feature     | Domains resource: list/get/create/update/delete, POST lookup and check, findings, history, statuses and registrar accounts - company-scoped, writes through DomainsService, auth codes refused both ways; spec.json section, typed schemas, docs wiki link. |
-| 2040 | Integrations      | Feature     | Domains plugged into Watchtower (new card, company- and module-scoped), the Calendar (domain_expiry source), the notification bell (expiring / certificate / changed to the owner), workflow triggers, global search and the command palette, record previews, attached documents, the recent trail, and a "Domains registered here" card on a registrar's supplier page. |
-| 2041 | Domains           | Feature     | Demo data (8 .example domains graded A-F, 2 registrar accounts, never looked up) and 13 Feature Bingo cards. |
-| 2042 | REST API          | Fix         | GET /assets/{id}/physical-disks had no catalogue entry, so openapi_check.php failed its drift check; documented. |
-| 2043 | Domains           | Improvement | The domain page and Domains -> Accounts use the full screen width, like the register, instead of a centred 1280/1300px column. |
 
 
 
@@ -1181,6 +1167,25 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 317 | Tasks             | Fix         | **Drag-reorder drop indicator invisible in scrolling board columns.** The purple line that shows where a dragged card will land vanished whenever its column had enough cards to scroll. Cause: `.board-cards` is a `flex-direction:column` container and the `.drop-indicator` is an empty `<div>` &mdash; so its min-content height is 0, and when the column overflowed, flexbox's `flex-shrink` compressed the indicator to 0px (the cards resist because their text gives them a min-content height; the empty indicator does not). Fixed by adding `flex-shrink:0` to `.drop-indicator` (and to `.task-card` for good measure, so cards can never be squished either). `tasks.css` bumped to `?v=6`. |
 
 ## Published
+
+### 2.9.0 - 29 September 2026
+
+| ID   | Module            | Type        | Description |
+|------|-------------------|-------------|-------------|
+| 2030 | Domains           | Feature     | New Domains module (GH #154): a company-scoped register of domain names - register page with views/filters/bulk edit, domain page, Table view on the shared data-table engine (saved views), Accounts, Settings (4 capability-gated tabs), Help; schema in freeitsm.sql + db_verify (7 tables, 14 FKs, seeded statuses), module registry, waffle, colours, landing card, theme tokens. |
+| 2031 | Domains           | Feature     | Registry lookups: RDAP via the cached IANA bootstrap, port-43 WHOIS fallback for TLDs without RDAP (.io, .co, .de...), filling registration/expiry dates, registrar, name servers, statuses, transfer/registry lock and DNSSEC under an "registry wins / fill blanks" setting; .uk treated as having no transfer lock unless a transfer status is present (Nominet uses registrar tags). |
+| 2032 | Domains           | Feature     | Daily health and security checks graded A+ to F with plain-English advice per finding: name servers, DNSSEC, CAA, SPF (incl. the 10-lookup limit), DKIM, DMARC, MTA-STS, TLS-RPT, certificates on the domain/www/extra sub-domains, plus lock-down checks for parked/defensive/redirect domains; DNS-over-HTTPS resolver on Windows where PHP's own resolver times out. |
+| 2033 | Domains           | Feature     | Change detection: registrar, live name servers, MX, SPF, DMARC and lock changes are recorded in the domain history and fire domain.changed; serious ones (possible hijack) are emailed at once when change alerts are on. |
+| 2034 | Domains           | Feature     | Alerts: expiry and certificate warnings as one digest per recipient (owner, list or both), fire-once per window with claim-before-send, a 45-day chase after lapsing, a dry-run preview, optional renewal task or ticket at the renewal window; off until switched on. |
+| 2035 | Domains           | Feature     | Optional outside-world watches: Certificate Transparency via crt.sh (new certificates flagged) and a typo-squat / look-alike scanner (omission, transposition, homoglyph, TLD swap...) flagging look-alikes that receive email. |
+| 2036 | Domains           | Feature     | Registrar accounts (login, owner, second-factor holder - never passwords) and encrypted auth codes behind their own capability, with every reveal recorded in the domain history. |
+| 2037 | Domains           | Feature     | Dashboard (12-month renewal forecast with cost, grade spread, email-security posture, spend by registrar/company, attention list); add one, paste a list, or import a CSV with on-screen column mapping, each looked up in batches with a progress bar. |
+| 2038 | Domains           | Feature     | Scheduled work in cron/domains.php (hourly, time-budgeted, GET_LOCK, token seeded by DB Verify and listed in scripts/cron_token.php) with a throttled page-load fallback for installs with no cron. |
+| 2039 | REST API          | Feature     | Domains resource: list/get/create/update/delete, POST lookup and check, findings, history, statuses and registrar accounts - company-scoped, writes through DomainsService, auth codes refused both ways; spec.json section, typed schemas, docs wiki link. |
+| 2040 | Integrations      | Feature     | Domains plugged into Watchtower (new card, company- and module-scoped), the Calendar (domain_expiry source), the notification bell (expiring / certificate / changed to the owner), workflow triggers, global search and the command palette, record previews, attached documents, the recent trail, and a "Domains registered here" card on a registrar's supplier page. |
+| 2041 | Domains           | Feature     | Demo data (8 .example domains graded A-F, 2 registrar accounts, never looked up) and 13 Feature Bingo cards. |
+| 2042 | REST API          | Fix         | GET /assets/{id}/physical-disks had no catalogue entry, so openapi_check.php failed its drift check; documented. |
+| 2043 | Domains           | Improvement | The domain page and Domains -> Accounts use the full screen width, like the register, instead of a centred 1280/1300px column. |
 
 ### 2.8.0 - 27 September 2026
 
