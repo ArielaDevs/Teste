@@ -1265,10 +1265,9 @@ return [
         'add_strong'     => 'Add',
         'enabled'        => 'Enabled',
         'disabled'       => 'Disabled',
-        'jit_both'       => 'All',
-        'jit_analyst'    => 'Only Analyst',
-        'jit_user'       => 'Only User',
-        'jit_none'       => 'None',
+        'jit_both'       => 'Portal + analysts',
+        'jit_analyst'    => 'Analysts',
+        'jit_user'       => 'Portal',
         'jit_off'        => 'Off',
         // Not "Off": off implies a switch somebody could flip, and for a
         // contacts source there is nothing to flip.

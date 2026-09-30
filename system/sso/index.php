@@ -725,7 +725,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                             if (u && a) return '<span class="badge-jit">' + window.t('system.sso.jit_both') + '</span>';
                             if (a)      return '<span class="badge-jit">' + window.t('system.sso.jit_analyst') + '</span>';
                             if (u)      return '<span class="badge-jit">' + window.t('system.sso.jit_user') + '</span>';
-                            return '<span class="jit-off">' + window.t('system.sso.jit_none') + '</span>';
+                            return '<span class="jit-off">' + window.t('system.sso.jit_off') + '</span>';
                         })()}</td>
                 <td style="text-align:right;">
                     ${(isLdap || isCardDav)
