@@ -46,7 +46,7 @@ try {
            application's brand colour, which help.css already reads from
            --accent. So there is nothing for this page to say. */
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=152">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=153">
 </head>
 <body data-mobile-page="tickets-help">
     <?php include 'includes/header.php'; ?>
@@ -517,6 +517,10 @@ try {
 
                     <p style="margin-top: 20px;"><?php echo t('tickets.help.csat.analytics_heading'); ?></p>
                     <p><?php echo t('tickets.help.csat.analytics_body'); ?></p>
+                    <p><?php echo t('tickets.help.csat.analytics_filters'); ?></p>
+                    <?php if ($showTenancyHelp): ?>
+                        <p><?php echo t('tickets.help.csat.analytics_company'); ?></p>
+                    <?php endif; ?>
                     <div class="help-cards cols-3">
                         <div class="help-card">
                             <strong><?php echo t('tickets.help.csat.card_kpi_title'); ?></strong>

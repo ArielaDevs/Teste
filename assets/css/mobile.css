@@ -13500,6 +13500,90 @@
     body[data-mobile-page="tickets-csat"] .analyst-table td { overflow-wrap: anywhere; }
     body[data-mobile-page="tickets-csat"] .panel { min-width: 0; }
 
+    /* ---- 39e. CSAT filters (GH #157): a sticky Filters button + a sheet ---
+       Ed: "on mobile can we have a sticky footer with a filter icon that lets
+       you set them". Five fields in a row under the heading would take half
+       the screen before a single figure, so on a phone the form is hidden and
+       the button at the bottom opens it full-screen (LAYER 7's sheet look,
+       reusing its .ms-close). The badge counts the filters in force, so it is
+       obvious the figures are filtered while the form is out of sight. */
+    body[data-mobile-page="tickets-csat"] .csat-page { padding-bottom: 84px; }
+    body[data-mobile-page="tickets-csat"] .csat-header { flex-wrap: wrap; gap: 10px; }
+    body[data-mobile-page="tickets-csat"] .csat-filters { display: none; }
+    body[data-mobile-page="tickets-csat"].csat-filters-open .csat-filters {
+        display: flex;
+        position: fixed;
+        inset: 0;
+        z-index: 1500;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 14px;
+        margin: 0;
+        padding: 0 16px 24px;
+        border-radius: 0;
+        box-shadow: none;
+        overflow-y: auto;
+    }
+    body[data-mobile-page="tickets-csat"] .csat-filters-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        padding: 14px 0;
+        background: var(--surface, #fff);
+        border-bottom: 1px solid var(--border, #ddd);
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text, #333);
+    }
+    body[data-mobile-page="tickets-csat"] .cf-field { font-size: 13px; }
+    /* 16px text: iOS zooms the page into any smaller input it focuses. */
+    body[data-mobile-page="tickets-csat"] .cf-field input,
+    body[data-mobile-page="tickets-csat"] .cf-field select {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        font-size: 16px;
+        box-sizing: border-box;
+    }
+    body[data-mobile-page="tickets-csat"] .cf-actions { justify-content: space-between; padding-top: 6px; }
+    body[data-mobile-page="tickets-csat"] .cf-apply { flex: 1; min-height: 46px; font-size: 16px; }
+    body[data-mobile-page="tickets-csat"] .cf-clear { font-size: 15px; padding: 10px 6px; }
+    body[data-mobile-page="tickets-csat"] .csat-filter-fab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1400;
+        min-height: 56px;
+        padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+        border: none;
+        border-top: 1px solid var(--border, #ddd);
+        background: var(--surface, #fff);
+        color: var(--text, #333);
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 -2px 8px var(--shadow, rgba(0,0,0,0.08));
+    }
+    body[data-mobile-page="tickets-csat"] .cf-badge {
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        border-radius: 11px;
+        background: var(--accent, #0078d4);
+        color: var(--on-accent, #fff);
+        font-size: 12px;
+        line-height: 22px;
+        text-align: center;
+    }
+
     /* ====================================================================
        LAYER 40 - Checklists & SOPs
        --------------------------------------------------------------------

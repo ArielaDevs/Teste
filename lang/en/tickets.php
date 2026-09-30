@@ -2439,6 +2439,31 @@ return [
         'unassigned'           => 'Unassigned',
         'recent_responses'     => 'Recent responses',
         'no_recent_responses'  => 'No responses yet in this window.',
+        // Filters (GH #157). On a phone they sit behind a "Filters" button.
+        'filters'              => 'Filters',
+        'close'                => 'Close',
+        'filter_from'          => 'From',
+        'filter_to'            => 'To',
+        'filter_rating'        => 'Rating',
+        'rating_all'           => 'All ratings',
+        'rating_positive'      => 'Positive (4-5)',
+        'rating_neutral'       => 'Neutral (3)',
+        'rating_negative'      => 'Negative (1-2)',
+        'filter_analyst'       => 'Analyst',
+        'analyst_all'          => 'All analysts',
+        'filter_customer'      => 'Customer',
+        'customer_all'         => 'All customers',
+        'apply'                => 'Apply',
+        'clear'                => 'Clear',
+        // The KPI caption when a From/To range is chosen instead of 7/30/90/365.
+        'in_period'            => 'in this period',
+        // {rating} is one of the rating_* labels above.
+        'rating_filter_note'   => 'Showing {rating} ratings only. The figures above include every rating.',
+        // Under a response: who left it. {name} is the customer.
+        'from_customer'        => 'from {name}',
+        'showing'              => '{from}-{to} of {total}',
+        'prev'                 => 'Previous',
+        'next'                 => 'Next',
     ],
 
     // tickets/dashboard/index.php + library.php — ticket dashboard + widget library
@@ -2801,6 +2826,9 @@ return [
             'card_leader_body' => 'Average rating + response count per analyst, ordered by avg desc. Use for development conversations',
             'card_recent_title'=> 'Recent responses',
             'card_recent_body' => 'The 25 most-recent ratings with their free-text comments, linked back to the source ticket',
+            // GH #157
+            'analytics_filters' => 'Narrow the page with the filters under the heading: a <strong>From / To</strong> date range (instead of the day buttons), a <strong>Rating</strong> band (Positive 4-5, Neutral 3, Negative 1-2), an <strong>Analyst</strong> and a <strong>Customer</strong>. Analyst and customer narrow every figure on the page; the rating band narrows only the list of responses, so the average still means something. On a phone the filters sit behind the <strong>Filters</strong> button at the bottom of the screen. A filtered page can be bookmarked.',
+            'analytics_company' => 'Every figure follows the <strong>company switcher</strong> in the header: the company you have selected, or every company you can see under <strong>All companies</strong>.',
             'analytics_tip'    => 'Per-analyst attribution survives ticket reassignment because the analyst id is captured onto the survey row at send time, not looked up live. If a ticket gets passed around before being closed, the analyst who actually closed it owns the rating.',
             'one_heading'      => '<strong>One survey per ticket</strong>',
             'one_body'         => 'If <em>One survey per ticket</em> is on (default), a reopened-then-closed ticket only gets another survey when an analyst manually triggers it &mdash; stops survey-spamming a flaky ticket that keeps cycling. Turn it off if you want every close to fire a fresh survey.',

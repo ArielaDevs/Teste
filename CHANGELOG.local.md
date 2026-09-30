@@ -27,6 +27,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2054 | Authentication    | Improvement | Review follow-ups on the #155 merge: userinfo fetched only when sync is on and discarded unless its sub matches; every reader of the new columns works before DB Verify; parked portal sign-in expires after 10 minutes; help, D010 diagnostics and 3 new Feature Bingo cards. |
 | 2055 | Tickets           | Improvement | Email sent through an SMTP (basic IMAP) mailbox now carries Date and Message-ID headers, which RFC 5322 requires and spam filters score; the Gmail API already stamped its own (GH #158 follow-up). |
 | 2056 | Tickets           | Fix         | The CSAT page follows the company switcher: KPIs, distribution, per-analyst table and recent responses show the selected company, or every company the analyst may see under All companies - they read every company's responses before, whatever the analyst's access (GH #157). |
+| 2057 | Tickets           | Feature     | CSAT page filters: a custom From/To range, a rating band (list only), analyst and customer (whole page), 25-a-page paging with the customer on each response, and on a phone a sticky Filters button that opens them full-screen; score percentages now add up to 100 (GH #157). |
 
 
 

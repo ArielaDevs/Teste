@@ -37,7 +37,7 @@ $translationNamespaces = ['common', 'domains'];
     <link rel="stylesheet" href="../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=74">
     <link rel="stylesheet" href="../assets/css/domains.css?v=1">
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=152">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=153">
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-register">
     <?php include 'includes/header.php'; ?>
