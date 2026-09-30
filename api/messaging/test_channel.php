@@ -116,6 +116,14 @@ function testReachability(PDO $conn, int $channelId): array
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 12);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    // A free ngrok tunnel serves its own "you're about to visit" HTML
+    // interstitial on a visitor's first hit, instead of proxying the request
+    // through — which would otherwise make THIS self-test fail with "HTTP 200
+    // but unexpected response" even though the tunnel is working fine. This is
+    // ngrok's own documented, always-safe way to say "this is an automated
+    // request, skip the interstitial" (ngrok-skip-browser-warning); a non-ngrok
+    // host simply ignores an extra header it doesn't recognise.
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['ngrok-skip-browser-warning: true']);
     sslApplyCurl($ch);
     $body = curl_exec($ch);
     if ($body === false) {
@@ -130,15 +138,25 @@ function testReachability(PDO $conn, int $channelId): array
     if ($code === 200 && is_array($json) && ($json['pong'] ?? '') === $nonce) {
         return ['ok' => true, 'detail' => "Reachable — the public webhook URL responded correctly ($host)."];
     }
+    if (strpos($host, 'ngrok') !== false && stripos((string) $body, 'ngrok') !== false) {
+        return ['ok' => false, 'detail' => "Reached $host, but ngrok's own interstitial page answered instead of FreeITSM. A free ngrok tunnel shows this once per visitor/browser — it normally does NOT affect real webhook calls from Telegram/Meta/Twilio (they aren't browsers), only manual clicks and some automated health checks. If it keeps happening, open the URL once in a browser and click through, or use a paid ngrok plan / your own domain instead."];
+    }
     return ['ok' => false, 'detail' => "Reached $host but got HTTP $code with an unexpected response — a proxy, firewall or login page may be intercepting the URL before it reaches FreeITSM."];
 }
 
 /** Run a synthetic inbound message through ingest, then clean up everything it created. */
 function testSimulation(PDO $conn, array $channel): array
 {
-    // A clearly-fake, unique sender so it always opens a fresh ticket we can delete.
-    $sender = '+99999' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT);
     $channelType = $channel['channel_type'] ?? 'whatsapp';
+    // A clearly-fake, unique sender so it always opens a fresh ticket we can
+    // delete. Must be shaped like a REAL sender for this channel type —
+    // normaliseChannelIdentifier() rejects anything else (e.g. a phone-shaped
+    // string is not a valid Telegram chat id, and vice versa), which is
+    // exactly the "no usable sender identifier" error this used to throw for
+    // every non-phone channel.
+    $sender = ($channelType === 'telegram')
+        ? (string) random_int(900000000, 999999999) // looks like a real (positive) chat id
+        : ('+99999' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT));
     $prevStamp = null;
 
     try {
@@ -155,6 +173,11 @@ function testSimulation(PDO $conn, array $channel): array
             'provider_msg_id' => 'SELFTEST-' . bin2hex(random_bytes(6)),
             'media'           => [],
             'timestamp'       => null,
+            // Telegram's identity gate (ingest.php) otherwise calls the REAL
+            // Telegram API to message this (fake, nonexistent) chat id, which
+            // breaks this file's own promise that a simulation never sends a
+            // real message. This flag tells it to skip those calls.
+            'is_test'         => true,
         ];
 
         $r = ingestInboundMessage($conn, $channel, $msg);

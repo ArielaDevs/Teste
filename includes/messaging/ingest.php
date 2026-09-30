@@ -376,17 +376,22 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
         } catch (Exception $e) {
             error_log('Telegram identity: could not save link for ' . $chatId . ': ' . $e->getMessage());
         }
-        // Ask, once, best-effort — never lets a failed send break ingest.
-        try {
-            $provider = messagingProvider($channel);
-            if ($provider instanceof TelegramProvider) {
-                $provider->requestContact(
-                    $chatId,
-                    'Hi! While we look into this, could you share your phone number using the button below? It helps us recognise you if you\'ve contacted us before.'
-                );
+        // Ask, once, best-effort — never lets a failed send break ingest. Skipped
+        // for the channel-settings self-test (testSimulation() in test_channel.php),
+        // which uses a fake chat id that Telegram would reject anyway, and which
+        // must never make a real outbound call (see its own file header comment).
+        if (empty($msg['is_test'])) {
+            try {
+                $provider = messagingProvider($channel);
+                if ($provider instanceof TelegramProvider) {
+                    $provider->requestContact(
+                        $chatId,
+                        'Hi! While we look into this, could you share your phone number using the button below? It helps us recognise you if you\'ve contacted us before.'
+                    );
+                }
+            } catch (Exception $e) {
+                error_log('Telegram contact request failed for chat ' . $chatId . ': ' . $e->getMessage());
             }
-        } catch (Exception $e) {
-            error_log('Telegram contact request failed for chat ' . $chatId . ': ' . $e->getMessage());
         }
     }
     $userId = (int) $userId;
