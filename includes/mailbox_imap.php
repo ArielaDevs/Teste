@@ -497,6 +497,7 @@ function imapSmtpSend(array $mailbox, string $to, string $cc, string $subject, s
             'subject'  => $subject,
             'html'     => $htmlBody,
             'parts'    => $parts,
+            'envelope' => true,   // nothing downstream adds Date / Message-ID for us
         ]);
         // Dot-stuff and terminate.
         $message = preg_replace('/^\./m', '..', $message);

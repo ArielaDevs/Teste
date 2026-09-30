@@ -139,6 +139,15 @@ check(strpos($l[4][0]['content-disposition'], "filename*=UTF-8''R%C3%A9sum%C3%A9
 check(($l[3][0]['content-id'] ?? '') === '<pic1>' && $l[3][1] === $png, 'the inline image carries its Content-ID and bytes');
 check(strpos($msg, "\r\nCc: c@example.test") !== false, 'the Cc header is written');
 check(strpos($msg, 'Subject: =?UTF-8?B?') !== false, 'a non-ASCII subject is encoded');
+check(!preg_match('/^(Date|Message-ID):/mi', $msg), 'without envelope: no Date / Message-ID (the Gmail API adds its own)');
+$env = mimeBuildMessage(['from' => 'desk@example.test', 'to' => ['b@example.test'], 'subject' => 'Hi', 'html' => '<p>x</p>', 'envelope' => true]);
+check(preg_match('/^Date: [A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} \+0000\r$/m', $env)
+      && strtotime(preg_replace('/^.*^Date: ([^\r]+).*$/ms', '$1', $env)) >= time() - 5,
+    'with envelope: an RFC 5322 Date for now');
+check(preg_match('/^Message-ID: <[0-9a-f]{24}\.\d+@example\.test>\r$/m', $env)
+      && mimeMessageId('x@example.test') !== mimeMessageId('x@example.test'),
+    'with envelope: a unique Message-ID on the sender\'s domain');
+check(preg_match('/@freeitsm\.local>$/', mimeMessageId('not-an-address')) === 1, 'no usable domain: Message-ID falls back to freeitsm.local');
 
 // ---------------------------------------------------------------------------
 echo "2. Pictures in a real quoted thread\n";
@@ -218,6 +227,8 @@ if (!$row) {
         $l = mimeLeaves($cap['data']);
         $top = $l[0][0]['__multipart'] ?? '';
         check($top === 'multipart/mixed', 'the message is multipart/mixed (was text/html in the bug report)');
+        check(preg_match('/^Date: .+\r$/m', $cap['data']) && preg_match('/^Message-ID: <[^>]+@example\.test>\r$/m', $cap['data']),
+            'the SMTP path sends a Date and a Message-ID');
         $file = array_values(array_filter($l, function ($x) { return stripos($x[0]['content-disposition'] ?? '', 'attachment') === 0; }));
         check(count($file) === 1 && $file[0][1] === $pdf, 'the attached PDF arrives, bytes identical');
         $html = array_values(array_filter($l, function ($x) { return stripos($x[0]['content-type'] ?? '', 'text/html') === 0; }));

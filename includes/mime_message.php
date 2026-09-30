@@ -31,7 +31,21 @@ function mimeEncodeHeader(string $value): string {
 }
 
 /**
- * @param array $m from, fromName, to (list), cc (list), subject, html, parts (list)
+ * A globally unique Message-ID on the sender's own domain, e.g.
+ * <3f9c...e1.1790805999@example.com>. Falls back to a fixed domain if the
+ * From address has none we can use.
+ */
+function mimeMessageId(string $from): string {
+    $domain = strtolower((string)substr(strrchr($from, '@') ?: '', 1));
+    if (!preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $domain)) {
+        $domain = 'freeitsm.local';
+    }
+    return '<' . bin2hex(random_bytes(12)) . '.' . time() . '@' . $domain . '>';
+}
+
+/**
+ * @param array $m from, fromName, to (list), cc (list), subject, html, parts (list),
+ *                 envelope (bool: add Date + Message-ID - SMTP only, see below)
  */
 function mimeBuildMessage(array $m): string {
     $from     = (string)($m['from'] ?? '');
@@ -48,6 +62,13 @@ function mimeBuildMessage(array $m): string {
         $headers[] = 'Cc: ' . implode(', ', $cc);
     }
     $headers[] = 'Subject: ' . mimeEncodeHeader((string)($m['subject'] ?? ''));
+    // Date and Message-ID are required by RFC 5322, and spam filters score a
+    // message without them. Only when asked: the Gmail API stamps both itself
+    // (seen on real sent copies), so only SMTP passes 'envelope'.
+    if (!empty($m['envelope'])) {
+        $headers[] = 'Date: ' . gmdate('D, d M Y H:i:s') . ' +0000';
+        $headers[] = 'Message-ID: ' . mimeMessageId($from);
+    }
     $headers[] = 'MIME-Version: 1.0';
 
     $inline = [];

@@ -25,6 +25,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2052 | Authentication    | Feature     | OIDC profile sync (never / on account creation / always) of name, job title, department, office, phone and mobile from ID-token and userinfo claims, written only after every access check; 'always' locks those fields on My Account and My details (#155, Santhosh Srinivasan). |
 | 2053 | Self-service      | Feature     | The portal's account menu shows an Analyst console link to anyone who also has an active analyst account (#155, Santhosh Srinivasan). |
 | 2054 | Authentication    | Improvement | Review follow-ups on the #155 merge: userinfo fetched only when sync is on and discarded unless its sub matches; every reader of the new columns works before DB Verify; parked portal sign-in expires after 10 minutes; help, D010 diagnostics and 3 new Feature Bingo cards. |
+| 2055 | Tickets           | Improvement | Email sent through an SMTP (basic IMAP) mailbox now carries Date and Message-ID headers, which RFC 5322 requires and spam filters score; the Gmail API already stamped its own (GH #158 follow-up). |
 
 
 
