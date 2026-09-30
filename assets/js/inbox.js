@@ -4256,6 +4256,21 @@ function stopChannelAutoRefresh() {
     }
 }
 
+// Shared translation helper for every channel-composer string (WhatsApp/
+// Telegram/Slack reply box, its templates, and its AI actions), falling back
+// to the key itself — same convention as the other per-module t() wrappers in
+// this file (e.g. the search modal's T() above) — so a missing key is visible
+// rather than silently blank.
+function Tc(key, params) {
+    return window.t ? window.t('tickets.channel_composer.' + key, params) : key;
+}
+
+// A human label for a channel, used in the composer header and toasts.
+function channelDisplayLabel(channelType) {
+    const labels = { whatsapp: 'WhatsApp', telegram: 'Telegram', slack: 'Slack', webchat: Tc('label_webchat') };
+    return labels[channelType] || channelType;
+}
+
 // Render (or remove) the inline channel reply composer for WhatsApp-style tickets.
 // Email tickets use the existing email modal and get no composer here.
 function renderChannelComposer(ticketId) {
@@ -4265,39 +4280,42 @@ function renderChannelComposer(ticketId) {
         return;
     }
 
-    const label = currentTicketChannel === 'whatsapp' ? 'WhatsApp' : currentTicketChannel;
+    const label = channelDisplayLabel(currentTicketChannel);
 
     let inner;
     if (currentChannelWindowOpen) {
-        // Inside the 24h window: free-text composer.
+        // Inside the 24h window (or always, for a channel with no such window).
         inner = `
-            <textarea id="channelComposerText" class="channel-composer-text" rows="3" placeholder="Type your reply…"></textarea>
+            <textarea id="channelComposerText" class="channel-composer-text" rows="3" placeholder="${escapeHtml(Tc('placeholder'))}"></textarea>
             <div class="channel-composer-actions">
-                <button class="action-btn" onclick="aiSuggestChannelReply(${ticketId})" title="Draft a reply with AI">
-                    <span class="action-btn-icon">🤖</span><span>Suggest</span>
+                <button class="action-btn" onclick="aiSuggestChannelReply(${ticketId})" title="${escapeHtml(Tc('suggest_title'))}">
+                    <span class="action-btn-icon">🤖</span><span>${escapeHtml(Tc('suggest'))}</span>
                 </button>
-                <button class="action-btn" onclick="aiSummariseChannel(${ticketId})" title="Summarise this conversation into the ticket">
-                    <span class="action-btn-icon">📝</span><span>Summarise</span>
+                <button class="action-btn" onclick="aiSummariseChannel(${ticketId})" title="${escapeHtml(Tc('summarise_title'))}">
+                    <span class="action-btn-icon">📝</span><span>${escapeHtml(Tc('summarise'))}</span>
                 </button>
                 <button class="action-btn action-btn-primary" id="channelSendBtn" onclick="sendChannelMessage(${ticketId})">
-                    <span class="action-btn-icon">📤</span><span>Send</span>
+                    <span class="action-btn-icon">📤</span><span>${escapeHtml(Tc('send'))}</span>
                 </button>
             </div>`;
     } else {
         // Window closed: only a pre-approved template can re-open the conversation.
+        // Only WhatsApp providers (Twilio/Meta) have this rule — this branch is
+        // unreachable for every other channel (see get_ticket_thread.php), so the
+        // wording can safely name WhatsApp specifically rather than say "the provider".
         inner = `
-            <div class="channel-window-closed">⏳ The 24-hour reply window has closed. Free-text replies are blocked by WhatsApp — send a pre-approved template to re-open the conversation.</div>
-            <label class="channel-tpl-label">Template</label>
+            <div class="channel-window-closed">${escapeHtml(Tc('window_closed'))}</div>
+            <label class="channel-tpl-label">${escapeHtml(Tc('template_label'))}</label>
             <select id="channelTemplateSelect" class="channel-composer-text" onchange="onChannelTemplatePick(${ticketId})">
-                <option value="">Loading templates…</option>
+                <option value="">${escapeHtml(Tc('loading_templates'))}</option>
             </select>
             <div id="channelTemplateVars"></div>
             <div class="channel-composer-actions">
-                <button class="action-btn" onclick="aiSummariseChannel(${ticketId})" title="Summarise this conversation into the ticket">
-                    <span class="action-btn-icon">📝</span><span>Summarise</span>
+                <button class="action-btn" onclick="aiSummariseChannel(${ticketId})" title="${escapeHtml(Tc('summarise_title'))}">
+                    <span class="action-btn-icon">📝</span><span>${escapeHtml(Tc('summarise'))}</span>
                 </button>
                 <button class="action-btn action-btn-primary" id="channelSendTplBtn" onclick="sendChannelTemplate(${ticketId})" disabled>
-                    <span class="action-btn-icon">📤</span><span>Send template</span>
+                    <span class="action-btn-icon">📤</span><span>${escapeHtml(Tc('send_template'))}</span>
                 </button>
             </div>`;
     }
@@ -4306,7 +4324,7 @@ function renderChannelComposer(ticketId) {
         <div id="channelComposer" class="channel-composer">
             <div class="channel-composer-head">
                 <span class="thread-direction-badge outbound">${escapeHtml(label)}</span>
-                <span class="channel-composer-title">Reply to the customer over ${escapeHtml(label)}</span>
+                <span class="channel-composer-title">${escapeHtml(Tc('reply_title', { channel: label }))}</span>
             </div>
             ${inner}
         </div>`;
@@ -4334,13 +4352,13 @@ async function loadChannelTemplates() {
         const data = await res.json();
         channelTemplates = (data.success && data.templates) ? data.templates : [];
         if (!channelTemplates.length) {
-            sel.innerHTML = '<option value="">No templates set up — add them in Settings → Messaging</option>';
+            sel.innerHTML = `<option value="">${escapeHtml(Tc('no_templates'))}</option>`;
             return;
         }
-        sel.innerHTML = '<option value="">— choose a template —</option>' +
+        sel.innerHTML = `<option value="">${escapeHtml(Tc('choose_template'))}</option>` +
             channelTemplates.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
     } catch (e) {
-        sel.innerHTML = '<option value="">Failed to load templates</option>';
+        sel.innerHTML = `<option value="">${escapeHtml(Tc('templates_load_failed'))}</option>`;
     }
 }
 
@@ -4354,7 +4372,7 @@ function onChannelTemplatePick(ticketId) {
 
     let fields = '';
     for (let i = 1; i <= (tpl.var_count || 0); i++) {
-        fields += `<input type="text" class="channel-composer-text channel-tpl-var" data-idx="${i}" placeholder="Value for {{${i}}}" oninput="updateChannelTemplatePreview()" style="margin-top:6px;">`;
+        fields += `<input type="text" class="channel-composer-text channel-tpl-var" data-idx="${i}" placeholder="${escapeHtml(Tc('template_var_placeholder', { n: i }))}" oninput="updateChannelTemplatePreview()" style="margin-top:6px;">`;
     }
     varsEl.innerHTML = `
         ${fields}
@@ -4378,12 +4396,12 @@ function updateChannelTemplatePreview() {
 async function sendChannelTemplate(ticketId) {
     const sel = document.getElementById('channelTemplateSelect');
     const btn = document.getElementById('channelSendTplBtn');
-    if (!sel || !sel.value) { showToast('Choose a template first', 'error'); return; }
+    if (!sel || !sel.value) { showToast(Tc('choose_template_first'), 'error'); return; }
     const vars = Array.from(document.querySelectorAll('.channel-tpl-var')).map(i => i.value.trim());
-    if (vars.some(v => v === '')) { showToast('Fill in all template values', 'error'); return; }
+    if (vars.some(v => v === '')) { showToast(Tc('fill_all_template_values'), 'error'); return; }
 
     const original = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span>Sending…</span>'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = `<span>${escapeHtml(Tc('sending'))}</span>`; }
     try {
         const res = await fetch(API_BASE.replace('tickets/', 'messaging/') + 'send_template.php', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
@@ -4391,13 +4409,13 @@ async function sendChannelTemplate(ticketId) {
         });
         const data = await res.json();
         if (data.success) {
-            showToast('Template sent', 'success');
+            showToast(Tc('template_sent'), 'success');
             loadCorrespondenceThread(ticketId);
         } else {
-            showToast('Could not send: ' + (data.error || 'unknown error'), 'error');
+            showToast(Tc('could_not_send', { error: data.error || Tc('unknown_error') }), 'error');
         }
     } catch (e) {
-        showToast('Failed to send template', 'error');
+        showToast(Tc('template_send_failed'), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = original; }
     }
@@ -4409,10 +4427,10 @@ async function sendChannelMessage(ticketId) {
     const btn = document.getElementById('channelSendBtn');
     if (!ta) return;
     const body = ta.value.trim();
-    if (!body) { showToast('Type a message first', 'error'); return; }
+    if (!body) { showToast(Tc('type_message_first'), 'error'); return; }
 
     const original = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span>Sending…</span>'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = `<span>${escapeHtml(Tc('sending'))}</span>`; }
     try {
         const res = await fetch(API_BASE.replace('tickets/', 'messaging/') + 'send_message.php', {
             method: 'POST',
@@ -4423,13 +4441,13 @@ async function sendChannelMessage(ticketId) {
         const data = await res.json();
         if (data.success) {
             ta.value = '';
-            showToast('Message sent', 'success');
+            showToast(Tc('message_sent'), 'success');
             loadCorrespondenceThread(ticketId);
         } else {
-            showToast('Could not send: ' + (data.error || 'unknown error'), 'error');
+            showToast(Tc('could_not_send', { error: data.error || Tc('unknown_error') }), 'error');
         }
     } catch (e) {
-        showToast('Failed to send message', 'error');
+        showToast(Tc('message_send_failed'), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = original; }
     }
@@ -4439,7 +4457,7 @@ async function sendChannelMessage(ticketId) {
 async function aiSuggestChannelReply(ticketId) {
     const ta = document.getElementById('channelComposerText');
     if (!ta || ta.disabled) return;
-    showToast('Drafting a reply…', 'info');
+    showToast(Tc('drafting_reply'), 'info');
     try {
         const res = await fetch(API_BASE.replace('tickets/', 'messaging/') + 'ai_suggest_reply.php', {
             method: 'POST',
@@ -4452,16 +4470,16 @@ async function aiSuggestChannelReply(ticketId) {
             ta.value = data.reply;
             ta.focus();
         } else {
-            showToast(data.error || 'Could not draft a reply', 'error');
+            showToast(data.error || Tc('draft_failed'), 'error');
         }
     } catch (e) {
-        showToast('Failed to draft a reply', 'error');
+        showToast(Tc('draft_failed'), 'error');
     }
 }
 
 // AI: summarise the conversation and save it as an internal note on the ticket.
 async function aiSummariseChannel(ticketId) {
-    showToast('Summarising…', 'info');
+    showToast(Tc('summarising'), 'info');
     try {
         const res = await fetch(API_BASE.replace('tickets/', 'messaging/') + 'ai_summary.php', {
             method: 'POST',
@@ -4471,13 +4489,13 @@ async function aiSummariseChannel(ticketId) {
         });
         const data = await res.json();
         if (data.success) {
-            showToast('Summary added to ticket notes', 'success');
+            showToast(Tc('summary_added'), 'success');
             if (typeof loadNotes === 'function') loadNotes(ticketId);
         } else {
-            showToast(data.error || 'Could not summarise', 'error');
+            showToast(data.error || Tc('summarise_failed'), 'error');
         }
     } catch (e) {
-        showToast('Failed to summarise', 'error');
+        showToast(Tc('summarise_failed'), 'error');
     }
 }
 
