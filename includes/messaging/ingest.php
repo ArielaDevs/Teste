@@ -30,6 +30,19 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     if ($from === '') {
         throw new Exception('Inbound message has no usable sender identifier');
     }
+
+    // Telegram identifies a chat by an opaque chat id, not a phone number, so
+    // — unlike WhatsApp, where the phone IS the identifier — there is nothing
+    // here to match against an existing `users` row. Gate on it: no ticket is
+    // created for a chat until it has shared its phone number and that phone
+    // has been linked (matched to an existing user, or turned into a new one).
+    // See messagingTelegramIdentityGate()'s own comment for the full flow.
+    if ($channelType === 'telegram') {
+        $gate = messagingTelegramIdentityGate($conn, $channel, $from, $msg);
+        if ($gate !== null) {
+            return $gate; // 'awaiting_phone' or 'awaiting_message' — no ticket yet
+        }
+    }
     $profileName   = trim((string) ($msg['profile_name'] ?? ''));
     $providerMsgId = trim((string) ($msg['provider_msg_id'] ?? ''));
 
@@ -69,6 +82,26 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         // Ask Slack who this is. Never fatal: a ticket must still be raised if
         // the lookup fails, just with a less useful name on it.
         [$userId, $displayName] = resolveSlackRequester($conn, $channel, $from);
+    } elseif ($channelType === 'telegram') {
+        // The gate above guarantees a link row exists by this point — reuse
+        // its resolved user (a real matched user, or the placeholder created
+        // for this phone) rather than a second chat-id-keyed pseudo-user.
+        $link = $conn->prepare("SELECT user_id FROM messaging_identity_links WHERE channel_type = 'telegram' AND external_id = ?");
+        $link->execute([$from]);
+        $userId = (int) $link->fetchColumn();
+        if ($userId) {
+            $nameStmt = $conn->prepare("SELECT display_name FROM users WHERE id = ?");
+            $nameStmt->execute([$userId]);
+            $known = trim((string) ($nameStmt->fetchColumn() ?: ''));
+            if ($known !== '') {
+                $displayName = $known;
+            }
+        } else {
+            // Should not happen (the gate links before returning null), but a
+            // ticket must still be raised rather than silently dropping the
+            // message if it somehow does.
+            $userId = getOrCreateChannelUser($conn, $from, $displayName, $channelType);
+        }
     } else {
         $userId = getOrCreateChannelUser($conn, $from, $displayName, $channelType);
     }
@@ -304,6 +337,137 @@ function resolveSlackRequester(PDO $conn, array $channel, string $slackUserId): 
     }
 
     return [$userId, $displayName];
+}
+
+/**
+ * The Telegram identity gate. Telegram identifies a chat by an opaque chat id
+ * that says nothing about who the person actually is, so — unlike WhatsApp,
+ * where the sender's phone number both identifies the chat AND is the thing
+ * an analyst recognises — a brand-new Telegram chat cannot be matched to an
+ * existing `users` row at all until the person shares their phone number.
+ *
+ * Returns:
+ *   null                                    — already linked; caller continues
+ *                                              normally (creates/updates the ticket).
+ *   ['status'=>'awaiting_phone', ...]       — not linked yet, and this message
+ *                                              wasn't a shared contact either.
+ *                                              A prompt was just sent; no ticket
+ *                                              is created, so the person's first
+ *                                              message text is NOT silently lost
+ *                                              into a ticket without their name.
+ *   ['status'=>'awaiting_message', ...]     — the phone just arrived and was
+ *                                              linked this call; a confirmation
+ *                                              was sent, asking them to describe
+ *                                              their issue. Still no ticket —
+ *                                              sharing a contact card carries no
+ *                                              question to raise one about.
+ *
+ * Either gated result leaves 'ticket_id' => null, matching ingestInboundMessage()'s
+ * documented return shape.
+ */
+function messagingTelegramIdentityGate(PDO $conn, array $channel, string $chatId, array $msg): ?array
+{
+    // Already linked from a previous message — nothing to gate.
+    $existing = $conn->prepare("SELECT id FROM messaging_identity_links WHERE channel_type = 'telegram' AND external_id = ?");
+    $existing->execute([$chatId]);
+    if ($existing->fetchColumn()) {
+        return null;
+    }
+
+    $contact = is_array($msg['contact'] ?? null) ? $msg['contact'] : null;
+    $phone = trim((string) ($contact['phone'] ?? ''));
+
+    if ($phone === '') {
+        // First contact from this chat, or they typed instead of tapping the
+        // button — ask again. Best-effort: a failed send must not 500 the
+        // webhook (the provider would just retry the whole batch).
+        try {
+            $provider = messagingProvider($channel);
+            if ($provider instanceof TelegramProvider) {
+                $provider->requestContact(
+                    $chatId,
+                    "Hi! To connect you with support, please share your phone number using the button below — then send your message again."
+                );
+            }
+        } catch (Exception $e) {
+            error_log('Telegram contact request failed for chat ' . $chatId . ': ' . $e->getMessage());
+        }
+        return ['status' => 'awaiting_phone', 'ticket_id' => null];
+    }
+
+    // Match against an existing user first — same phone, same person, same
+    // ticket history. Only when nothing matches does this create a new one.
+    $userId = messagingFindUserByPhone($conn, $phone);
+    $matched = $userId !== null;
+    if ($userId === null) {
+        $displayName = trim((string) ($msg['profile_name'] ?? '')) ?: $phone;
+        $pseudoEmail = ltrim($phone, '+') . '@telegram.local';
+        try {
+            $find = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+            $find->execute([$pseudoEmail]);
+            $userId = $find->fetchColumn() ?: null;
+            if (!$userId) {
+                $ins = $conn->prepare("INSERT INTO users (email, display_name, phone, created_at) VALUES (?, ?, ?, UTC_TIMESTAMP())");
+                $ins->execute([$pseudoEmail, $displayName, $phone]);
+                $userId = (int) $conn->lastInsertId();
+            }
+        } catch (Exception $e) {
+            error_log('Telegram identity: could not create placeholder user for ' . $chatId . ': ' . $e->getMessage());
+            return ['status' => 'awaiting_phone', 'ticket_id' => null]; // try again next message
+        }
+    }
+    $userId = (int) $userId;
+
+    try {
+        $link = $conn->prepare(
+            "INSERT INTO messaging_identity_links (channel_type, external_id, user_id, phone) VALUES ('telegram', ?, ?, ?)"
+        );
+        $link->execute([$chatId, $userId, $phone]);
+    } catch (Exception $e) {
+        error_log('Telegram identity: could not save link for ' . $chatId . ': ' . $e->getMessage());
+        return ['status' => 'awaiting_phone', 'ticket_id' => null]; // try again next message
+    }
+
+    try {
+        $provider = messagingProvider($channel);
+        if ($provider instanceof TelegramProvider) {
+            $ack = $matched
+                ? 'Thanks — found your account. Please describe your issue and we\'ll take it from here.'
+                : 'Thanks! Please describe your issue and we\'ll take it from here.';
+            $provider->sendMessage($chatId, $ack);
+        }
+    } catch (Exception $e) {
+        error_log('Telegram identity: confirmation send failed for chat ' . $chatId . ': ' . $e->getMessage());
+    }
+
+    return ['status' => 'awaiting_message', 'ticket_id' => null];
+}
+
+/**
+ * Find an existing user by phone number, comparing digits only so formatting
+ * differences ("+1 415 555 0100" vs "14155550100") still match. Checks both
+ * `phone` and `mobile`. Small, deliberate scan (not an indexed lookup) — phone
+ * numbers are free-text and rarely normalised at entry, so a SQL equality or
+ * prefix match would miss real matches; the users table is small enough on
+ * every install this code runs on for a full scan to be the correct trade-off.
+ */
+function messagingFindUserByPhone(PDO $conn, string $phone): ?int
+{
+    $needle = preg_replace('/\D+/', '', $phone);
+    if ($needle === '' || strlen($needle) < 7) {
+        return null; // too short to be a real match, phone-vs-mobile column noise
+    }
+    $rows = $conn->query("SELECT id, phone, mobile FROM users WHERE (phone IS NOT NULL AND phone <> '') OR (mobile IS NOT NULL AND mobile <> '')")
+                 ->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        foreach (['phone', 'mobile'] as $col) {
+            $digits = preg_replace('/\D+/', '', (string) ($row[$col] ?? ''));
+            if ($digits !== '' && $digits === $needle) {
+                return (int) $row['id'];
+            }
+        }
+    }
+    return null;
 }
 
 /**

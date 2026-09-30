@@ -85,6 +85,21 @@ class TelegramProvider extends MessagingProvider
             'timestamp'       => isset($message['date']) ? (int) $message['date'] : null,
         ];
 
+        // A tap on the "Share phone number" button (see requestContact() below)
+        // arrives as its own message shape — a `contact` object, normally with
+        // no text at all. Surface it so ingest.php's identity gate can act on
+        // it; only trust a contact that is the SENDER's own (Telegram lets a
+        // user forward someone else's saved contact card too, which must not
+        // be treated as proof of the sender's own number).
+        $contact = $message['contact'] ?? null;
+        if (is_array($contact) && !empty($contact['phone_number'])
+            && isset($contact['user_id'], $from['id'])
+            && (int) $contact['user_id'] === (int) $from['id']) {
+            $entry['contact'] = [
+                'phone' => '+' . ltrim((string) $contact['phone_number'], '+'),
+            ];
+        }
+
         return [$entry];
     }
 
@@ -140,6 +155,47 @@ class TelegramProvider extends MessagingProvider
         if ($code < 200 || $code >= 300 || empty($json['ok'])) {
             $msg = $json['description'] ?? ('HTTP ' . $code);
             throw new Exception('Telegram rejected the message: ' . $msg);
+        }
+        return (string) ($json['result']['message_id'] ?? '');
+    }
+
+    /**
+     * Ask the chat to share their phone number, via Telegram's native
+     * "Share phone number" button (a reply keyboard with request_contact,
+     * not an inline button — that's what makes Telegram hand back a verified
+     * contact object rather than free-typed, unverifiable text).
+     *
+     * One-time keyboard: it disappears from their client after one tap, so it
+     * doesn't linger once the identity gate (ingest.php) has what it needs.
+     */
+    public function requestContact(string $chatId, string $promptText): string
+    {
+        $token = $this->channel['credentials']['bot_token'] ?? '';
+        if ($token === '') {
+            throw new Exception('Telegram channel is missing its bot token.');
+        }
+
+        $payload = json_encode([
+            'chat_id'      => $chatId,
+            'text'         => $promptText,
+            'reply_markup' => [
+                'keyboard'          => [[
+                    ['text' => 'Share phone number', 'request_contact' => true],
+                ]],
+                'resize_keyboard'   => true,
+                'one_time_keyboard' => true,
+            ],
+        ]);
+
+        [$code, $resp] = $this->httpRequest(self::API_BASE . $token . '/sendMessage', [
+            'method'  => 'POST',
+            'headers' => ['Content-Type: application/json'],
+            'body'    => $payload,
+        ]);
+
+        $json = json_decode($resp, true);
+        if ($code < 200 || $code >= 300 || empty($json['ok'])) {
+            throw new Exception('Telegram rejected the contact request: ' . ($json['description'] ?? ('HTTP ' . $code)));
         }
         return (string) ($json['result']['message_id'] ?? '');
     }
