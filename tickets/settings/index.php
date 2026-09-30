@@ -2698,10 +2698,10 @@ $translationNamespaces = ['common', 'tickets'];
                         <label for="channelAppSecret"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.app_secret')); ?> *</label>
                         <input type="password" id="channelAppSecret" placeholder="••••••••">
                     </div>
-                    <div class="form-group provider-meta provider-telegram" id="channelVerifyTokenGroup">
+                    <div class="form-group provider-meta" id="channelVerifyTokenGroup">
                         <label for="channelVerifyToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token')); ?></label>
                         <input type="text" id="channelVerifyToken" placeholder="<?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_placeholder')); ?>">
-                        <small style="color:var(--text-muted, #666);" id="channelVerifyTokenHelp"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_help')); ?></small>
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_help')); ?></small>
                     </div>
                     <div class="form-group provider-meta">
                         <label for="channelGraphVersion"><?php echo t('tickets.settings.modals.channel.graph_version'); ?></label>
@@ -2712,8 +2712,33 @@ $translationNamespaces = ['common', 'tickets'];
                     <!-- Telegram credentials -->
                     <div class="form-group provider-telegram" style="grid-column: span 2;">
                         <label for="channelBotToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.bot_token')); ?> *</label>
-                        <input type="password" id="channelBotToken" placeholder="123456789:AA••••••••••••••••••••••••••••••••">
+                        <input type="password" id="channelBotToken" placeholder="123456789:AA••••••••••••••••••••••••••••••••" oninput="updateTelegramSetupCommand()">
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.bot_token_help')); ?></small>
+                    </div>
+                    <div class="form-group provider-telegram" style="grid-column: span 2;">
+                        <label for="channelTelegramSecret"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret')); ?></label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="channelTelegramSecret" style="flex:1;" placeholder="<?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_placeholder')); ?>" oninput="updateTelegramSetupCommand()">
+                            <button type="button" class="btn btn-secondary" onclick="generateTelegramSecret()" style="white-space:nowrap; padding:8px 12px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.generate')); ?></button>
+                        </div>
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_help')); ?></small>
+                    </div>
+
+                    <!-- How to connect: only meaningful once the secret is set and (for the
+                         exact webhook URL) the channel has been saved at least once. -->
+                    <div class="form-group provider-telegram" style="grid-column: span 2; background:var(--bg-secondary, #f5f7fa); border:1px solid var(--border-color, #e0e0e0); border-radius:8px; padding:12px 14px;">
+                        <label style="font-weight:600; display:block; margin-bottom:6px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_title')); ?></label>
+                        <ol style="margin:0 0 10px 18px; padding:0; font-size:13px; color:var(--text-muted, #555); line-height:1.6;">
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step1')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step2')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step3')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step4')); ?></li>
+                        </ol>
+                        <div id="telegramSetupCommandWrap" style="display:none;">
+                            <label style="font-size:12px; color:var(--text-muted, #666); display:block; margin-bottom:4px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_command_label')); ?></label>
+                            <input type="text" id="telegramSetupCommand" readonly onclick="this.select()" style="font-family:monospace; font-size:12px; width:100%;">
+                        </div>
+                        <small id="telegramSetupHint" style="color:var(--text-muted, #666); display:block;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_save_first_hint')); ?></small>
                     </div>
 
                     <div class="form-group" style="grid-column: span 2;">
@@ -4336,16 +4361,41 @@ $translationNamespaces = ['common', 'tickets'];
             document.querySelectorAll('.provider-telegram').forEach(el => el.style.display = (p === 'telegram') ? '' : 'none');
             // Telegram has no WhatsApp-style phone number; the field is meaningless there.
             document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram') ? 'none' : '');
-            // The shared verify-token field means different things per provider — swap the copy.
-            const isTelegram = (p === 'telegram');
-            const label = document.querySelector('#channelVerifyTokenGroup label');
-            const help = document.getElementById('channelVerifyTokenHelp');
-            if (label) label.textContent = isTelegram
-                ? '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret'), ENT_QUOTES); ?>'
-                : '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token'), ENT_QUOTES); ?>';
-            if (help) help.textContent = isTelegram
-                ? '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_help'), ENT_QUOTES); ?>'
-                : '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_help'), ENT_QUOTES); ?>';
+            if (p === 'telegram') updateTelegramSetupCommand();
+        }
+
+        /** A random 32-char hex string — good enough entropy for Telegram's secret_token (max 256 chars, this app's own value, never sent anywhere but Telegram). */
+        function generateTelegramSecret() {
+            const bytes = new Uint8Array(24);
+            (window.crypto || window.msCrypto).getRandomValues(bytes);
+            const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+            document.getElementById('channelTelegramSecret').value = hex;
+            updateTelegramSetupCommand();
+        }
+
+        /**
+         * Rebuilds the copy-pasteable `setWebhook` command from whatever is
+         * currently in the form. The bot token is a secret this page never
+         * gets back from the server (write-only, like every other credential
+         * here) — so on an existing channel, until the admin retypes it, the
+         * command shows a placeholder instead of silently using a blank one.
+         */
+        function updateTelegramSetupCommand() {
+            const wrap = document.getElementById('telegramSetupCommandWrap');
+            const hint = document.getElementById('telegramSetupHint');
+            const cmdField = document.getElementById('telegramSetupCommand');
+            const webhookUrl = document.getElementById('channelWebhookHint').value.trim();
+            if (!webhookUrl) {
+                wrap.style.display = 'none';
+                hint.style.display = '';
+                return;
+            }
+            const rawToken = document.getElementById('channelBotToken').value.trim();
+            const token = (rawToken === '' || /^\*+$/.test(rawToken)) ? '<BOT_TOKEN>' : rawToken;
+            const secret = document.getElementById('channelTelegramSecret').value.trim() || '<SECRET_TOKEN>';
+            cmdField.value = 'curl "https://api.telegram.org/bot' + token + '/setWebhook?url=' + encodeURIComponent(webhookUrl) + '&secret_token=' + encodeURIComponent(secret) + '"';
+            wrap.style.display = '';
+            hint.style.display = 'none';
         }
 
         function toggleChannelIngressFields() {
@@ -4365,7 +4415,7 @@ $translationNamespaces = ['common', 'tickets'];
             // Secrets are write-only; show a masked placeholder on edit if configured.
             const mask = (channel && channel.has_credentials) ? '********' : '';
             ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken'].forEach(idv => document.getElementById(idv).value = mask);
-            ['channelAccountSid','channelPhoneNumberId','channelVerifyToken','channelRelaySecret'].forEach(idv => document.getElementById(idv).value = '');
+            ['channelAccountSid','channelPhoneNumberId','channelVerifyToken','channelRelaySecret','channelTelegramSecret'].forEach(idv => document.getElementById(idv).value = '');
             document.getElementById('channelGraphVersion').value = channel ? (channel.graph_version || '') : '';
 
             const hintGroup = document.getElementById('channelWebhookHintGroup');
@@ -4374,11 +4424,13 @@ $translationNamespaces = ['common', 'tickets'];
                 document.getElementById('channelWebhookHint').value = channel.webhook_url;
             } else {
                 hintGroup.style.display = 'none';
+                document.getElementById('channelWebhookHint').value = '';
             }
 
             populateChannelCompanies(channel ? channel.tenant_id : null);
             toggleChannelProviderFields();
             toggleChannelIngressFields();
+            updateTelegramSetupCommand();
             document.getElementById('channelModal').classList.add('active');
         }
 
@@ -4451,15 +4503,21 @@ $translationNamespaces = ['common', 'tickets'];
 
         document.getElementById('channelForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            const selectedProvider = document.getElementById('channelProvider').value;
             const payload = {
                 id: document.getElementById('channelId').value || null,
                 name: document.getElementById('channelName').value.trim(),
                 channel_type: document.getElementById('channelType').value,
-                provider: document.getElementById('channelProvider').value,
+                provider: selectedProvider,
                 phone_number: document.getElementById('channelPhone').value.trim(),
                 ingress_mode: document.getElementById('channelIngress').value,
                 relay_secret: document.getElementById('channelRelaySecret').value.trim(),
-                verify_token: document.getElementById('channelVerifyToken').value.trim(),
+                // Meta and Telegram each have their own visible secret-token field
+                // (different meaning, different help text) even though both are
+                // saved into the same column server-side.
+                verify_token: (selectedProvider === 'telegram'
+                    ? document.getElementById('channelTelegramSecret').value
+                    : document.getElementById('channelVerifyToken').value).trim(),
                 tenant_id: document.getElementById('channelCompany').value || null,
                 is_active: document.getElementById('channelActive').checked,
                 account_sid: document.getElementById('channelAccountSid').value.trim(),
