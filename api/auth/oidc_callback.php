@@ -40,7 +40,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_portal_proceed') {
     }
     $pending = $_SESSION['sso_pending_portal'] ?? null;
     unset($_SESSION['sso_pending_portal'], $_SESSION['sso_portal_csrf']);
-    if (!$pending || empty($pending['provider_id'])) {
+    // The same ten minutes a code-exchange round trip would reasonably take: a
+    // confirm screen left open on a shared PC should not work the next morning.
+    if (!$pending || empty($pending['provider_id'])
+        || (time() - (int)($pending['created'] ?? 0)) > 600) {
         ssoBail('Session expired. Please try signing in again.');
     }
     try {
@@ -97,9 +100,20 @@ try {
     $disco  = oidcDiscover($provider['issuer_url']);
     $tokens = oidcExchangeCode($provider, $disco, $code, $codeVerifier);
     $claims = oidcValidateIdToken($tokens['id_token'], $disco, $provider, $nonce);
-    if (!empty($disco['userinfo_endpoint']) && !empty($tokens['access_token'])) {
+
+    // Profile sync (discussion #155) can top the claims up from the userinfo
+    // endpoint, for IdPs that leave job title / department out of the ID token.
+    //  - Only when sync is on: the result feeds nothing else, so with sync off
+    //    it would be an extra round trip on every sign-in for no reason.
+    //  - The userinfo `sub` MUST match the ID token's, or the response is
+    //    thrown away (OpenID Connect Core 1.0 §5.3.2).
+    //  - array_merge() puts the ID token LAST, so a signed claim is never
+    //    overwritten by an unsigned one.
+    if (($provider['profile_sync_mode'] ?? 'never') !== 'never'
+        && !empty($disco['userinfo_endpoint']) && !empty($tokens['access_token'])) {
         $userInfo = oidcFetchUserInfo($disco['userinfo_endpoint'], $tokens['access_token']);
-        if (!empty($userInfo)) {
+        if (!empty($userInfo) && isset($userInfo['sub'], $claims['sub'])
+            && hash_equals((string)$claims['sub'], (string)$userInfo['sub'])) {
             $claims = array_merge($userInfo, $claims);
         }
     }
@@ -184,32 +198,41 @@ try {
                 ssoBail('This account is not set up to sign in with this provider.');
             }
         } else {
-            // --- 3) Non-analyst routing: check if auto-create analysts is allowed ---
-            if (!empty($provider['auto_create_analysts'])) {
+            // --- 3) No analyst account: create one (JIT), or apply the fallback ---
+            // ⚠️ Before Database Verification has added the discussion #155
+            // columns, the row has neither. Behave exactly as before the split:
+            // the old single switch decides, and anyone else is refused.
+            $autoAnalysts = array_key_exists('auto_create_analysts', $provider)
+                ? (int)$provider['auto_create_analysts'] === 1
+                : (int)($provider['auto_create_users'] ?? 0) === 1;
+            if ($autoAnalysts) {
                 if ($email === '') {
                     ssoBail('Cannot auto-create an account without an email from the provider.');
                 }
                 $analystId = oidcCreateAnalyst($conn, $providerId, $preferredUser, $name, $email, $provider['default_modules'], $claims, $provider['profile_sync_mode'] ?? 'never');
                 $analyst   = oidcLoadAnalyst($conn, $analystId);
             } else {
-                $fallbackMode = $provider['analyst_fallback_mode'] ?? 'confirm';
+                $fallbackMode = $provider['analyst_fallback_mode'] ?? 'block';
                 if ($fallbackMode === 'block') {
                     ssoBail('No analyst account exists for ' . ($email ?: 'this user') . '. Ask an administrator to create one.');
                 } elseif ($fallbackMode === 'redirect') {
                     completeSelfServiceSso($conn, $provider, $providerId, $sub, $email, $emailVerified, $name, $tokens, $claims);
                 } else {
-                    // 'confirm' (default): warn and prompt before switching to self-service portal
-                    if (empty($_SESSION['sso_portal_csrf'])) {
-                        $_SESSION['sso_portal_csrf'] = bin2hex(random_bytes(16));
-                    }
+                    // 'confirm': ask before switching to the self-service portal.
+                    // The IdP has already proved who they are, so what is parked
+                    // here is the verified result, not a way to skip the proof.
+                    // Only the ID token is kept (logout needs it as a hint) -
+                    // there is no reason to hold the access or refresh token.
+                    $_SESSION['sso_portal_csrf'] = bin2hex(random_bytes(16));
                     $_SESSION['sso_pending_portal'] = [
                         'provider_id'    => $providerId,
                         'sub'            => $sub,
                         'email'          => $email,
                         'email_verified' => $emailVerified,
                         'name'           => $name,
-                        'tokens'         => $tokens,
+                        'tokens'         => ['id_token' => $tokens['id_token']],
                         'claims'         => $claims,
+                        'created'        => time(),
                     ];
                     header('Location: ' . BASE_URL . 'auth/sso_confirm_portal.php');
                     exit;
@@ -281,26 +304,6 @@ function ssLoadUser(PDO $conn, int $id): ?array {
 }
 
 /**
- * Complete an SSO sign-in for the SELF-SERVICE portal.
- *
- * Mirrors the analyst flow against the requester `users` table:
- *   1) existing link by (provider, sub),
- *   2) match an existing requester by verified email,
- *   3) just-in-time create (if the provider allows it).
- * Then sets the self-service session (SSO bypasses local TOTP) and lands in
- * the portal. Never returns — it redirects and exits.
- *
- * Deliberate difference from analysts: a requester matched by verified email
- * who is still UNASSIGNED is auto-claimed onto this provider, rather than
- * rejected. Requesters are low-privilege and self-onboarding (a ticket-created
- * contact starts passwordless and unassigned), so we don't require an admin to
- * pre-enrol every customer. An already-assigned requester is still strictly
- * isolated to their own provider.
- */
-/**
- * Extract standard profile attributes from OIDC claims across Okta, Entra ID, Keycloak, Google.
- */
-/**
  * Copy profile details from the identity provider onto a local account.
  *
  * 🔴 Call this ONLY after the account has passed every access check (active,
@@ -353,6 +356,12 @@ function oidcSyncProfile(PDO $conn, array $provider, string $table, array $recor
          ->execute($params);
 }
 
+/**
+ * Pull the five profile fields out of OIDC claims. Each IdP names them its own
+ * way (Entra `jobTitle`/`businessPhones`, Okta `title`, Keycloak `job_title`,
+ * the standard `phone_number`), so each field tries the known spellings in
+ * turn. Values are trimmed and cut to the column length; missing = null.
+ */
 function oidcExtractProfileAttributes(array $claims): array {
     $clean = function ($val, int $max = 100) {
         if ($val === null || $val === "") return null;
@@ -386,7 +395,29 @@ function oidcExtractProfileAttributes(array $claims): array {
     ];
 }
 
+/**
+ * Complete an SSO sign-in for the SELF-SERVICE portal.
+ *
+ * Mirrors the analyst flow against the requester `users` table:
+ *   1) existing link by (provider, sub),
+ *   2) match an existing requester by verified email,
+ *   3) just-in-time create (if the provider allows it).
+ * Then sets the self-service session (SSO bypasses local TOTP) and lands in
+ * the portal. Never returns — it redirects and exits.
+ *
+ * Also reached from the ANALYST login, when someone with no analyst account
+ * is sent on to the portal (the provider's analyst_fallback_mode, #155).
+ *
+ * Deliberate difference from analysts: a requester matched by verified email
+ * who is still UNASSIGNED is auto-claimed onto this provider, rather than
+ * rejected. Requesters are low-privilege and self-onboarding (a ticket-created
+ * contact starts passwordless and unassigned), so we don't require an admin to
+ * pre-enrol every customer. An already-assigned requester is still strictly
+ * isolated to their own provider.
+ */
 function completeSelfServiceSso(PDO $conn, array $provider, int $providerId, string $sub, string $email, bool $emailVerified, string $name, array $tokens, array $claims = []): void {
+    // From here on this is a portal sign-in, so any error goes back to the
+    // portal's login page - including when we arrived from the analyst one.
     $_SESSION['oidc_portal'] = 'self-service';
     // --- 1) Existing link by (provider, sub) ---
     $stmt = $conn->prepare("SELECT user_id FROM user_sso_identities WHERE provider_id = ? AND subject = ?");

@@ -8,7 +8,8 @@
  *              ldap_bind_dn, ldap_bind_password, ldap_base_dn, ldap_user_filter,
  *              ldap_attr_*, ... }
  * Shared: enabled, auto_create_users, require_verified_email, default_modules,
- *         sort_order, tenant_id.
+ *         sort_order, tenant_id, auto_create_analysts (discussion #155).
+ * OIDC only in practice: analyst_fallback_mode, profile_sync_mode (#155).
  *
  * Secrets (client_secret / ldap_bind_password) are encrypted at rest via
  * encryptValue(). On update, a blank or masked ("****") secret means "leave the
@@ -19,6 +20,7 @@ require_once '../../config.php';
 require_once '../../includes/admin_api_guard.php'; // System admins only (issue #34)
 require_once '../../includes/functions.php';
 require_once '../../includes/encryption.php';
+require_once '../../includes/sso_identity.php';
 
 header('Content-Type: application/json');
 
@@ -86,7 +88,7 @@ $autoCreateAnalysts = !empty($data['auto_create_analysts']) ? 1 : 0;
 $fallbackInput      = $data['analyst_fallback_mode'] ?? 'confirm';
 $analystFallback    = in_array($fallbackInput, ['confirm', 'redirect', 'block'], true) ? $fallbackInput : 'confirm';
 $requireVerified    = !empty($data['require_verified_email']) ? 1 : 0;
-$profileSyncMode   = in_array($data['profile_sync_mode'] ?? '', ['always', 'initial', 'never'], true) ? $data['profile_sync_mode'] : 'never';
+$profileSyncMode    = in_array($data['profile_sync_mode'] ?? '', ['always', 'initial', 'never'], true) ? $data['profile_sync_mode'] : 'never';
 $defaultModules  = isset($data['default_modules']) && trim($data['default_modules']) !== ''
                    ? trim($data['default_modules']) : null;
 $sortOrder       = (int)($data['sort_order'] ?? 0);
@@ -189,11 +191,13 @@ if ($protocol === 'carddav') {
     $secretInput     = '';
     $ldapSecretInput = '';
 
-    // An address book cannot authenticate anybody, so these two are meaningless
+    // An address book cannot authenticate anybody, so these are meaningless
     // here and are forced off rather than trusted from the request — the dialog
     // hides them, and a hidden control is not a guard.
-    $autoCreate      = 0;
-    $requireVerified = 0;
+    $autoCreate         = 0;
+    $autoCreateAnalysts = 0;
+    $requireVerified    = 0;
+    $profileSyncMode    = 'never';
 
 } elseif ($protocol === 'oidc') {
     $issuerUrl = rtrim(trim($data['issuer_url'] ?? ''), '/');
@@ -390,6 +394,16 @@ try {
     if (!$conn->query("SHOW COLUMNS FROM auth_providers LIKE 'carddav_allow_create'")->fetch()) {
         array_splice($cols, $iAc, 1);
         array_splice($vals, $iAc, 1);
+    }
+    // Same for the three discussion #155 columns, which arrive together.
+    if (!ssoJitColumnsReady($conn)) {
+        foreach (['auto_create_analysts', 'analyst_fallback_mode', 'profile_sync_mode'] as $jitCol) {
+            $i = array_search($jitCol, $cols, true);
+            if ($i !== false) {
+                array_splice($cols, $i, 1);
+                array_splice($vals, $i, 1);
+            }
+        }
     }
 
     // A blank/masked secret on update = keep what is stored.

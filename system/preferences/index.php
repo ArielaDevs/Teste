@@ -1276,7 +1276,10 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
                 document.getElementById('myDepartment').value = p.department || '';
                 document.getElementById('myPhone').value      = p.phone      || '';
                 document.getElementById('myMobile').value     = p.mobile     || '';
-                const isManaged = !!p.is_managed;
+                // An OIDC provider set to sync 'always' rewrites these on every
+                // sign-in (#155), so they are read-only here. The server refuses
+                // the save too - this only stops anyone typing into them.
+                const isManaged = !!p.sso_synced;
                 ['myJobTitle', 'myDepartment', 'myPhone', 'myMobile'].forEach(function (id) {
                     const el = document.getElementById(id);
                     if (el) {

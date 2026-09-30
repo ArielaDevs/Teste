@@ -12,6 +12,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/admin_api_guard.php'; // System admins only (issue #34)
 require_once '../../includes/functions.php';
+require_once '../../includes/sso_identity.php';
 
 header('Content-Type: application/json');
 
@@ -23,9 +24,16 @@ if (!isset($_SESSION['analyst_id'])) {
 try {
     $conn = connectToDatabase();
 
+    // 🔴 The #155 columns only once Database Verification has added them. A
+    // query naming a missing column fails, and this page reads a failure as
+    // "No providers yet". Until then, report what the old single switch meant.
+    $jitCols = ssoJitColumnsReady($conn)
+        ? 'p.auto_create_analysts, p.analyst_fallback_mode, p.profile_sync_mode'
+        : "p.auto_create_users AS auto_create_analysts, 'block' AS analyst_fallback_mode, 'never' AS profile_sync_mode";
+
     $stmt = $conn->query(
         "SELECT p.id, p.display_name, p.protocol, p.issuer_url, p.client_id, p.client_secret,
-                p.scopes, p.enabled, p.auto_create_users, p.auto_create_analysts, p.analyst_fallback_mode, p.require_verified_email, p.profile_sync_mode,
+                p.scopes, p.enabled, p.auto_create_users, $jitCols, p.require_verified_email,
                 p.default_modules, p.sort_order, p.tenant_id, t.name AS tenant_name,
                 p.ldap_host, p.ldap_port, p.ldap_encryption, p.ldap_bind_dn, p.ldap_bind_password,
                 p.ldap_base_dn, p.ldap_user_filter, p.ldap_attr_username, p.ldap_attr_email,

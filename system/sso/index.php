@@ -703,7 +703,10 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                 <td><span class="proto-badge">${badge}</span></td>
                 <td class="issuer-cell" title="${esc(target)}">${esc(target)}</td>
                 <td><span class="status-badge ${p.enabled ? 'on' : 'off'}">${p.enabled ? window.t('system.sso.enabled') : window.t('system.sso.disabled')}</span></td>
-                <td>${isCardDav ? '<span class="jit-off">' + window.t('system.sso.jit_na') + '</span>' : (() => {
+                <?php /* Profile sync is an OIDC feature (#155): LDAP keeps details
+                         up to date through its own directory sync, so its row says
+                         "not applicable" rather than showing a setting it ignores. */ ?>
+                <td>${p.protocol !== 'oidc' ? '<span class="jit-off">' + window.t('system.sso.jit_na') + '</span>' : (() => {
                     const mode = p.profile_sync_mode || 'never';
                     const label = mode === 'never' ? window.t('system.sso.sync_pill_never')
                                 : mode === 'initial' ? window.t('system.sso.sync_pill_initial')
@@ -800,12 +803,18 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         // sign anybody in, so offering the toggle would promise something that
         // can never happen.
         $('autoCreateField').style.display = isCardDav ? 'none' : '';
-        $('autoCreateAnalystsField').style.display = isCardDav ? 'none' : '';
-        $('analystFallbackField').style.display = isCardDav ? 'none' : '';
-        // "Default module access for auto-created users" describes the accounts
-        // JIT sign-in creates. Nothing signs in through an address book, so
-        // there are none — the field is meaningless rather than merely unused.
-        $('defaultModulesField').style.display = isCardDav ? 'none' : '';
+        $('autoCreateAnalystsField').style.display = isCardDav ? 'none' : '';   // LDAP uses this one too
+        // Discussion #155. Only the OIDC callback reads these two: LDAP signs in
+        // through a password form, so there is no redirect to fall back from,
+        // and it keeps details up to date through its own directory sync.
+        // The fallback only applies when analysts are NOT auto-created.
+        const autoAnalysts = $('fAutoCreateAnalysts').checked;
+        $('analystFallbackField').style.display = (isOidc && !autoAnalysts) ? '' : 'none';
+        $('profileSyncModeField').style.display = isOidc ? '' : 'none';
+        // "Default module access for auto-created analysts" describes the
+        // accounts JIT sign-in creates, so it only shows while that is on.
+        // Nothing signs in through an address book, so there are none.
+        $('defaultModulesField').style.display = (!isCardDav && autoAnalysts) ? '' : 'none';
         // "Shown on the login button" is false for an address book.
         $('displayNameHint').textContent = isCardDav
             ? window.t('system.sso.field_display_name_hint_carddav')
@@ -818,17 +827,8 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
             : window.t('system.sso.cb_enabled_desc');
     }
     $('fProtocol').addEventListener('change', syncProtocolFields);
+    $('fAutoCreateAnalysts').addEventListener('change', syncProtocolFields);
 
-    function syncAnalystFields() {
-        const cb = document.getElementById('fAutoCreateAnalysts');
-        const autoAnalyst = cb ? cb.checked : false;
-        const fallbackField = document.getElementById('analystFallbackField');
-        const defaultModulesField = document.getElementById('defaultModulesField');
-        if (fallbackField) fallbackField.style.display = autoAnalyst ? 'none' : 'block';
-        if (defaultModulesField) defaultModulesField.style.display = autoAnalyst ? 'block' : 'none';
-    }
-    const aca = document.getElementById('fAutoCreateAnalysts');
-    if (aca) aca.addEventListener('change', syncAnalystFields);
     function openModal(p) {
         document.getElementById('testResult').className = 'test-result';
         $('ldapTestResult').className = 'test-result';
@@ -895,7 +895,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         document.getElementById('fEnabled').checked = p ? !!p.enabled : true;
         document.getElementById('fAutoCreate').checked = p ? !!p.auto_create_users : false;
         document.getElementById('fAutoCreateAnalysts').checked = p ? !!p.auto_create_analysts : false;
-        syncAnalystFields();
+        syncProtocolFields();   // again: which #155 fields show depends on this box
         document.getElementById('fAnalystFallbackMode').value = (p && p.analyst_fallback_mode) ? p.analyst_fallback_mode : 'confirm';
         document.getElementById('fRequireVerified').checked = p ? !!p.require_verified_email : false;
         document.getElementById('fProfileSyncMode').value = (p && p.profile_sync_mode) ? p.profile_sync_mode : 'never';

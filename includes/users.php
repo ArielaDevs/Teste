@@ -15,6 +15,8 @@
  * See the wiki: Directory sync — importing people from Active Directory.
  */
 
+require_once __DIR__ . '/sso_identity.php';   // SSO profile-sync lock (#155)
+
 /**
  * Every person field that a human may edit through the UI or the API.
  *
@@ -301,9 +303,11 @@ function portalProfileAddressBookWrites(PDO $conn): bool
 function portalProfileAccess(PDO $conn, int $userId): ?array
 {
     $cols = implode(', ', array_map(function ($f) { return 'u.' . $f; }, USER_PERSON_FIELDS));
+    // profile_sync_mode only once Database Verification has added it (#155) -
+    // naming a missing column here would break My Account for everyone.
+    $syncCol = ssoJitColumnsReady($conn) ? 'p.profile_sync_mode' : 'NULL AS profile_sync_mode';
     $st = $conn->prepare(
-        "SELECT u.is_managed, u.display_name, p.protocol, p.carddav_write_back, p.profile_sync_mode,
-                u.auth_provider_id, $cols
+        "SELECT u.is_managed, u.display_name, p.protocol, p.carddav_write_back, $syncCol, $cols
            FROM users u
       LEFT JOIN auth_providers p ON p.id = u.auth_provider_id
           WHERE u.id = ?"
@@ -313,7 +317,7 @@ function portalProfileAccess(PDO $conn, int $userId): ?array
     if ($row === false) return null;
 
     $fields  = portalProfileEditableFields($conn);
-    $managed = (int)($row['is_managed'] ?? 0) === 1;          // unchanged
+    $managed = (int)($row['is_managed'] ?? 0) === 1;
     $isCardDav = strtolower((string)($row['protocol'] ?? '')) === 'carddav';
 
     // 🔴 Write-back on the address book is NOT enough on its own. That switch
@@ -333,10 +337,10 @@ function portalProfileAccess(PDO $conn, int $userId): ?array
     // SSO profile sync (discussion #155): an OIDC provider set to 'always'
     // rewrites these on every sign-in, so an edit here would be undone at the
     // next one. Only the five it actually writes - never employee_id or
-    // manager_id, which OIDC sync does not touch.
-    $oidcSynced = strtolower((string)($row['protocol'] ?? '')) === 'oidc'
-               && ($row['profile_sync_mode'] ?? 'never') === 'always';
-    if ($oidcSynced) {
+    // manager_id, which OIDC sync does not touch. Kept apart from $managed,
+    // which means "a directory import owns this record" and which the CardDAV
+    // write-back rules above depend on.
+    if (ssoProfileSyncLocks($row['protocol'] ?? null, $row['profile_sync_mode'] ?? null)) {
         $locked = array_values(array_unique(array_merge(
             $locked,
             array_intersect($fields, USER_CARDDAV_OWNED)   // the same five: job_title, department, office, phone, mobile

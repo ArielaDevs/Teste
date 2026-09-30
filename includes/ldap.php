@@ -557,7 +557,8 @@ function ldapCreateAnalyst(PDO $conn, int $providerId, string $preferredUser, st
  *   1) existing link by (provider, subject),
  *   2) match an existing analyst by email — STRICTLY isolated: the analyst must
  *      already be assigned to this provider,
- *   3) just-in-time create, if auto_create_users is on.
+ *   3) just-in-time create, if auto_create_analysts is on (auto_create_users
+ *      is the PORTAL switch - see ldapResolveUser()).
  *
  * Returns ['ok' => true, 'analyst_id' => int] or ['ok' => false, 'error' => string].
  */
@@ -622,7 +623,12 @@ function ldapResolveAnalyst(PDO $conn, array $provider, array $ldapUser): array 
         }
     } else {
         // 3) Just-in-time create.
-        if ((int)($provider['auto_create_analysts'] ?? 0) !== 1) {
+        // Analyst JIT has its own switch since discussion #155. Before Database
+        // Verification adds it, the old single switch still decides.
+        $autoAnalysts = array_key_exists('auto_create_analysts', $provider)
+            ? (int)$provider['auto_create_analysts']
+            : (int)($provider['auto_create_users'] ?? 0);
+        if ($autoAnalysts !== 1) {
             return ['ok' => false, 'error' => 'No FreeITSM analyst account exists for that user. Ask an administrator to create one.'];
         }
         // No email is allowed: plenty of directories hold staff who were never

@@ -110,6 +110,56 @@ require __DIR__ . '/_top.php';
     <div class="help-note warn"><strong>Today, each client hands you a client secret</strong> (which you store and rotate). That's the “bring-your-own-credentials” model and it works for any provider. A future option — where you register one app and each client just clicks “consent”, with no secret to hand over — is designed but not yet built. It will not change anything above; only how a provider is added.</div>
 </div>
 
+<!-- 4a. Auto-create rules (discussion #155) -->
+<div class="help-section" id="jit-rules">
+    <div class="help-section-header"><?php echo helpSectionNum('jit-rules'); ?>
+        <div>
+            <h3>Auto-create rules: portal requesters and analysts</h3>
+        </div>
+    </div>
+    <p>A sign-in provider can create accounts the first time someone signs in through it (sometimes called <em>just-in-time</em> or JIT provisioning). There are two separate switches, so one company sign-in can serve both your staff and your customers:</p>
+    <ul>
+        <li><strong>Auto-create portal requesters</strong> &mdash; someone signing in on the <em>self-service portal</em> for the first time gets a portal account. Leave it off if only people you already know (for example, contacts created from tickets) should get in.</li>
+        <li><strong>Auto-create IT analysts</strong> &mdash; someone signing in on the <em>analyst</em> login for the first time gets an analyst account. Works for OpenID Connect and LDAP providers.</li>
+        <li><strong>Default module access for auto-created analysts</strong> &mdash; shown while the analyst switch is on. List the modules new analysts get (for example <code>tickets, knowledge</code>). Blank means every module, so set it for a pilot.</li>
+    </ul>
+
+    <h4>Someone with no analyst account signs in on the analyst login</h4>
+    <p>For an OpenID Connect provider with <em>Auto-create IT analysts</em> off, choose what happens under <strong>Non-analyst sign-in action</strong>:</p>
+    <ul>
+        <li><strong>Warn and confirm</strong> &mdash; a page explains they have no analyst account and offers to continue to the self-service portal. Nothing happens unless they choose it. This is the default for a new provider.</li>
+        <li><strong>Automatically switch</strong> &mdash; they go straight to the portal, as if they had signed in there.</li>
+        <li><strong>Block</strong> &mdash; they see an error on the analyst login, as before this setting existed.</li>
+    </ul>
+    <p>Either way the portal applies its own rules: if <em>Auto-create portal requesters</em> is off and they have no portal account, they are refused there instead.</p>
+    <div class="help-note"><strong>Upgrading keeps your settings.</strong> Before these switches were split, one <em>auto-create users</em> switch covered both portals. When you upgrade and run Database Verification, any provider that had it on keeps creating analysts as well, and the non-analyst action is set to <strong>Block</strong> so nobody sees a new screen until you choose it.</div>
+</div>
+
+<!-- 4a2. Profile sync (discussion #155) -->
+<div class="help-section" id="profile-sync">
+    <div class="help-section-header"><?php echo helpSectionNum('profile-sync'); ?>
+        <div>
+            <h3>Keeping profile details in step with your identity provider</h3>
+        </div>
+    </div>
+    <p>An OpenID Connect provider can also fill in people's <strong>name, job title, department, office, phone and mobile</strong> from what it sends at sign-in. Choose how under <strong>Profile attribute sync</strong>:</p>
+    <ul>
+        <li><strong>Never</strong> (the default) &mdash; only the sign-in details are used. Profile fields are left alone and people edit their own.</li>
+        <li><strong>On account creation</strong> &mdash; fills the fields in when an account is auto-created. After that, people can edit them and sign-in does not overwrite them.</li>
+        <li><strong>Always</strong> &mdash; updates the fields at every sign-in. Because an edit would be undone at the next one, the fields become read-only in the portal's <strong>My Account</strong> and in the analyst's <strong>Preferences &rarr; My details</strong>, with a note saying they come from the identity provider.</li>
+    </ul>
+    <p>A portal user's own <em>preferred name</em> is never overwritten. Nothing is written until the person has passed every sign-in check, so a provider that is about to be refused cannot change anyone's details.</p>
+    <p>LDAP and CardDAV are not affected by this setting: they keep details up to date their own way, through directory sync and address-book write-back.</p>
+
+    <h4>Getting the details into the sign-in</h4>
+    <p>Keep <strong>Scopes</strong> set to the standard <code>openid email profile</code> &mdash; job title and department are <em>claims</em>, not scopes. Add them as claims in your identity provider:</p>
+    <ul>
+        <li><strong>Microsoft Entra ID:</strong> <em>App registrations &rarr; your app &rarr; Token configuration &rarr; Add optional claim</em>, choose the <strong>ID</strong> token, and add the ones you want. Entra's userinfo endpoint only returns the basic profile, so for Entra these <strong>must</strong> be in the ID token.</li>
+        <li><strong>Okta:</strong> <em>Security &rarr; API &rarr; Authorization Servers &rarr; Claims</em>, add claims mapped to <code>user.title</code>, <code>user.department</code> and <code>user.primaryPhone</code>.</li>
+        <li><strong>Keycloak:</strong> <em>Client scopes &rarr; profile &rarr; Mappers</em>, add <em>User Attribute</em> mappers for <code>job_title</code>, <code>department</code> and <code>phone_number</code>.</li>
+    </ul>
+    <p>When sync is on, FreeITSM also asks the provider's userinfo endpoint for anything missing from the ID token. What the ID token says always wins.</p>
+</div>
 <!-- 4b. LDAP / Active Directory -->
 <div class="help-section" id="ldap">
     <div class="help-section-header"><?php echo helpSectionNum('ldap'); ?>
@@ -403,51 +453,6 @@ require __DIR__ . '/_top.php';
     </ul>
 </div>
 
-<!-- 4k. Just-in-Time Provisioning & Fallbacks -->
-<div class="help-section" id="jit-rules">
-    <div class="help-section-header"><?php echo helpSectionNum('jit-rules'); ?>
-        <div>
-            <h3>Just-in-Time (JIT) Provisioning &amp; Role Separation</h3>
-        </div>
-    </div>
-    <p>FreeITSM allows fine-grained control over which accounts are automatically provisioned when people sign in through an identity provider:</p>
-    <ul>
-        <li><strong>Auto-create self-service users (Portal)</strong> &mdash; Creates a portal customer/requester profile on their first sign-in. Turn this off if only existing ticket-contacts should access the portal.</li>
-        <li><strong>Auto-create IT analysts</strong> &mdash; Automatically creates an IT analyst staff account on first sign-in.</li>
-        <li><strong>Default analyst permissions</strong> &mdash; Choose the default module capabilities assigned to newly created analysts so they don't unintentionally gain administrative privileges.</li>
-        <li><strong>Non-analyst fallback mode</strong> &mdash; Controls what happens when a person without an analyst account signs in on the staff analyst login screen:
-            <ul>
-                <li><em>Warn &amp; confirm</em> &mdash; Shows a branded prompt giving them the option to continue to the Self-Service Portal or sign out.</li>
-                <li><em>Automatically switch</em> &mdash; Instantly redirects them to the Self-Service Portal without prompting.</li>
-                <li><em>Block</em> &mdash; Denies access and prevents login.</li>
-            </ul>
-        </li>
-    </ul>
-    <!-- 4l. Profile Attribute Sync & Field Locking -->
-<div class="help-section" id="profile-sync">
-    <div class="help-section-header"><?php echo helpSectionNum('profile-sync'); ?>
-        <div>
-            <h3>Profile Attribute Sync &amp; Field Locking</h3>
-        </div>
-    </div>
-    <p>FreeITSM can automatically synchronize user profile details (full name, job title, department, office/location, phone, and mobile) from claims passed by your Identity Provider (via ID tokens or the OIDC <code>userinfo</code> endpoint):</p>
-    <ul>
-        <li><strong>Always (Every sign-in)</strong> &mdash; Re-syncs profile attributes on every login. When active, profile fields in both the <em>Self-Service Portal</em> (<strong>My Account</strong>) and the <em>Staff Preferences</em> (<strong>System &rarr; Preferences &rarr; My details</strong>) are locked from manual editing to prevent local drift from the directory of record.</li>
-        <li><strong>Initial only (First sign-in)</strong> &mdash; Populates profile details when the account is initially created via JIT. Subsequent local edits by the user or analysts are retained.</li>
-        <li><strong>Never (Do not sync)</strong> &mdash; Only the minimum identity claims (subject, name, and verified email) are used for authentication; extra profile attributes are neither populated nor overwritten.</li>
-    </ul>
-    <div class="help-note">
-        <strong>Scopes vs. Optional Claims:</strong>
-        <p style="margin-top:6px;margin-bottom:6px;">Keep the <strong>Scopes</strong> field in FreeITSM set to standard OIDC scopes (<code>openid email profile</code>). Do not add attribute names into the scopes box. To emit profile attributes, configure optional claims in your identity provider:</p>
-        <ul style="margin-bottom:0;">
-            <li><strong>Microsoft Entra ID (Azure AD):</strong> In the Azure Portal, go to <em>App registrations &rarr; [Your App] &rarr; Token configuration &rarr; Add optional claim</em>, select <strong>ID</strong> token, and check <code>department</code>, <code>job_title</code>, and <code>phone_number</code>. (Note: Entra's <code>userinfo</code> endpoint only returns basic profile claims, so department and title must be configured as optional claims on the ID token).</li>
-            <li><strong>Okta / Auth0:</strong> Under <em>API &rarr; Authorization Servers &rarr; Claims</em>, add claims mapped to <code>user.department</code>, <code>user.title</code>, and <code>user.primaryPhone</code>.</li>
-            <li><strong>Keycloak:</strong> In <em>Client Scopes &rarr; profile &rarr; Mappers</em>, add User Attribute mappers for <code>department</code>, <code>job_title</code>, and <code>phone_number</code>.</li>
-        </ul>
-    </div>
-</div>
-
-</div>
 <!-- 5. Experience -->
 <div class="help-section" id="experience">
     <div class="help-section-header"><?php echo helpSectionNum('experience'); ?>

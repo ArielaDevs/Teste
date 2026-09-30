@@ -178,6 +178,8 @@ function getHelpTopics() {
                 ['id' => 'which',      'label' => 'Single or multi-company?'],
                 ['id' => 'single',     'label' => 'Single-company setup'],
                 ['id' => 'multi',      'label' => 'Multi-company (MSP) setup'],
+                ['id' => 'jit-rules',  'label' => 'Auto-create rules'],
+                ['id' => 'profile-sync','label' => 'Profile sync'],
                 ['id' => 'ldap',       'label' => 'LDAP / Active Directory'],
                 ['id' => 'ldap-setup', 'label' => 'Setting up a directory'],
                 ['id' => 'ldap-groups','label' => 'Controlling access by group'],
@@ -190,7 +192,6 @@ function getHelpTopics() {
                 ['id' => 'carddav-diagnostics', 'label' => 'Checking it is working'],
                 ['id' => 'carddav-safety', 'label' => 'Safety, leavers & scheduling'],
                 ['id' => 'carddav-faq',    'label' => 'CardDAV troubleshooting'],
-                ['id' => 'jit-rules',      'label' => 'JIT provisioning & role separation'],
                 ['id' => 'experience', 'label' => 'What people see'],
                 ['id' => 'breakglass', 'label' => 'Break-glass & safety'],
                 ['id' => 'faq',        'label' => 'Troubleshooting'],
@@ -210,7 +211,7 @@ function getHelpTopics() {
                      . ' read-only permission privilege etag conflict changed since'
                      . ' add to address book new contact create card not in address book link person'
                      . ' log logging troubleshoot diagnose health check drift compare d015 d016'
-                     . ' jit just-in-time auto-create auto create provision analyst portal fallback groups filter permissions'
+                     . ' jit just-in-time auto-create auto create provision analyst portal fallback profile sync job title department claims'
                      . ' not writing failed unreachable server response refused',
         ],
         'api' => [

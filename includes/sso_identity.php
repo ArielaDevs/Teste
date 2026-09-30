@@ -44,3 +44,58 @@ function ssoClearDanglingLink(PDO $conn, string $table, int $providerId, string 
     $conn->prepare("DELETE FROM `$table` WHERE provider_id = ? AND subject = ?")
          ->execute([$providerId, $sub]);
 }
+
+/**
+ * Have the discussion #155 provider columns (auto_create_analysts,
+ * analyst_fallback_mode, profile_sync_mode) been added yet?
+ *
+ * 🔴 An upgraded install has none of them until someone runs System →
+ * Database Verification. Any query that NAMES one fails until then, and the
+ * screens that read providers treat a failed query as "nothing there" - the
+ * Authentication page would say "No providers yet". So every reader that
+ * names them asks this first. The three arrive together, so one probe covers
+ * all of them. Cached per request.
+ */
+function ssoJitColumnsReady(PDO $conn): bool {
+    static $ready = null;
+    if ($ready === null) {
+        try {
+            $ready = (bool)$conn->query("SHOW COLUMNS FROM auth_providers LIKE 'profile_sync_mode'")->fetch();
+        } catch (PDOException $e) {
+            $ready = false;
+        }
+    }
+    return $ready;
+}
+
+/**
+ * Is this provider rewriting profile details on every sign-in? (discussion #155)
+ *
+ * True only for an OIDC provider set to 'always'. When it is, the synced
+ * fields are shown read-only on My Account (portal) and My details (analyst),
+ * because anything typed there would be put back at the next sign-in.
+ *
+ * Deliberately NOT true for LDAP or CardDAV: they keep records up to date
+ * their own way (directory sync, address-book write-back), with their own
+ * rules about what is editable - see portalProfileAccess().
+ */
+function ssoProfileSyncLocks(?string $protocol, ?string $syncMode): bool {
+    return strtolower((string)$protocol) === 'oidc' && $syncMode === 'always';
+}
+
+/**
+ * Does the given analyst's sign-in provider lock their My details fields?
+ * Safe before Database Verification (answers false).
+ */
+function ssoAnalystProfileLocked(PDO $conn, int $analystId): bool {
+    if (!ssoJitColumnsReady($conn)) return false;
+    $st = $conn->prepare(
+        "SELECT p.protocol, p.profile_sync_mode
+           FROM analysts a
+           JOIN auth_providers p ON p.id = a.auth_provider_id
+          WHERE a.id = ?"
+    );
+    $st->execute([$analystId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    return $row ? ssoProfileSyncLocks($row['protocol'], $row['profile_sync_mode']) : false;
+}

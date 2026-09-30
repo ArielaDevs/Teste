@@ -166,7 +166,7 @@ $schema = ["auth_providers table            : " . ($hasProviders ? 'OK' : 'MISSI
 $syncCols = ['sync_enabled', 'sync_base_dn', 'sync_ou_includes', 'sync_ou_excludes', 'sync_brake_percent', 'sync_last_run_datetime'];
 $missingSync = [];
 if ($hasProviders) {
-    foreach (['protocol', 'enabled', 'ldap_host', 'ldap_base_dn', 'auto_create_users'] as $c) {
+    foreach (['protocol', 'enabled', 'ldap_host', 'ldap_base_dn', 'auto_create_users', 'auto_create_analysts', 'profile_sync_mode'] as $c) {
         $schema[] = str_pad("  column {$c}", 33) . ': ' . (colExists($conn, 'auth_providers', $c) ? 'OK' : 'MISSING');
     }
     foreach ($syncCols as $c) {
@@ -320,7 +320,17 @@ if (!$providers) {
         if (array_key_exists('tenant_id', $p)) {
             $b[] = '  Company              : ' . ($p['tenant_id'] ? ('#' . (int)$p['tenant_id']) : 'all companies');
         }
-        $b[] = '  Create people on first sign-in (JIT): ' . yn(!empty($p['auto_create_users']));
+        $b[] = '  Create portal requesters on first sign-in (JIT): ' . yn(!empty($p['auto_create_users']));
+        // Split out of the switch above in discussion #155. Absent until
+        // Database Verification adds it, when the old switch still decides.
+        $b[] = '  Create analysts on first sign-in (JIT)         : '
+             . (array_key_exists('auto_create_analysts', $p)
+                ? yn(!empty($p['auto_create_analysts']))
+                : yn(!empty($p['auto_create_users'])) . ' (column not added yet - run Database Verification)');
+        if (($p['protocol'] ?? '') === 'oidc' && array_key_exists('profile_sync_mode', $p)) {
+            $b[] = '  No analyst account on the analyst login        : ' . ($p['analyst_fallback_mode'] ?? '?');
+            $b[] = '  Profile sync                                   : ' . $p['profile_sync_mode'];
+        }
 
         if ($isLdap) {
             $b[] = '  Host                 : ' . maskHost($p['ldap_host'] ?? '') . ':' . ((int)($p['ldap_port'] ?? 0) ?: '(no port)');

@@ -13,11 +13,11 @@ if (count($_um_parts) > 1) {
 }
 
 /**
- * Does this portal user have a matching active analyst account?
- * Mirrors the portal account check in includes/waffle-menu.php.
- * If they are already signed in as an analyst ($_SESSION['analyst_id']) OR
- * if an active analyst with their verified email exists in the database,
- * offer them the jump to the analyst console.
+ * Does this portal user also have an active analyst account? If so the menu
+ * offers a way back to the analyst console (discussion #155, contributed by
+ * Santhosh Srinivasan). The mirror of the portal link in includes/waffle-menu.php
+ * (#81). Matching on email is fine here: it only shows a link, and signing in
+ * on the other side still goes through that side's own login.
  */
 $__hasAnalystAccount = !empty($_SESSION['analyst_id']);
 if (!$__hasAnalystAccount && !empty($ss_user_email)) {
@@ -106,27 +106,15 @@ if (!$__hasAnalystAccount && !empty($ss_user_email)) {
         padding: 11px 16px;
         cursor: pointer;
         font-size: 13px;
-        color: var(--text) !important;
-        text-decoration: none !important;
+        color: var(--text, #333);
         transition: background 0.15s;
         border: none;
         background: none;
         width: 100%;
         text-align: left;
-        box-sizing: border-box;
     }
-    .ss-menu-item span {
-        color: var(--text) !important;
-    }
-    .ss-menu-item:hover, .ss-menu-item:focus {
-        background: var(--surface-hover);
-        color: var(--text) !important;
-        text-decoration: none !important;
-    }
-    .ss-menu-item:hover span, .ss-menu-item:focus span {
-        color: var(--text) !important;
-    }
-    .ss-menu-item svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
+    .ss-menu-item:hover { background: var(--surface-hover, #f5f5f5); }
+    .ss-menu-item svg { width: 16px; height: 16px; color: var(--text-muted, #666); flex-shrink: 0; }
     .ss-menu-divider { height: 1px; background: var(--border-soft, #eee); margin: 0; }
     .ss-menu-item.logout-item { color: var(--danger-accent, #d32f2f); }
     .ss-menu-item.logout-item svg { color: var(--danger-accent, #d32f2f); }
@@ -378,11 +366,10 @@ if (!$__hasAnalystAccount && !empty($ss_user_email)) {
             <span><?php echo htmlspecialchars(t('self-service.menu.mfa')); ?></span>
             <span class="ss-mfa-badge disabled" id="ssMfaBadge"><?php echo htmlspecialchars(t('self-service.menu.mfa_off')); ?></span>
         </button>
-        <?php if (!empty($__hasAnalystAccount)): ?>
+        <?php if ($__hasAnalystAccount): ?>
         <button class="ss-menu-item" onclick="window.open('<?php echo BASE_URL; ?>', '_blank', 'noopener');">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
             <span><?php echo htmlspecialchars(t('self-service.menu.analyst_console')); ?></span>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;width:12px;height:12px;opacity:0.6;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
         </button>
         <?php endif; ?>
         <div class="ss-menu-divider"></div>
@@ -540,20 +527,17 @@ function ssCloseMenu() {
 let _ssMfaEnabled = false;
 
 async function ssLoadMfaBadge() {
-    const badge = document.getElementById('ssMfaBadge');
-    if (!badge) return;
     try {
         const resp = await fetch(_mfaApi + 'get_mfa_status.php?ctx=user');
         const data = await resp.json();
+        const badge = document.getElementById('ssMfaBadge');
         _ssMfaEnabled = data.success && data.mfa_enabled;
-        if (badge) {
-            if (_ssMfaEnabled) {
-                badge.className = 'ss-mfa-badge enabled';
-                badge.textContent = window.t('self-service.menu.mfa_on');
-            } else {
-                badge.className = 'ss-mfa-badge disabled';
-                badge.textContent = window.t('self-service.menu.mfa_off');
-            }
+        if (_ssMfaEnabled) {
+            badge.className = 'ss-mfa-badge enabled';
+            badge.textContent = window.t('self-service.menu.mfa_on');
+        } else {
+            badge.className = 'ss-mfa-badge disabled';
+            badge.textContent = window.t('self-service.menu.mfa_off');
         }
     } catch (e) {}
 }
@@ -561,18 +545,12 @@ async function ssLoadMfaBadge() {
 /* --- Account Modal --- */
 function ssOpenAccountModal() {
     ssCloseMenu();
-    const acctMsg = document.getElementById('ssAcctMsg');
-    if (acctMsg) acctMsg.className = 'ss-msg';
-    const pwMsg = document.getElementById('ssPwMsg');
-    if (pwMsg) pwMsg.className = 'ss-msg';
-    const pwCur = document.getElementById('ssPwCurrent');
-    if (pwCur) pwCur.value = '';
-    const pwNew = document.getElementById('ssPwNew');
-    if (pwNew) pwNew.value = '';
-    const pwConf = document.getElementById('ssPwConfirm');
-    if (pwConf) pwConf.value = '';
-    const modal = document.getElementById('ssAccountModal');
-    if (modal) modal.classList.add('active');
+    document.getElementById('ssAcctMsg').className = 'ss-msg';
+    document.getElementById('ssPwMsg').className = 'ss-msg';
+    document.getElementById('ssPwCurrent').value = '';
+    document.getElementById('ssPwNew').value = '';
+    document.getElementById('ssPwConfirm').value = '';
+    document.getElementById('ssAccountModal').classList.add('active');
     ssLoadProfile();
 }
 

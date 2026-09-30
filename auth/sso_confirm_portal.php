@@ -51,7 +51,7 @@ function tr(string $key, string $default, array $params = []): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars(tr('sso_fallback_title', 'Analyst Account Not Found')); ?> - FreeITSM</title>
+    <title><?php echo htmlspecialchars(tr('sso_fallback_title', 'No analyst account')); ?> - FreeITSM</title>
     <link rel="icon" type="image/png" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>assets/img/favicon.png">
     <link rel="stylesheet" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>assets/css/theme.css">
     <link rel="stylesheet" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>assets/css/branding.css">
@@ -59,7 +59,7 @@ function tr(string $key, string $default, array $params = []): string {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--login-bg, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -164,11 +164,11 @@ function tr(string $key, string $default, array $params = []): string {
         <div class="login-header">
             <img src="<?php echo htmlspecialchars($brandLogo); ?>" alt="Company Logo">
 
-            <h1><?php echo htmlspecialchars(tr('sso_fallback_heading', 'Analyst Account Not Found')); ?></h1>
+            <h1><?php echo htmlspecialchars(tr('sso_fallback_heading', 'No analyst account')); ?></h1>
         </div>
 
         <div class="fallback-notice">
-            <?php echo tr('sso_fallback_desc', 'You signed in as <strong>{email}</strong>. This account does not have IT Analyst permissions.', ['email' => htmlspecialchars($email)]); ?>
+            <?php echo tr('sso_fallback_desc', 'You signed in as <strong>{email}</strong>. There is no analyst account for this address.', ['email' => htmlspecialchars($email)]); ?>
         </div>
 
         <p class="fallback-prompt">
@@ -178,10 +178,10 @@ function tr(string $key, string $default, array $params = []): string {
         <form method="POST" action="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>api/auth/oidc_callback.php">
             <input type="hidden" name="action" value="confirm_portal_proceed">
             <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf); ?>">
-            <button type="submit" class="login-button"><?php echo htmlspecialchars(tr('sso_fallback_btn_continue', 'Continue to Self-Service Portal')); ?></button>
+            <button type="submit" class="login-button"><?php echo htmlspecialchars(tr('sso_fallback_btn_continue', 'Continue')); ?></button>
         </form>
 
-        <a href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>auth/login.php?cancel_sso=1" class="cancel-link"><?php echo htmlspecialchars(tr('sso_fallback_btn_signout', 'Sign out')); ?></a>
+        <a href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>auth/login.php?cancel_sso=1" class="cancel-link"><?php echo htmlspecialchars(tr('sso_fallback_btn_signout', 'Cancel')); ?></a>
     </div>
 </body>
 </html>

@@ -133,11 +133,7 @@ try {
         $ticketsTenantColWasMissing = ((int)$tkProbe->fetchColumn() === 0);
     } catch (Exception $e) {}
 
-    // Was analysts.is_admin absent *before* this run added it? If so, every existing
-    // analyst predates the admin/non-admin split and must be grandfathered to admin
-    // (below) so an upgrade never locks anyone out of System. Once the column exists
-    // the flag is managed deliberately, so this backfill must run only this once.
-        // SSO JIT split (discussion #155): was auth_providers.auto_create_analysts
+    // SSO JIT split (discussion #155): was auth_providers.auto_create_analysts
     // absent before this run? Before the split, auto_create_users ALSO meant
     // "create an analyst" on the analyst login, so on the run that adds the new
     // column we copy the old value across. Only this once: after that the two
@@ -149,6 +145,10 @@ try {
         $providerAutoAnalystsColWasMissing = ((int)$aaProbe->fetchColumn() === 0);
     } catch (Exception $e) {}
 
+    // Was analysts.is_admin absent *before* this run added it? If so, every existing
+    // analyst predates the admin/non-admin split and must be grandfathered to admin
+    // (below) so an upgrade never locks anyone out of System. Once the column exists
+    // the flag is managed deliberately, so this backfill must run only this once.
     $analystIsAdminColWasMissing = false;
     try {
         $iaProbe = $conn->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? AND table_name = 'analysts' AND column_name = 'is_admin'");
@@ -452,11 +452,7 @@ try {
         ];
     }
 
-    // One-time grandfather: if is_admin was just added, promote every existing
-    // analyst to admin so the upgrade preserves today's behaviour (all analysts
-    // could reach System) rather than locking everyone out. Admins then demote
-    // people deliberately. Runs only on the run that first adds the column.
-        // One-time SSO JIT split (discussion #155). Keeps every existing provider
+    // One-time SSO JIT split (discussion #155). Keeps every existing provider
     // behaving exactly as it did before the upgrade:
     //  - analyst JIT stays on wherever the old single switch was on
     //  - someone with no analyst account is refused, as before, rather than
@@ -471,6 +467,10 @@ try {
         ];
     }
 
+    // One-time grandfather: if is_admin was just added, promote every existing
+    // analyst to admin so the upgrade preserves today's behaviour (all analysts
+    // could reach System) rather than locking everyone out. Admins then demote
+    // people deliberately. Runs only on the run that first adds the column.
     if ($analystIsAdminColWasMissing) {
         $graduated = $conn->exec("UPDATE analysts SET is_admin = 1");
         $results[] = [

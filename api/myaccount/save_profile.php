@@ -11,6 +11,9 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/sso_identity.php';
+require_once '../../includes/i18n.php';
+I18n::initFromSession();
 
 header('Content-Type: application/json');
 
@@ -28,16 +31,11 @@ try {
     };
 
     $conn = connectToDatabase();
-    $chkStmt = $conn->prepare(
-        "SELECT a.auth_provider_id, p.protocol, p.profile_sync_mode
-           FROM analysts a
-      LEFT JOIN auth_providers p ON p.id = a.auth_provider_id
-          WHERE a.id = ?"
-    );
-    $chkStmt->execute([(int)$_SESSION['analyst_id']]);
-    $chk = $chkStmt->fetch(PDO::FETCH_ASSOC);
-    if (strtolower((string)($chk['protocol'] ?? '')) === 'oidc' && ($chk['profile_sync_mode'] ?? 'never') === 'always') {
-        echo json_encode(['success' => false, 'error' => 'Your profile details are managed by your sign-in provider.']);
+
+    // Enforced here, not only by greying the fields out: an OIDC provider set
+    // to sync 'always' would put these back at the next sign-in (#155).
+    if (ssoAnalystProfileLocked($conn, (int)$_SESSION['analyst_id'])) {
+        echo json_encode(['success' => false, 'error' => t('system.preferences.details_managed_note')]);
         exit;
     }
     $stmt = $conn->prepare("UPDATE analysts
