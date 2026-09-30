@@ -4283,12 +4283,12 @@ function renderChannelComposer(ticketId) {
     const label = channelDisplayLabel(currentTicketChannel);
 
     // Attaching a file is only offered where MessagingProvider::sendMedia() is
-    // actually implemented (Telegram today). Every other provider's base-class
-    // default throws "not supported for this channel yet" — showing the button
-    // there would just be a guaranteed error, so it's gated on the channel
-    // rather than shown always and left to fail. Widen this list as more
-    // providers gain sendMedia().
-    const canAttach = (currentTicketChannel === 'telegram');
+    // actually implemented (Telegram, and WhatsApp via Twilio or Meta).
+    // Slack and web chat still hit the base class's "not supported for this
+    // channel yet" — showing the button there would just be a guaranteed
+    // error, so it's gated on the channel rather than shown always and left
+    // to fail. Widen this list as more providers gain sendMedia().
+    const canAttach = (currentTicketChannel === 'telegram' || currentTicketChannel === 'whatsapp');
 
     let inner;
     if (currentChannelWindowOpen) {

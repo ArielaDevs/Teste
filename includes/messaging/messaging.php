@@ -148,6 +148,48 @@ function messagingWebhookUrl(PDO $conn, int $channelId): string
 }
 
 /**
+ * A short-lived, unguessable URL to one outbound attachment's bytes — for a
+ * provider (Twilio) that fetches media itself rather than accepting an
+ * upload. NOT a general-purpose public file host: the token is bound to this
+ * ONE attachment id and expires quickly (checked in media.php), so it only
+ * stays reachable for the brief window between sending the message and the
+ * provider fetching it — not for as long as the ticket exists.
+ */
+function messagingOutboundMediaUrl(PDO $conn, int $attachmentId): string
+{
+    $base = rtrim(messagingPublicBaseUrl($conn), '/');
+    $root = preg_replace('#/api/messaging/.*$#', '', $_SERVER['SCRIPT_NAME'] ?? '');
+    if ($root !== '' && substr($base, -strlen($root)) === $root) {
+        $root = '';
+    }
+
+    // Comfortably longer than any provider takes to fetch (usually seconds),
+    // short enough that a URL sitting in a proxy/access log doesn't stay a
+    // live attack surface indefinitely.
+    $expires = time() + 3600;
+    $token = messagingOutboundMediaToken($attachmentId, $expires);
+
+    return $base . $root . '/api/messaging/media.php?id=' . $attachmentId . '&exp=' . $expires . '&token=' . $token;
+}
+
+/** HMAC binding one attachment id to one expiry — see messagingOutboundMediaUrl() and media.php. */
+function messagingOutboundMediaToken(int $attachmentId, int $expires): string
+{
+    require_once __DIR__ . '/../encryption.php';
+    return hash_hmac('sha256', $attachmentId . ':' . $expires, getEncryptionKey());
+}
+
+/** The category Meta's Media upload endpoint wants for a mime type ('image'|'video'|'audio'|'document'). */
+function messagingMediaCategory(string $mime): string
+{
+    $mime = strtolower(trim(explode(';', $mime)[0]));
+    if (strpos($mime, 'image/') === 0) return 'image';
+    if (strpos($mime, 'video/') === 0) return 'video';
+    if (strpos($mime, 'audio/') === 0) return 'audio';
+    return 'document';
+}
+
+/**
  * Normalise a sender identifier for storage and matching.
  *
  * ⚠️ This USED to be phone-only, and silently destroyed anything that wasn't a

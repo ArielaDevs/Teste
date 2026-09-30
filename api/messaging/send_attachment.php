@@ -7,9 +7,20 @@
  * resolution, but multipart/form-data (ticket_id + file + optional caption)
  * instead of a JSON body, because a browser cannot put a file into JSON.
  *
- * Today only TelegramProvider implements MessagingProvider::sendMedia();
- * every other provider's default throws "not supported for this channel
- * yet", which this endpoint surfaces as an ordinary error rather than a 500.
+ * The DB row + final attachment file are created BEFORE the provider is
+ * asked to send — unlike every other endpoint here, which sends first and
+ * records after. Twilio needs a URL to fetch the bytes FROM (it never takes
+ * an upload), and that URL has to point at something that already exists at
+ * its final path; Meta and Telegram upload the bytes directly and would be
+ * fine with the old order, but one shared order for every provider is less
+ * to get wrong than a branch per provider. A failed send rolls all of it
+ * back (see the catch block) so a rejected attachment never lingers as a
+ * ticket message with nothing behind it.
+ *
+ * TelegramProvider, MetaCloudProvider and TwilioProvider all implement
+ * MessagingProvider::sendMedia(); SlackProvider and FreeitsmProvider (web
+ * chat) don't yet — their base-class default throws "not supported for this
+ * channel yet", which this endpoint surfaces as an ordinary error, not a 500.
  */
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
@@ -92,26 +103,22 @@ try {
 
     // Validate the upload the same way any other ticket attachment is (two
     // gates: an extension WE named, and content that matches it) — it is
-    // about to be forwarded to a third party (Telegram), so it gets no more
-    // trust than an inbound attachment would. Stored to a temp path first;
-    // moved into the ticket's own attachment directory only once sending
-    // succeeds and the email row (whose id that path is keyed on) exists.
+    // about to be forwarded to a third party, so it gets no more trust than
+    // an inbound attachment would.
     $stored = uploadStoreFile($_FILES['file'], sys_get_temp_dir(), attachmentAllowedTypes($conn));
     $tmpPath = $stored['path'];
 
-    $provider = messagingProvider($channel);
-    $providerMsgId = $provider->sendMedia($recipient, $tmpPath, $stored['mime'], $caption);
-
-    // Store the outbound message in the shared thread (same shape as a text reply).
+    // Record the message + move the file into its final place BEFORE sending
+    // — see the file header for why. $emailId/$attachmentId below are rolled
+    // back in the catch block if the provider then rejects it.
     $ins = $conn->prepare(
         "INSERT INTO emails (
             exchange_message_id, subject, from_address, from_name, to_recipients,
             received_datetime, body_content, body_type, has_attachments, ticket_id,
             is_initial, direction, channel, channel_id
-        ) VALUES (?, NULL, ?, ?, ?, UTC_TIMESTAMP(), ?, 'text', 1, ?, 0, 'Outbound', ?, ?)"
+        ) VALUES (NULL, NULL, ?, ?, ?, UTC_TIMESTAMP(), ?, 'text', 1, ?, 0, 'Outbound', ?, ?)"
     );
     $ins->execute([
-        $providerMsgId !== '' ? $providerMsgId : null,
         (string) ($channel['phone_number'] ?? ''),
         $channel['name'] ?? 'Service Desk',
         $recipient,
@@ -133,16 +140,41 @@ try {
     }
     $finalPath = $emailDir . '/' . $stored['stored_name'];
     if (!rename($tmpPath, $finalPath)) {
-        throw new Exception('The message was sent, but its attachment could not be saved to this ticket.');
+        throw new Exception('The attachment could not be saved.');
     }
-    $tmpPath = null; // moved — nothing left for the finally-style cleanup below
+    $tmpPath = null; // moved — nothing left for the temp-cleanup below
 
     $filePath = $subDir . '/' . $emailId . '/' . $stored['stored_name'];
     $conn->prepare(
         "INSERT INTO email_attachments (email_id, exchange_attachment_id, filename, content_type, content_id, file_path, file_size, is_inline)
          VALUES (?, NULL, ?, ?, NULL, ?, ?, 0)"
     )->execute([$emailId, $stored['original_name'], $stored['mime'], $filePath, $stored['size']]);
+    $attachmentId = (int) $conn->lastInsertId();
 
+    // Now actually send it. $finalPath for a provider that uploads bytes
+    // directly (Meta, Telegram); a short-lived signed URL to that same file
+    // for one that fetches it itself (Twilio) — see MessagingProvider::sendMedia().
+    try {
+        $provider = messagingProvider($channel);
+        $providerMsgId = $provider->sendMedia(
+            $recipient,
+            $finalPath,
+            $stored['mime'],
+            $caption,
+            messagingOutboundMediaUrl($conn, $attachmentId)
+        );
+    } catch (Exception $sendEx) {
+        // Roll back everything recorded above — a rejected attachment must
+        // not sit in the thread looking like it went out.
+        $conn->prepare("DELETE FROM email_attachments WHERE id = ?")->execute([$attachmentId]);
+        $conn->prepare("DELETE FROM emails WHERE id = ?")->execute([$emailId]);
+        @unlink($finalPath);
+        throw $sendEx;
+    }
+
+    if ($providerMsgId !== '') {
+        $conn->prepare("UPDATE emails SET exchange_message_id = ? WHERE id = ?")->execute([$providerMsgId, $emailId]);
+    }
     $conn->prepare("UPDATE tickets SET updated_datetime = UTC_TIMESTAMP() WHERE id = ?")->execute([$ticketId]);
 
     echo json_encode(['success' => true, 'message' => 'Attachment sent']);
@@ -150,8 +182,9 @@ try {
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 } finally {
-    // Only reached on a failure path before the rename() above — clean up the
-    // validated-but-unsent temp copy rather than leaving it in the OS temp dir.
+    // Only reached if something failed before the file was moved into its
+    // final place — clean up the validated-but-unsent temp copy rather than
+    // leaving it in the OS temp dir.
     if ($tmpPath !== null && is_file($tmpPath)) {
         @unlink($tmpPath);
     }

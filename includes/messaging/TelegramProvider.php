@@ -268,7 +268,7 @@ class TelegramProvider extends MessagingProvider
      * explicit Content-Type, but a multipart upload needs curl to build the
      * body AND the boundary header itself from an array of fields.
      */
-    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = ''): string
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = ''): string
     {
         $token = $this->channel['credentials']['bot_token'] ?? '';
         if ($token === '') {
