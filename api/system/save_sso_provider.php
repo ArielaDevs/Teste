@@ -80,9 +80,13 @@ $displayName = trim($data['display_name'] ?? '');
 if ($displayName === '') bail('Display name is required');
 
 // --- Shared optional fields ---
-$enabled         = !empty($data['enabled']) ? 1 : 0;
-$autoCreate      = !empty($data['auto_create_users']) ? 1 : 0;
-$requireVerified = !empty($data['require_verified_email']) ? 1 : 0;
+$enabled            = !empty($data['enabled']) ? 1 : 0;
+$autoCreate         = !empty($data['auto_create_users']) ? 1 : 0;
+$autoCreateAnalysts = !empty($data['auto_create_analysts']) ? 1 : 0;
+$fallbackInput      = $data['analyst_fallback_mode'] ?? 'confirm';
+$analystFallback    = in_array($fallbackInput, ['confirm', 'redirect', 'block'], true) ? $fallbackInput : 'confirm';
+$requireVerified    = !empty($data['require_verified_email']) ? 1 : 0;
+$profileSyncMode   = in_array($data['profile_sync_mode'] ?? '', ['always', 'initial', 'never'], true) ? $data['profile_sync_mode'] : 'never';
 $defaultModules  = isset($data['default_modules']) && trim($data['default_modules']) !== ''
                    ? trim($data['default_modules']) : null;
 $sortOrder       = (int)($data['sort_order'] ?? 0);
@@ -294,7 +298,7 @@ try {
 
     // Columns common to both branches, in a fixed order.
     $cols = ['display_name', 'protocol', 'issuer_url', 'client_id', 'scopes',
-             'enabled', 'auto_create_users', 'require_verified_email',
+             'enabled', 'auto_create_users', 'auto_create_analysts', 'analyst_fallback_mode', 'require_verified_email', 'profile_sync_mode',
              'default_modules', 'sort_order', 'tenant_id',
              'ldap_host', 'ldap_port', 'ldap_encryption', 'ldap_bind_dn',
              'ldap_base_dn', 'ldap_user_filter', 'ldap_attr_username',
@@ -307,7 +311,7 @@ try {
              'carddav_url', 'carddav_username', 'carddav_addressbook', 'carddav_auth',
              'carddav_scope', 'carddav_scope_value', 'carddav_write_back', 'carddav_allow_create'];
     $vals = [$displayName, $protocol, $issuerUrl, $clientId, $scopes,
-             $enabled, $autoCreate, $requireVerified,
+             $enabled, $autoCreate, $autoCreateAnalysts, $analystFallback, $requireVerified, $profileSyncMode,
              $defaultModules, $sortOrder, $tenantId,
              $ldap['host'], $ldap['port'], $ldap['encryption'], $ldap['bind_dn'],
              $ldap['base_dn'], $ldap['user_filter'], $ldap['attr_username'],
@@ -346,9 +350,9 @@ try {
         if ($existing['protocol'] === $protocol) {
             $readable = ['enabled', 'default_modules', 'sort_order', 'tenant_id'];
             if ($protocol === 'oidc') {
-                $readable = array_merge($readable, ['auto_create_users', 'require_verified_email', 'issuer_url', 'client_id', 'scopes']);
+                $readable = array_merge($readable, ['auto_create_users', 'auto_create_analysts', 'analyst_fallback_mode', 'require_verified_email', 'profile_sync_mode', 'issuer_url', 'client_id', 'scopes']);
             } elseif ($protocol === 'ldap') {
-                $readable = array_merge($readable, ['auto_create_users', 'require_verified_email'],
+                $readable = array_merge($readable, ['auto_create_users', 'auto_create_analysts', 'analyst_fallback_mode', 'require_verified_email', 'profile_sync_mode'],
                     array_values(array_filter($cols, fn($c) => strpos($c, 'ldap_') === 0 || strpos($c, 'sync_') === 0)));
             } else {
                 $readable = array_merge($readable,

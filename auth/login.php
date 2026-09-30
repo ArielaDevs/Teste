@@ -80,6 +80,9 @@ function tr(string $key, string $english, array $params = []): string {
 // An SSO sign-in attempt that failed bounces back here with a message.
 $sso_error = $_SESSION['sso_error'] ?? null;
 unset($_SESSION['sso_error']);
+if (isset($_GET['cancel_sso'])) {
+    unset($_SESSION['sso_pending_portal'], $_SESSION['sso_portal_csrf']);
+}
 
 /**
  * Get a security setting from system_settings (returns string or null)

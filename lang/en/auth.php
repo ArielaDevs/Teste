@@ -116,4 +116,12 @@ return [
     'back_to_login'       => 'Back to login',
     'new_password'        => 'New Password',
     'err_generic'         => 'Something went wrong. Please try again.',
+
+    // ── SSO Fallback to Self-Service (auth/sso_confirm_portal.php) ──────
+    'sso_fallback_title'         => 'Analyst Account Not Found',
+    'sso_fallback_heading'       => 'Analyst Account Not Found',
+    'sso_fallback_desc'          => 'You signed in as <strong>{email}</strong>. This account does not have IT Analyst permissions.',
+    'sso_fallback_prompt'        => 'Would you like to proceed to the Self-Service Portal to submit or view support tickets, access assigned equipment, or complete training?',
+    'sso_fallback_btn_continue'  => 'Continue to Self-Service Portal',
+    'sso_fallback_btn_signout'   => 'Sign out',
 ];

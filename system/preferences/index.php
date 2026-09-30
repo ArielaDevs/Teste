@@ -182,10 +182,48 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
 
         /* My details + signatures (#80). */
         .sig-details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }
-        .sig-details-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+        .sig-details-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text, #333); }
         .sig-details-grid input, .sig-field input[type="text"] {
             padding: 9px 10px; border: 1px solid var(--border, #ddd); border-radius: 4px;
             font-size: 14px; font-family: inherit;
+            background: var(--surface, #fff);
+            color: var(--text, #333);
+            box-sizing: border-box;
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+        .sig-details-grid input:focus, .sig-field input[type="text"]:focus {
+            outline: none;
+            border-color: var(--sys-accent, #546e7a);
+        }
+        .sig-details-grid input:disabled, .sig-field input[type="text"]:disabled {
+            background: var(--surface-2, #f5f5f5);
+            color: var(--text-muted, #888);
+            cursor: not-allowed;
+            border-color: var(--border, #e0e0e0);
+            opacity: 0.8;
+        }
+        .sig-details-grid label.is-disabled {
+            cursor: not-allowed;
+            opacity: 0.85;
+        }
+        .pref-managed-note {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+            background: var(--surface-2, rgba(84, 110, 122, 0.1));
+            color: var(--text, #333);
+            border-left: 3px solid var(--sys-accent, #546e7a);
+        }
+        .pref-managed-note svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            stroke: var(--sys-accent, #546e7a);
         }
         .sig-btn { padding: 8px 16px; border-radius: 4px; border: 1px solid var(--border, #ddd); cursor: pointer; font-size: 13px; font-family: inherit; }
         .sig-btn-primary { background: var(--accent, #2d6a4f); color: #fff; border-color: transparent; }
@@ -786,6 +824,10 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
             <div class="pref-section">
                 <h3><?php echo htmlspecialchars(t('system.preferences.details_heading')); ?></h3>
                 <p><?php echo htmlspecialchars(t('system.preferences.details_desc')); ?></p>
+                <div id="detailsManagedNote" class="pref-managed-note" style="display:none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span><?php echo htmlspecialchars(t('system.preferences.details_managed_note')); ?></span>
+                </div>
                 <div class="sig-details-grid">
                     <label><span><?php echo htmlspecialchars(t('system.preferences.details_job_title')); ?></span>
                         <input type="text" id="myJobTitle" autocomplete="off" maxlength="100"></label>
@@ -796,7 +838,7 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
                     <label><span><?php echo htmlspecialchars(t('system.preferences.details_mobile')); ?></span>
                         <input type="text" id="myMobile" autocomplete="off" maxlength="50"></label>
                 </div>
-                <button type="button" class="sig-btn sig-btn-primary" onclick="saveMyDetails()"><?php echo htmlspecialchars(t('common.save')); ?></button>
+                <button type="button" class="sig-btn sig-btn-primary" id="saveDetailsBtn" onclick="saveMyDetails()"><?php echo htmlspecialchars(t('common.save')); ?></button>
                 <span class="pref-saving-hint" id="detailsSavingHint"><?php echo htmlspecialchars(t('system.preferences.saving')); ?></span>
             </div>
 
@@ -1234,6 +1276,24 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
                 document.getElementById('myDepartment').value = p.department || '';
                 document.getElementById('myPhone').value      = p.phone      || '';
                 document.getElementById('myMobile').value     = p.mobile     || '';
+                const isManaged = !!p.is_managed;
+                ['myJobTitle', 'myDepartment', 'myPhone', 'myMobile'].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = isManaged;
+                        if (isManaged) {
+                            el.title = window.t ? window.t('system.preferences.details_managed_note') : 'Managed by identity provider';
+                            if (el.parentElement) el.parentElement.classList.add('is-disabled');
+                        } else {
+                            el.removeAttribute('title');
+                            if (el.parentElement) el.parentElement.classList.remove('is-disabled');
+                        }
+                    }
+                });
+                const saveBtn = document.getElementById('saveDetailsBtn');
+                if (saveBtn) saveBtn.style.display = isManaged ? 'none' : '';
+                const managedNote = document.getElementById('detailsManagedNote');
+                if (managedNote) managedNote.style.display = isManaged ? 'flex' : 'none';
 
                 renderSignatureList();
                 renderSignatureCodes();

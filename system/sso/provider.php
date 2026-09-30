@@ -406,7 +406,28 @@ function v($row, string $k): string { return htmlspecialchars((string)($row[$k] 
                 </div>
             </div>
             <div class="fld">
+                <label for="fProfileSyncMode" style="display:block;margin-bottom:6px;font-weight:500;"><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode')); ?></label>
+                <div class="hint" style="margin-bottom:6px;"><?php echo htmlspecialchars(t('system.sso.field_profile_sync_mode_hint')); ?></div>
+                <select id="fProfileSyncMode" style="width:100%;max-width:400px;padding:8px;border:1px solid var(--border,#ccc);border-radius:4px;background:var(--surface,#fff);color:var(--text,#333);">
+                    <option value="never"<?php echo ($p['profile_sync_mode'] ?? 'never') === 'never' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_never')); ?></option>
+                    <option value="initial"<?php echo ($p['profile_sync_mode'] ?? '') === 'initial' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_initial')); ?></option>
+                    <option value="always"<?php echo ($p['profile_sync_mode'] ?? '') === 'always' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.profile_sync_always')); ?></option>
+                </select>
+            </div>
+            <div class="fld">
                 <label class="chk"><input type="checkbox" id="fAutoCreate"<?php echo (int)$p['auto_create_users'] === 1 ? ' checked' : ''; ?>> <?php echo htmlspecialchars(t('system.sso.field_auto_create')); ?></label>
+            </div>
+            <div class="fld">
+                <label class="chk"><input type="checkbox" id="fAutoCreateAnalysts"<?php echo (int)($p['auto_create_analysts'] ?? 0) === 1 ? ' checked' : ''; ?>> <?php echo htmlspecialchars(t('system.sso.cb_autocreate_analysts')); ?></label>
+            </div>
+            <div class="fld">
+                <label for="fAnalystFallbackMode" style="display:block;margin-bottom:6px;font-weight:500;"><?php echo htmlspecialchars(t('system.sso.field_fallback_mode')); ?></label>
+                <div class="hint" style="margin-bottom:6px;"><?php echo htmlspecialchars(t('system.sso.field_fallback_mode_hint')); ?></div>
+                <select id="fAnalystFallbackMode" style="width:100%;max-width:400px;padding:8px;border:1px solid var(--border,#ccc);border-radius:4px;background:var(--surface,#fff);color:var(--text,#333);">
+                    <option value="confirm"<?php echo ($p['analyst_fallback_mode'] ?? 'confirm') === 'confirm' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.fallback_mode_confirm')); ?></option>
+                    <option value="redirect"<?php echo ($p['analyst_fallback_mode'] ?? '') === 'redirect' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.fallback_mode_redirect')); ?></option>
+                    <option value="block"<?php echo ($p['analyst_fallback_mode'] ?? '') === 'block' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('system.sso.fallback_mode_block')); ?></option>
+                </select>
             </div>
         </div>
 
@@ -624,7 +645,10 @@ function payload() {
         protocol: 'ldap',
         display_name: $('fDisplayName').value.trim(),
         enabled: $('fEnabled').checked ? 1 : 0,
+        profile_sync_mode: $('fProfileSyncMode').value || 'never',
         auto_create_users: $('fAutoCreate').checked ? 1 : 0,
+        auto_create_analysts: $('fAutoCreateAnalysts').checked ? 1 : 0,
+        analyst_fallback_mode: $('fAnalystFallbackMode').value || 'confirm',
         tenant_id: $('fTenantId') ? ($('fTenantId').value || null) : null,
         ldap_host: $('fHost').value.trim(),
         ldap_port: parseInt($('fPort').value, 10) || 389,

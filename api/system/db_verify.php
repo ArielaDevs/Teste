@@ -137,6 +137,18 @@ try {
     // analyst predates the admin/non-admin split and must be grandfathered to admin
     // (below) so an upgrade never locks anyone out of System. Once the column exists
     // the flag is managed deliberately, so this backfill must run only this once.
+        // SSO JIT split (discussion #155): was auth_providers.auto_create_analysts
+    // absent before this run? Before the split, auto_create_users ALSO meant
+    // "create an analyst" on the analyst login, so on the run that adds the new
+    // column we copy the old value across. Only this once: after that the two
+    // switches are set deliberately and must never be re-synced.
+    $providerAutoAnalystsColWasMissing = false;
+    try {
+        $aaProbe = $conn->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? AND table_name = 'auth_providers' AND column_name = 'auto_create_analysts'");
+        $aaProbe->execute([$dbName]);
+        $providerAutoAnalystsColWasMissing = ((int)$aaProbe->fetchColumn() === 0);
+    } catch (Exception $e) {}
+
     $analystIsAdminColWasMissing = false;
     try {
         $iaProbe = $conn->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? AND table_name = 'analysts' AND column_name = 'is_admin'");
@@ -444,6 +456,21 @@ try {
     // analyst to admin so the upgrade preserves today's behaviour (all analysts
     // could reach System) rather than locking everyone out. Admins then demote
     // people deliberately. Runs only on the run that first adds the column.
+        // One-time SSO JIT split (discussion #155). Keeps every existing provider
+    // behaving exactly as it did before the upgrade:
+    //  - analyst JIT stays on wherever the old single switch was on
+    //  - someone with no analyst account is refused, as before, rather than
+    //    being offered the portal; admins can choose 'confirm' deliberately
+    if ($providerAutoAnalystsColWasMissing) {
+        $copied = $conn->exec("UPDATE auth_providers SET auto_create_analysts = auto_create_users");
+        $conn->exec("UPDATE auth_providers SET analyst_fallback_mode = 'block'");
+        $results[] = [
+            'table'   => 'auth_providers',
+            'status'  => 'updated',
+            'details' => ['Kept the auto-create setting for ' . (int)$copied . ' sign-in provider(s) (one-time upgrade)']
+        ];
+    }
+
     if ($analystIsAdminColWasMissing) {
         $graduated = $conn->exec("UPDATE analysts SET is_admin = 1");
         $results[] = [

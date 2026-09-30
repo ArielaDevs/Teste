@@ -302,7 +302,8 @@ function portalProfileAccess(PDO $conn, int $userId): ?array
 {
     $cols = implode(', ', array_map(function ($f) { return 'u.' . $f; }, USER_PERSON_FIELDS));
     $st = $conn->prepare(
-        "SELECT u.is_managed, u.display_name, p.protocol, p.carddav_write_back, $cols
+        "SELECT u.is_managed, u.display_name, p.protocol, p.carddav_write_back, p.profile_sync_mode,
+                u.auth_provider_id, $cols
            FROM users u
       LEFT JOIN auth_providers p ON p.id = u.auth_provider_id
           WHERE u.id = ?"
@@ -312,7 +313,7 @@ function portalProfileAccess(PDO $conn, int $userId): ?array
     if ($row === false) return null;
 
     $fields  = portalProfileEditableFields($conn);
-    $managed = (int)($row['is_managed'] ?? 0) === 1;
+    $managed = (int)($row['is_managed'] ?? 0) === 1;          // unchanged
     $isCardDav = strtolower((string)($row['protocol'] ?? '')) === 'carddav';
 
     // 🔴 Write-back on the address book is NOT enough on its own. That switch
@@ -328,6 +329,19 @@ function portalProfileAccess(PDO $conn, int $userId): ?array
     $locked = ($managed && !$addressBook)
         ? array_values(array_intersect($fields, userDirectoryOwnedFields($row['protocol'] ?? null, false)))
         : [];
+
+    // SSO profile sync (discussion #155): an OIDC provider set to 'always'
+    // rewrites these on every sign-in, so an edit here would be undone at the
+    // next one. Only the five it actually writes - never employee_id or
+    // manager_id, which OIDC sync does not touch.
+    $oidcSynced = strtolower((string)($row['protocol'] ?? '')) === 'oidc'
+               && ($row['profile_sync_mode'] ?? 'never') === 'always';
+    if ($oidcSynced) {
+        $locked = array_values(array_unique(array_merge(
+            $locked,
+            array_intersect($fields, USER_CARDDAV_OWNED)   // the same five: job_title, department, office, phone, mobile
+        )));
+    }
 
     return [
         'fields'       => $fields,

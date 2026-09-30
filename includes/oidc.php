@@ -243,3 +243,34 @@ function oidcHttpPost(string $url, array $fields): string {
     return $body; // caller inspects JSON (may be a 400 with an error body)
 }
 
+
+/**
+ * Fetch claims from the provider userinfo_endpoint using the access_token.
+ * Returns decoded JSON claims array or empty array on failure.
+ */
+function oidcFetchUserInfo(string $userinfoEndpoint, string $accessToken): array {
+    if (empty($userinfoEndpoint) || empty($accessToken)) return [];
+    try {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $userinfoEndpoint,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $accessToken,
+                'Accept: application/json',
+            ],
+        ]);
+        sslApplyCurl($ch);
+        $body = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($body !== false && $code === 200) {
+            $data = json_decode($body, true);
+            return is_array($data) ? $data : [];
+        }
+    } catch (Throwable $e) {
+        // Fall back gracefully to ID token claims
+    }
+    return [];
+}

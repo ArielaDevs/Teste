@@ -530,6 +530,7 @@ return [
     'menu' => [
         'my_account'    => 'My Account',
         'mfa'           => 'Multi-Factor Auth',
+        'analyst_console' => 'Analyst console',
         'logout'        => 'Logout',
         'logout_confirm'=> 'Are you sure you want to logout?',
         'mfa_on'        => 'On',
