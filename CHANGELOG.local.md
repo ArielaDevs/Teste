@@ -20,6 +20,11 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2047 | Tickets           | Fix         | Pictures in the quoted thread of a reply or forward are carried inside the email (up to 2 MB per email) on every provider, including Microsoft; the converter's pattern matched no stored email, so they arrived as broken links. |
 | 2048 | Tickets           | Fix         | A pasted screenshot in a reply is sent as an inline picture rather than a data: image, which Gmail and Outlook will not display. |
 | 2049 | Tickets           | Improvement | Pictures embedded in an outgoing email are read only from the same ticket, so a hand-typed link cannot mail out another ticket's or company's file. |
+| 2050 | Authentication    | Feature     | Separate auto-create switches per sign-in provider for portal requesters and IT analysts (OIDC and LDAP); DB Verify copies the old single switch into both once, so upgrades behave as before (discussion #155, contributed by Santhosh Srinivasan). |
+| 2051 | Authentication    | Feature     | Per-provider action when someone with no analyst account signs in on the analyst login via OIDC: warn and confirm, switch to the portal, or block; existing providers are set to block on upgrade (#155, Santhosh Srinivasan). |
+| 2052 | Authentication    | Feature     | OIDC profile sync (never / on account creation / always) of name, job title, department, office, phone and mobile from ID-token and userinfo claims, written only after every access check; 'always' locks those fields on My Account and My details (#155, Santhosh Srinivasan). |
+| 2053 | Self-service      | Feature     | The portal's account menu shows an Analyst console link to anyone who also has an active analyst account (#155, Santhosh Srinivasan). |
+| 2054 | Authentication    | Improvement | Review follow-ups on the #155 merge: userinfo fetched only when sync is on and discarded unless its sub matches; every reader of the new columns works before DB Verify; parked portal sign-in expires after 10 minutes; help, D010 diagnostics and 3 new Feature Bingo cards. |
 
 
 
