@@ -14,6 +14,7 @@ require_once '../../includes/functions.php';
 require_once '../../includes/i18n.php';
 require_once '../../includes/theme.php';
 require_once '../../includes/timezone.php';
+require_once '../../includes/tenancy.php';
 I18n::initFromSession();
 Tz::init();
 
@@ -29,16 +30,24 @@ $days = max(1, min(365, (int)($_GET['days'] ?? 30)));
 
 $conn = connectToDatabase();
 
+// GH #157: every figure on this page follows the company switcher in the
+// header, like the ticket list - the company picked there, or every company
+// this analyst may see under "All companies". ticketTenantFilter() is the
+// ticket list's own scope; it is empty on a single-company install, where the
+// join to tickets changes nothing (a CSAT row is deleted with its ticket).
+[$ttSql, $ttParams] = ticketTenantFilter($conn, (int)$_SESSION['analyst_id'], 't');
+
 // Headline KPIs — average, count, response rate over the window
 $kpiStmt = $conn->prepare(
     "SELECT
         COUNT(*) AS sent_count,
-        SUM(CASE WHEN responded_datetime IS NOT NULL THEN 1 ELSE 0 END) AS response_count,
-        AVG(rating) AS avg_rating
-     FROM ticket_csat_responses
-     WHERE sent_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)"
+        SUM(CASE WHEN cr.responded_datetime IS NOT NULL THEN 1 ELSE 0 END) AS response_count,
+        AVG(cr.rating) AS avg_rating
+     FROM ticket_csat_responses cr
+     INNER JOIN tickets t ON t.id = cr.ticket_id
+     WHERE cr.sent_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)" . $ttSql
 );
-$kpiStmt->execute([$days]);
+$kpiStmt->execute(array_merge([$days], $ttParams));
 $kpi = $kpiStmt->fetch(PDO::FETCH_ASSOC) ?: ['sent_count' => 0, 'response_count' => 0, 'avg_rating' => null];
 
 $sent     = (int)($kpi['sent_count'] ?? 0);
@@ -48,11 +57,12 @@ $rate     = $sent > 0 ? round($received / $sent * 100, 1) : 0;
 
 // Distribution of scores 1-5 in the window
 $distStmt = $conn->prepare(
-    "SELECT rating, COUNT(*) AS n FROM ticket_csat_responses
-     WHERE rating IS NOT NULL AND responded_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)
-     GROUP BY rating"
+    "SELECT cr.rating, COUNT(*) AS n FROM ticket_csat_responses cr
+     INNER JOIN tickets t ON t.id = cr.ticket_id
+     WHERE cr.rating IS NOT NULL AND cr.responded_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)" . $ttSql . "
+     GROUP BY cr.rating"
 );
-$distStmt->execute([$days]);
+$distStmt->execute(array_merge([$days], $ttParams));
 $dist = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
 foreach ($distStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
     $dist[(int)$r['rating']] = (int)$r['n'];
@@ -63,13 +73,14 @@ $distMax = max(array_values($dist) + [1]);
 $analystStmt = $conn->prepare(
     "SELECT a.full_name, COUNT(cr.rating) AS responses, AVG(cr.rating) AS avg_rating
      FROM ticket_csat_responses cr
+     INNER JOIN tickets t ON t.id = cr.ticket_id
      LEFT JOIN analysts a ON a.id = cr.analyst_id
-     WHERE cr.rating IS NOT NULL AND cr.responded_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)
+     WHERE cr.rating IS NOT NULL AND cr.responded_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)" . $ttSql . "
      GROUP BY a.id, a.full_name
      HAVING responses > 0
      ORDER BY avg_rating DESC, responses DESC"
 );
-$analystStmt->execute([$days]);
+$analystStmt->execute(array_merge([$days], $ttParams));
 $perAnalyst = $analystStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Recent responses (last 25 in window, with comment if any)
@@ -80,11 +91,11 @@ $recentStmt = $conn->prepare(
      FROM ticket_csat_responses cr
      INNER JOIN tickets t ON t.id = cr.ticket_id
      LEFT JOIN analysts a ON a.id = cr.analyst_id
-     WHERE cr.rating IS NOT NULL AND cr.responded_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)
+     WHERE cr.rating IS NOT NULL AND cr.responded_datetime >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)" . $ttSql . "
      ORDER BY cr.responded_datetime DESC
      LIMIT 25"
 );
-$recentStmt->execute([$days]);
+$recentStmt->execute(array_merge([$days], $ttParams));
 $recent = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $emojis = ['', '😡', '🙁', '😐', '🙂', '😀'];
