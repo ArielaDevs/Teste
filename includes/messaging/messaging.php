@@ -21,6 +21,7 @@ require_once __DIR__ . '/TwilioProvider.php';
 require_once __DIR__ . '/MetaCloudProvider.php';
 require_once __DIR__ . '/SlackProvider.php';
 require_once __DIR__ . '/FreeitsmProvider.php';
+require_once __DIR__ . '/TelegramProvider.php';
 require_once __DIR__ . '/../encryption.php';
 
 /** The 24h provider service window, in seconds. */
@@ -43,6 +44,8 @@ function messagingProvider(array $channel): MessagingProvider
             return new FreeitsmProvider($channel);
         case 'slack':
             return new SlackProvider($channel);
+        case 'telegram':
+            return new TelegramProvider($channel);
         default:
             throw new Exception('Unknown messaging provider: ' . ($channel['provider'] ?? '?'));
     }
@@ -166,6 +169,14 @@ function normaliseChannelIdentifier(string $raw, string $channelType = 'whatsapp
         // upper-case but a hand-typed value in settings might not be.
         $s = strtoupper($s);
         return preg_match('/^[UW][A-Z0-9]{2,}$/', $s) ? $s : '';
+    }
+
+    if ($channelType === 'telegram') {
+        // A Telegram chat id — a bare (optionally negative, for group chats)
+        // integer. NOT a phone number: running it through the digit-stripping
+        // rule below would silently drop a leading '-' and collapse a group
+        // chat id onto a different, positive one.
+        return preg_match('/^-?\d+$/', $s) ? $s : '';
     }
 
     // --- phone identifiers (whatsapp, and the default for anything else) ---

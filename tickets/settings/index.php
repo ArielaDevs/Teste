@@ -2658,10 +2658,11 @@ $translationNamespaces = ['common', 'tickets'];
                         <select id="channelProvider" onchange="toggleChannelProviderFields()">
                             <option value="twilio">Twilio</option>
                             <option value="meta"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_meta')); ?></option>
+                            <option value="telegram"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_telegram')); ?></option>
                         </select>
                     </div>
 
-                    <div class="form-group" style="grid-column: span 2;">
+                    <div class="form-group provider-phone" style="grid-column: span 2;">
                         <label for="channelPhone"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.phone')); ?></label>
                         <input type="text" id="channelPhone" placeholder="<?php echo htmlspecialchars(t('tickets.settings.modals.channel.phone_placeholder')); ?>">
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.phone_help')); ?></small>
@@ -2697,15 +2698,22 @@ $translationNamespaces = ['common', 'tickets'];
                         <label for="channelAppSecret"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.app_secret')); ?> *</label>
                         <input type="password" id="channelAppSecret" placeholder="••••••••">
                     </div>
-                    <div class="form-group provider-meta">
+                    <div class="form-group provider-meta provider-telegram" id="channelVerifyTokenGroup">
                         <label for="channelVerifyToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token')); ?></label>
                         <input type="text" id="channelVerifyToken" placeholder="<?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_placeholder')); ?>">
-                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_help')); ?></small>
+                        <small style="color:var(--text-muted, #666);" id="channelVerifyTokenHelp"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_help')); ?></small>
                     </div>
                     <div class="form-group provider-meta">
                         <label for="channelGraphVersion"><?php echo t('tickets.settings.modals.channel.graph_version'); ?></label>
                         <input type="text" id="channelGraphVersion" placeholder="<?php echo htmlspecialchars(t('tickets.settings.modals.channel.graph_version_placeholder')); ?>">
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.graph_version_help')); ?></small>
+                    </div>
+
+                    <!-- Telegram credentials -->
+                    <div class="form-group provider-telegram" style="grid-column: span 2;">
+                        <label for="channelBotToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.bot_token')); ?> *</label>
+                        <input type="password" id="channelBotToken" placeholder="123456789:AA••••••••••••••••••••••••••••••••">
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.bot_token_help')); ?></small>
                     </div>
 
                     <div class="form-group" style="grid-column: span 2;">
@@ -4274,6 +4282,8 @@ $translationNamespaces = ['common', 'tickets'];
             tbody.innerHTML = list.map(c => {
                 const providerBadge = c.provider === 'meta'
                     ? ' <span class="status-badge" style="background:#e3f2fd;color:#1565c0;">Meta</span>'
+                    : c.provider === 'telegram'
+                    ? ' <span class="status-badge" style="background:#e1f5fe;color:#0288d1;">Telegram</span>'
                     : ' <span class="status-badge" style="background:#e8f5e9;color:#2e7d32;">Twilio</span>';
                 const activeBadge = c.is_active ? '' : ' <span class="status-badge status-inactive">Inactive</span>';
                 const credBadge = c.has_credentials
@@ -4323,6 +4333,19 @@ $translationNamespaces = ['common', 'tickets'];
             const p = document.getElementById('channelProvider').value;
             document.querySelectorAll('.provider-twilio').forEach(el => el.style.display = (p === 'twilio') ? '' : 'none');
             document.querySelectorAll('.provider-meta').forEach(el => el.style.display = (p === 'meta') ? '' : 'none');
+            document.querySelectorAll('.provider-telegram').forEach(el => el.style.display = (p === 'telegram') ? '' : 'none');
+            // Telegram has no WhatsApp-style phone number; the field is meaningless there.
+            document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram') ? 'none' : '');
+            // The shared verify-token field means different things per provider — swap the copy.
+            const isTelegram = (p === 'telegram');
+            const label = document.querySelector('#channelVerifyTokenGroup label');
+            const help = document.getElementById('channelVerifyTokenHelp');
+            if (label) label.textContent = isTelegram
+                ? '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret'), ENT_QUOTES); ?>'
+                : '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token'), ENT_QUOTES); ?>';
+            if (help) help.textContent = isTelegram
+                ? '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_help'), ENT_QUOTES); ?>'
+                : '<?php echo htmlspecialchars(t('tickets.settings.modals.channel.verify_token_help'), ENT_QUOTES); ?>';
         }
 
         function toggleChannelIngressFields() {
@@ -4341,7 +4364,7 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('channelActive').checked = channel ? !!channel.is_active : true;
             // Secrets are write-only; show a masked placeholder on edit if configured.
             const mask = (channel && channel.has_credentials) ? '********' : '';
-            ['channelAuthToken','channelAccessToken','channelAppSecret'].forEach(idv => document.getElementById(idv).value = mask);
+            ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken'].forEach(idv => document.getElementById(idv).value = mask);
             ['channelAccountSid','channelPhoneNumberId','channelVerifyToken','channelRelaySecret'].forEach(idv => document.getElementById(idv).value = '');
             document.getElementById('channelGraphVersion').value = channel ? (channel.graph_version || '') : '';
 
@@ -4444,7 +4467,8 @@ $translationNamespaces = ['common', 'tickets'];
                 phone_number_id: document.getElementById('channelPhoneNumberId').value.trim(),
                 access_token: document.getElementById('channelAccessToken').value,
                 app_secret: document.getElementById('channelAppSecret').value,
-                graph_version: document.getElementById('channelGraphVersion').value.trim()
+                graph_version: document.getElementById('channelGraphVersion').value.trim(),
+                bot_token: document.getElementById('channelBotToken').value
             };
             if (!payload.name) { showToast('Name is required', 'error'); return; }
             try {
