@@ -815,8 +815,11 @@ heading('Unscoped lists  Endpoints that read a scoped table');
 // activity — while `FROM users u` returned every requester on the install.
 // Found while building the requester picker (discussion #54) on top of it.
 $gu = code("$APP/api/tickets/get_users.php");
+// Either filter counts: 119d04c0 moved this list to activeTenantReadFilter()
+// so that "All companies" shows every company the analyst may see. The test
+// looked for the old name only and reported a leak that was not there.
 check("get_users.php scopes the USER LIST, not only the ticket count",
-      strpos($gu, 'activeTenantFilter') !== false,
+      preg_match('/activeTenant(Read)?Filter\(\$conn,[^;]*[\'"]u[\'"]\)/', $gu) === 1,
       'the list itself returned every requester on the install');
 // Precedence is half the fix: appended after a bare `a LIKE ? OR b LIKE ?` the
 // company clause would bind to the last OR branch only.
