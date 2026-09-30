@@ -698,6 +698,16 @@ return [
     ],
 
     // Inline reply box on a WhatsApp/Telegram/Slack ticket (assets/js/inbox.js renderChannelComposer() and friends).
+    // The Telegram bot's OWN outbound text (not UI chrome) — sent in the
+    // CUSTOMER's language_code (includes/messaging/ingest.php), not the
+    // analyst's interface language. See I18n::tFor().
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Hi! While we look into this, could you share your phone number using the button below? It helps us recognise you if you\'ve contacted us before.',
+        'request_contact_button' => 'Share phone number',
+        'ack_matched'            => 'Thanks — found your account. Please describe your issue and we\'ll take it from here.',
+        'ack_new'                => 'Thanks! Please describe your issue and we\'ll take it from here.',
+    ],
+
     'channel_composer' => [
         'label_webchat'             => 'Web chat',
         'reply_title'               => 'Reply to the customer over {channel}',
@@ -707,6 +717,10 @@ return [
         'summarise_title'           => 'Summarise this conversation into the ticket',
         'summarise'                 => 'Summarise',
         'send'                      => 'Send',
+        'attach'                    => 'Attach',
+        'attach_title'              => 'Attach a file (image, document…)',
+        'attachment_sent'           => 'Attachment sent',
+        'attachment_send_failed'    => 'Failed to send attachment',
         'window_closed'             => '⏳ The 24-hour reply window has closed. Free-text replies are blocked by WhatsApp — send a pre-approved template to re-open the conversation.',
         'template_label'            => 'Template',
         'loading_templates'         => 'Loading templates…',

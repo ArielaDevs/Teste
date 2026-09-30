@@ -191,6 +191,35 @@ function normaliseChannelIdentifier(string $raw, string $channelType = 'whatsapp
 }
 
 /**
+ * Map a raw client-reported language tag (e.g. Telegram's message.from.
+ * language_code — the user's own OS/app setting, "uk", "en", "pt-BR", never
+ * something they typed) onto one of this install's I18n::SUPPORTED_LOCALES
+ * keys. Unrecognised or empty input falls back to English — I18n::tFor()
+ * would do that anyway, but resolving it here keeps the fallback visible to
+ * the caller (e.g. for deciding whether to bother storing it).
+ */
+function messagingNormaliseLocale(string $raw): string
+{
+    require_once __DIR__ . '/../i18n.php';
+    $lower = strtolower(trim($raw));
+    if ($lower === '') {
+        return 'en';
+    }
+    // Our one locale whose key isn't a bare lowercase tag.
+    if ($lower === 'pt' || strpos($lower, 'pt-br') === 0) {
+        return 'pt-BR';
+    }
+    // Telegram (and browsers) may send the old generic "no" for Norwegian;
+    // bokmål is the majority written standard, so that's the sensible default
+    // — a reader who actually wants nynorsk can still switch in Settings.
+    if ($lower === 'no') {
+        return 'nb';
+    }
+    $base = strtok($lower, '-_'); // "en-US" -> "en", but "pt-BR" is handled above first
+    return array_key_exists($base, I18n::SUPPORTED_LOCALES) ? $base : 'en';
+}
+
+/**
  * A sensible file extension for a media MIME type (for naming downloaded media).
  */
 function messagingExtForMime(string $mime): string

@@ -543,6 +543,12 @@ return [
         'too_short' => 'Bruk et ord på minst {n} bokstaver for å søke inne i saker.',
         'not_indexed' => 'Saksinnholdet er ikke indeksert på denne installasjonen ennå.',
     ],
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Hei! Mens vi ser på dette, kan du dele telefonnummeret ditt med knappen nedenfor? Det hjelper oss å kjenne deg igjen hvis du har kontaktet oss før.',
+        'request_contact_button' => 'Del telefonnummer',
+        'ack_matched' => 'Takk — fant kontoen din. Beskriv problemet ditt, så tar vi det herfra.',
+        'ack_new' => 'Takk! Beskriv problemet ditt, så tar vi det herfra.',
+    ],
     'channel_composer' => [
         'label_webchat' => 'Nettprat',
         'reply_title' => 'Svar kunden via {channel}',
@@ -552,6 +558,10 @@ return [
         'summarise_title' => 'Oppsummer denne samtalen i saken',
         'summarise' => 'Oppsummer',
         'send' => 'Send',
+        'attach' => 'Legg ved',
+        'attach_title' => 'Legg ved en fil (bilde, dokument…)',
+        'attachment_sent' => 'Vedlegg sendt',
+        'attachment_send_failed' => 'Kunne ikke sende vedlegg',
         'window_closed' => '⏳ Svarvinduet på 24 timer er stengt. Frittekstsvar er blokkert av WhatsApp — send en forhåndsgodkjent mal for å gjenåpne samtalen.',
         'template_label' => 'Mal',
         'loading_templates' => 'Laster maler…',

@@ -1827,6 +1827,10 @@ CREATE TABLE IF NOT EXISTS `messaging_identity_links` (
     `external_id`      VARCHAR(190) NOT NULL,
     `user_id`          INT NOT NULL,
     `phone`            VARCHAR(40) NULL,
+    -- The chat's own reported language (Telegram's language_code, normalised
+    -- to one of I18n::SUPPORTED_LOCALES) — the bot's prompts and replies to
+    -- this chat are sent in it. NULL on channels that don't report one.
+    `locale`           VARCHAR(10) NULL,
     `linked_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_messaging_identity_link` (`channel_type`,`external_id`),

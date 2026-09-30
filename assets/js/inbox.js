@@ -4282,12 +4282,24 @@ function renderChannelComposer(ticketId) {
 
     const label = channelDisplayLabel(currentTicketChannel);
 
+    // Attaching a file is only offered where MessagingProvider::sendMedia() is
+    // actually implemented (Telegram today). Every other provider's base-class
+    // default throws "not supported for this channel yet" — showing the button
+    // there would just be a guaranteed error, so it's gated on the channel
+    // rather than shown always and left to fail. Widen this list as more
+    // providers gain sendMedia().
+    const canAttach = (currentTicketChannel === 'telegram');
+
     let inner;
     if (currentChannelWindowOpen) {
         // Inside the 24h window (or always, for a channel with no such window).
         inner = `
             <textarea id="channelComposerText" class="channel-composer-text" rows="3" placeholder="${escapeHtml(Tc('placeholder'))}"></textarea>
+            ${canAttach ? `<input type="file" id="channelAttachFile" style="display:none;" onchange="sendChannelAttachment(${ticketId})">` : ''}
             <div class="channel-composer-actions">
+                ${canAttach ? `<button class="action-btn" id="channelAttachBtn" onclick="document.getElementById('channelAttachFile').click()" title="${escapeHtml(Tc('attach_title'))}">
+                    <span class="action-btn-icon">📎</span><span>${escapeHtml(Tc('attach'))}</span>
+                </button>` : ''}
                 <button class="action-btn" onclick="aiSuggestChannelReply(${ticketId})" title="${escapeHtml(Tc('suggest_title'))}">
                     <span class="action-btn-icon">🤖</span><span>${escapeHtml(Tc('suggest'))}</span>
                 </button>
@@ -4450,6 +4462,46 @@ async function sendChannelMessage(ticketId) {
         showToast(Tc('message_send_failed'), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
+}
+
+// Send a file (image, document, …) picked via the composer's Attach button.
+// The composer's text box, if anything is typed in it, becomes the caption —
+// Telegram shows a caption under the photo/document, same as a person would
+// type one there directly, so reusing the textarea needs no separate field.
+async function sendChannelAttachment(ticketId) {
+    const input = document.getElementById('channelAttachFile');
+    const attachBtn = document.getElementById('channelAttachBtn');
+    const ta = document.getElementById('channelComposerText');
+    if (!input || !input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const caption = ta ? ta.value.trim() : '';
+
+    const original = attachBtn ? attachBtn.innerHTML : '';
+    if (attachBtn) { attachBtn.disabled = true; attachBtn.innerHTML = `<span>${escapeHtml(Tc('sending'))}</span>`; }
+    try {
+        const form = new FormData();
+        form.append('ticket_id', ticketId);
+        form.append('caption', caption);
+        form.append('file', file);
+        const res = await fetch(API_BASE.replace('tickets/', 'messaging/') + 'send_attachment.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: form
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (ta) ta.value = '';
+            showToast(Tc('attachment_sent'), 'success');
+            loadCorrespondenceThread(ticketId);
+        } else {
+            showToast(Tc('could_not_send', { error: data.error || Tc('unknown_error') }), 'error');
+        }
+    } catch (e) {
+        showToast(Tc('attachment_send_failed'), 'error');
+    } finally {
+        if (attachBtn) { attachBtn.disabled = false; attachBtn.innerHTML = original; }
+        input.value = ''; // let the same file be picked again if the send failed
     }
 }
 

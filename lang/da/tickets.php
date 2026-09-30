@@ -543,6 +543,12 @@ return [
         'too_short' => 'Brug et ord på mindst {n} bogstaver for at søge inde i sager.',
         'not_indexed' => 'Sagsindhold er endnu ikke indekseret på denne installation.',
     ],
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Hej! Mens vi ser nærmere på dette, kan du dele dit telefonnummer med knappen nedenfor? Det hjælper os med at genkende dig, hvis du har kontaktet os før.',
+        'request_contact_button' => 'Del telefonnummer',
+        'ack_matched' => 'Tak — fandt din konto. Beskriv venligst dit problem, så tager vi det herfra.',
+        'ack_new' => 'Tak! Beskriv venligst dit problem, så tager vi det herfra.',
+    ],
     'channel_composer' => [
         'label_webchat' => 'Webchat',
         'reply_title' => 'Svar kunden via {channel}',
@@ -552,6 +558,10 @@ return [
         'summarise_title' => 'Opsummér denne samtale i sagen',
         'summarise' => 'Opsummér',
         'send' => 'Send',
+        'attach' => 'Vedhæft',
+        'attach_title' => 'Vedhæft en fil (billede, dokument…)',
+        'attachment_sent' => 'Vedhæftning sendt',
+        'attachment_send_failed' => 'Kunne ikke sende vedhæftning',
         'window_closed' => '⏳ Det 24-timers svarvindue er lukket. Fritekstsvar er blokeret af WhatsApp — send en forhåndsgodkendt skabelon for at genåbne samtalen.',
         'template_label' => 'Skabelon',
         'loading_templates' => 'Indlæser skabeloner…',

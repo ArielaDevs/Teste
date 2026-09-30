@@ -943,6 +943,7 @@ return [
         'external_id'      => 'VARCHAR(190) NOT NULL',
         'user_id'          => 'INT NOT NULL',
         'phone'            => 'VARCHAR(40) NULL',
+        'locale'           => 'VARCHAR(10) NULL',
         'linked_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
     ],
 

@@ -543,6 +543,12 @@ return [
         'too_short' => 'Użyj słowa o długości co najmniej {n} liter, aby wyszukiwać w zgłoszeniach.',
         'not_indexed' => 'Zawartość zgłoszeń nie została jeszcze zindeksowana w tej instalacji.',
     ],
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Cześć! Podczas gdy się tym zajmujemy, czy mógłbyś/mogłabyś podać swój numer telefonu za pomocą przycisku poniżej? Pomoże nam to Cię rozpoznać, jeśli kontaktowałeś/aś się z nami wcześniej.',
+        'request_contact_button' => 'Udostępnij numer telefonu',
+        'ack_matched' => 'Dziękujemy — znaleziono Twoje konto. Opisz swój problem, a my się tym zajmiemy.',
+        'ack_new' => 'Dziękujemy! Opisz swój problem, a my się tym zajmiemy.',
+    ],
     'channel_composer' => [
         'label_webchat' => 'Czat internetowy',
         'reply_title' => 'Odpowiedz klientowi przez {channel}',
@@ -552,6 +558,10 @@ return [
         'summarise_title' => 'Podsumuj tę rozmowę w zgłoszeniu',
         'summarise' => 'Podsumuj',
         'send' => 'Wyślij',
+        'attach' => 'Załącz',
+        'attach_title' => 'Załącz plik (obraz, dokument…)',
+        'attachment_sent' => 'Załącznik wysłany',
+        'attachment_send_failed' => 'Nie udało się wysłać załącznika',
         'window_closed' => '⏳ 24-godzinne okno odpowiedzi zostało zamknięte. WhatsApp blokuje odpowiedzi w postaci dowolnego tekstu — wyślij zatwierdzony szablon, aby ponownie otworzyć rozmowę.',
         'template_label' => 'Szablon',
         'loading_templates' => 'Ładowanie szablonów…',

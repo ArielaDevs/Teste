@@ -543,6 +543,12 @@ return [
         'too_short' => 'Use uma palavra com pelo menos {n} letras para pesquisar dentro dos chamados.',
         'not_indexed' => 'O conteúdo dos chamados ainda não foi indexado nesta instalação.',
     ],
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Olá! Enquanto analisamos isso, você poderia compartilhar seu número de telefone usando o botão abaixo? Isso nos ajuda a reconhecê-lo caso já tenha entrado em contato antes.',
+        'request_contact_button' => 'Compartilhar número de telefone',
+        'ack_matched' => 'Obrigado — encontramos sua conta. Descreva seu problema que cuidaremos disso.',
+        'ack_new' => 'Obrigado! Descreva seu problema que cuidaremos disso.',
+    ],
     'channel_composer' => [
         'label_webchat' => 'Chat do site',
         'reply_title' => 'Responder ao cliente pelo {channel}',
@@ -552,6 +558,10 @@ return [
         'summarise_title' => 'Resumir esta conversa no chamado',
         'summarise' => 'Resumir',
         'send' => 'Enviar',
+        'attach' => 'Anexar',
+        'attach_title' => 'Anexar um arquivo (imagem, documento…)',
+        'attachment_sent' => 'Anexo enviado',
+        'attachment_send_failed' => 'Falha ao enviar o anexo',
         'window_closed' => '⏳ A janela de resposta de 24 horas foi encerrada. Respostas em texto livre são bloqueadas pelo WhatsApp — envie um modelo pré-aprovado para reabrir a conversa.',
         'template_label' => 'Modelo',
         'loading_templates' => 'Carregando modelos…',

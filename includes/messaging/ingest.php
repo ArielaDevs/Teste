@@ -16,6 +16,7 @@ require_once __DIR__ . '/../tenancy.php';
 require_once __DIR__ . '/../ticket_reply.php';
 require_once __DIR__ . '/../ticket_snooze.php';
 require_once __DIR__ . '/../uploads.php';   // uploadStoreBytes() — see F1
+require_once __DIR__ . '/../i18n.php';      // I18n::tFor() — Telegram bot replies in the customer's own language_code
 
 /**
  * Ingest one normalised inbound message for a (decrypted) channel row.
@@ -361,9 +362,15 @@ function resolveSlackRequester(PDO $conn, array $channel, string $slackUserId): 
  */
 function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $chatId, array $msg, string $profileName): array
 {
-    $link = $conn->prepare("SELECT user_id FROM messaging_identity_links WHERE channel_type = 'telegram' AND external_id = ?");
+    // Telegram's own language_code is the USER's OS/app setting, not
+    // something they typed — the one signal this app has, this early, for
+    // which language the bot's own text (prompt, buttons, acks) should be in.
+    $locale = messagingNormaliseLocale((string) ($msg['language_code'] ?? ''));
+
+    $link = $conn->prepare("SELECT user_id, locale FROM messaging_identity_links WHERE channel_type = 'telegram' AND external_id = ?");
     $link->execute([$chatId]);
-    $userId = $link->fetchColumn();
+    $row = $link->fetch(PDO::FETCH_ASSOC);
+    $userId = $row['user_id'] ?? null;
 
     $isNewPlaceholder = !$userId;
     if ($isNewPlaceholder) {
@@ -371,8 +378,8 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
         // like every other channel, so the ticket is never held up for this.
         $userId = getOrCreateChannelUser($conn, $chatId, $profileName !== '' ? $profileName : $chatId, 'telegram');
         try {
-            $conn->prepare("INSERT INTO messaging_identity_links (channel_type, external_id, user_id, phone) VALUES ('telegram', ?, ?, NULL)")
-                 ->execute([$chatId, $userId]);
+            $conn->prepare("INSERT INTO messaging_identity_links (channel_type, external_id, user_id, phone, locale) VALUES ('telegram', ?, ?, NULL, ?)")
+                 ->execute([$chatId, $userId, $locale]);
         } catch (Exception $e) {
             error_log('Telegram identity: could not save link for ' . $chatId . ': ' . $e->getMessage());
         }
@@ -386,12 +393,25 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
                 if ($provider instanceof TelegramProvider) {
                     $provider->requestContact(
                         $chatId,
-                        'Hi! While we look into this, could you share your phone number using the button below? It helps us recognise you if you\'ve contacted us before.'
+                        I18n::tFor($locale, 'tickets.telegram_bot.request_contact_prompt'),
+                        I18n::tFor($locale, 'tickets.telegram_bot.request_contact_button')
                     );
                 }
             } catch (Exception $e) {
                 error_log('Telegram contact request failed for chat ' . $chatId . ': ' . $e->getMessage());
             }
+        }
+    } else {
+        // Already linked — keep the stored locale current (a person can change
+        // their Telegram app language at any time), but never fight a value a
+        // previous call already resolved from the same signal: this just keeps
+        // it in sync, it isn't a second source of truth.
+        $locale = $row['locale'] ?: $locale;
+        if (($row['locale'] ?? null) !== $locale) {
+            try {
+                $conn->prepare("UPDATE messaging_identity_links SET locale = ? WHERE channel_type = 'telegram' AND external_id = ?")
+                     ->execute([$locale, $chatId]);
+            } catch (Exception $e) { /* cosmetic — never worth failing ingest over */ }
         }
     }
     $userId = (int) $userId;
@@ -402,7 +422,7 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
         return ['user_id' => $userId, 'display_name' => '', 'contact_only' => false, 'is_new_placeholder' => $isNewPlaceholder];
     }
 
-    [$resolvedId, $resolvedName] = messagingTelegramLinkPhone($conn, $channel, $chatId, $userId, $phone, $profileName);
+    [$resolvedId, $resolvedName] = messagingTelegramLinkPhone($conn, $channel, $chatId, $userId, $phone, $profileName, $locale, !empty($msg['is_test']));
     // The phone arrived and was resolved in this same call — the note above
     // already covers it, so don't ALSO flag "new, unverified" on the ticket.
     return ['user_id' => $resolvedId, 'display_name' => $resolvedName, 'contact_only' => true, 'is_new_placeholder' => false];
@@ -417,7 +437,7 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
  *
  * @return array{0:int,1:string} [resolved user_id, display name override]
  */
-function messagingTelegramLinkPhone(PDO $conn, array $channel, string $chatId, int $placeholderUserId, string $phone, string $profileName): array
+function messagingTelegramLinkPhone(PDO $conn, array $channel, string $chatId, int $placeholderUserId, string $phone, string $profileName, string $locale = 'en', bool $isTest = false): array
 {
     $openTicketId = findOpenChannelTicket($conn, $chatId, 'telegram', '');
     $matchedId = messagingFindUserByPhone($conn, $phone);
@@ -449,7 +469,9 @@ function messagingTelegramLinkPhone(PDO $conn, array $channel, string $chatId, i
             messagingTelegramNote($conn, $openTicketId,
                 'Telegram contact matched to an existing profile: ' . ($realName !== '' ? $realName : ('user #' . $matchedId)) . ' (phone ' . $phone . ').');
         }
-        messagingTelegramAck($conn, $channel, $chatId, 'Thanks — found your account. Please describe your issue and we\'ll take it from here.');
+        if (!$isTest) {
+            messagingTelegramAck($conn, $channel, $chatId, I18n::tFor($locale, 'tickets.telegram_bot.ack_matched'));
+        }
 
         return [$matchedId, $realName];
     }
@@ -466,7 +488,9 @@ function messagingTelegramLinkPhone(PDO $conn, array $channel, string $chatId, i
         messagingTelegramNote($conn, $openTicketId,
             'New Telegram contact confirmed — phone ' . $phone . ' saved; no existing profile matched it.');
     }
-    messagingTelegramAck($conn, $channel, $chatId, 'Thanks! Please describe your issue and we\'ll take it from here.');
+    if (!$isTest) {
+        messagingTelegramAck($conn, $channel, $chatId, I18n::tFor($locale, 'tickets.telegram_bot.ack_new'));
+    }
 
     return [$placeholderUserId, ''];
 }

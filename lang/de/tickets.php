@@ -543,6 +543,12 @@ return [
         'too_short' => 'Verwenden Sie ein Wort mit mindestens {n} Buchstaben, um in Tickets zu suchen.',
         'not_indexed' => 'Der Ticketinhalt wurde auf dieser Installation noch nicht indiziert.',
     ],
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Hallo! Während wir uns das ansehen, könnten Sie uns über die Schaltfläche unten Ihre Telefonnummer mitteilen? Das hilft uns, Sie wiederzuerkennen, falls Sie uns schon einmal kontaktiert haben.',
+        'request_contact_button' => 'Telefonnummer teilen',
+        'ack_matched' => 'Danke — Ihr Konto wurde gefunden. Bitte beschreiben Sie Ihr Anliegen, wir kümmern uns darum.',
+        'ack_new' => 'Danke! Bitte beschreiben Sie Ihr Anliegen, wir kümmern uns darum.',
+    ],
     'channel_composer' => [
         'label_webchat' => 'Webchat',
         'reply_title' => 'Dem Kunden über {channel} antworten',
@@ -552,6 +558,10 @@ return [
         'summarise_title' => 'Dieses Gespräch im Ticket zusammenfassen',
         'summarise' => 'Zusammenfassen',
         'send' => 'Senden',
+        'attach' => 'Anhängen',
+        'attach_title' => 'Datei anhängen (Bild, Dokument…)',
+        'attachment_sent' => 'Anhang gesendet',
+        'attachment_send_failed' => 'Anhang konnte nicht gesendet werden',
         'window_closed' => '⏳ Das 24-Stunden-Antwortfenster ist geschlossen. Freitextantworten sind von WhatsApp blockiert — senden Sie eine genehmigte Vorlage, um das Gespräch wieder zu öffnen.',
         'template_label' => 'Vorlage',
         'loading_templates' => 'Vorlagen werden geladen…',

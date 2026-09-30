@@ -543,6 +543,12 @@ return [
         'too_short' => 'Gunakan perkataan sekurang-kurangnya {n} huruf untuk mencari di dalam tiket.',
         'not_indexed' => 'Kandungan tiket belum diindeks pada pemasangan ini.',
     ],
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Hai! Semasa kami menyiasat ini, bolehkah anda kongsikan nombor telefon anda menggunakan butang di bawah? Ini membantu kami mengenali anda jika anda pernah menghubungi kami sebelum ini.',
+        'request_contact_button' => 'Kongsi nombor telefon',
+        'ack_matched' => 'Terima kasih — akaun anda dijumpai. Sila huraikan masalah anda dan kami akan uruskannya.',
+        'ack_new' => 'Terima kasih! Sila huraikan masalah anda dan kami akan uruskannya.',
+    ],
     'channel_composer' => [
         'label_webchat' => 'Sembang web',
         'reply_title' => 'Balas kepada pelanggan melalui {channel}',
@@ -552,6 +558,10 @@ return [
         'summarise_title' => 'Ringkaskan perbualan ini ke dalam tiket',
         'summarise' => 'Ringkaskan',
         'send' => 'Hantar',
+        'attach' => 'Lampirkan',
+        'attach_title' => 'Lampirkan fail (imej, dokumen…)',
+        'attachment_sent' => 'Lampiran dihantar',
+        'attachment_send_failed' => 'Gagal menghantar lampiran',
         'window_closed' => '⏳ Tetingkap balasan 24 jam telah ditutup. Balasan teks bebas disekat oleh WhatsApp — hantar templat yang diluluskan terlebih dahulu untuk membuka semula perbualan.',
         'template_label' => 'Templat',
         'loading_templates' => 'Memuatkan templat…',

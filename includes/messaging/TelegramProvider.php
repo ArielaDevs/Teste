@@ -83,6 +83,12 @@ class TelegramProvider extends MessagingProvider
             'provider_msg_id' => 'tg:' . $chatId . ':' . $messageId,
             'media'           => $this->extractMedia($message),
             'timestamp'       => isset($message['date']) ? (int) $message['date'] : null,
+            // Telegram's own IETF language tag for this user's client (e.g.
+            // "uk", "en", "pt-BR") — their OS/app setting, not something they
+            // typed. ingest.php uses it to pick which language the bot's own
+            // prompts/replies are sent in. Empty when Telegram doesn't report
+            // one (some clients omit it).
+            'language_code'   => trim((string) ($from['language_code'] ?? '')),
         ];
 
         // A tap on the "Share phone number" button (see requestContact() below)
@@ -168,7 +174,7 @@ class TelegramProvider extends MessagingProvider
      * One-time keyboard: it disappears from their client after one tap, so it
      * doesn't linger once the identity gate (ingest.php) has what it needs.
      */
-    public function requestContact(string $chatId, string $promptText): string
+    public function requestContact(string $chatId, string $promptText, string $buttonText = 'Share phone number'): string
     {
         $token = $this->channel['credentials']['bot_token'] ?? '';
         if ($token === '') {
@@ -180,7 +186,7 @@ class TelegramProvider extends MessagingProvider
             'text'         => $promptText,
             'reply_markup' => [
                 'keyboard'          => [[
-                    ['text' => 'Share phone number', 'request_contact' => true],
+                    ['text' => $buttonText, 'request_contact' => true],
                 ]],
                 'resize_keyboard'   => true,
                 'one_time_keyboard' => true,
@@ -248,6 +254,64 @@ class TelegramProvider extends MessagingProvider
         $mime = $item['content_type'] ?: 'application/octet-stream';
         $filename = ($item['filename'] ?? '') !== '' ? $item['filename'] : (basename($filePath) ?: ('media.' . messagingExtForMime($mime)));
         return ['data' => $body, 'content_type' => $mime, 'filename' => $filename];
+    }
+
+    /**
+     * Send a local file to a chat. Photos go through sendPhoto (Telegram
+     * renders them inline, recompressing — exactly what an analyst expects
+     * "attach a picture" to look like in the chat); everything else goes
+     * through sendDocument (sent byte-for-byte, no recompression, no
+     * dimension limits beyond the flat 50MB bot API cap).
+     *
+     * Uses multipart/form-data directly (via CURLFile) rather than the shared
+     * httpRequest() helper: that helper always sends a string body with an
+     * explicit Content-Type, but a multipart upload needs curl to build the
+     * body AND the boundary header itself from an array of fields.
+     */
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = ''): string
+    {
+        $token = $this->channel['credentials']['bot_token'] ?? '';
+        if ($token === '') {
+            throw new Exception('Telegram channel is missing its bot token.');
+        }
+        if (!is_file($filePath)) {
+            throw new Exception('Attachment file not found.');
+        }
+
+        $isPhoto = (strpos($mimeType, 'image/') === 0) && $mimeType !== 'image/svg+xml';
+        $method  = $isPhoto ? 'sendPhoto' : 'sendDocument';
+        $field   = $isPhoto ? 'photo' : 'document';
+
+        $fields = [
+            'chat_id' => $to,
+            $field    => new CURLFile($filePath, $mimeType, basename($filePath)),
+        ];
+        if ($caption !== '') {
+            // Telegram's own caption limit; longer is silently rejected rather
+            // than truncated, so trim here where the person can still see why.
+            $fields['caption'] = mb_strimwidth($caption, 0, 1024, '');
+        }
+
+        $ch = curl_init(self::API_BASE . $token . '/' . $method);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $fields); // array => curl builds the multipart body + boundary itself
+        sslApplyCurl($ch);
+        $resp = curl_exec($ch);
+        if ($resp === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Network error sending attachment to Telegram: ' . $err);
+        }
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $json = json_decode($resp, true);
+        if ($code < 200 || $code >= 300 || empty($json['ok'])) {
+            throw new Exception('Telegram rejected the attachment: ' . ($json['description'] ?? ('HTTP ' . $code)));
+        }
+        return (string) ($json['result']['message_id'] ?? '');
     }
 
     public function testConnection(): string

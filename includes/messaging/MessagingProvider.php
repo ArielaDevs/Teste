@@ -83,6 +83,18 @@ abstract class MessagingProvider
     }
 
     /**
+     * Send a single local file (image, document, …) to a recipient — the
+     * outbound twin of downloadMedia(). $filePath is a path on THIS server's
+     * disk (already validated — see uploadStoreFile()), never something taken
+     * from user input directly. Returns the provider's message id. Throws on
+     * failure, and by default for any provider that doesn't support this yet.
+     */
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = ''): string
+    {
+        throw new Exception('Sending attachments is not supported for this channel yet.');
+    }
+
+    /**
      * Verify the channel's credentials against the provider with a lightweight,
      * read-only API call (no message is sent). Returns a short human-readable
      * success detail (e.g. the account/number it reached). Throws on failure with

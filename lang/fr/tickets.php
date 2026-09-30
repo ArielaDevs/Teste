@@ -543,6 +543,12 @@ return [
         'too_short' => 'Utilisez un mot d\'au moins {n} lettres pour rechercher dans les tickets.',
         'not_indexed' => 'Le contenu des tickets n\'a pas encore été indexé sur cette installation.',
     ],
+    'telegram_bot' => [
+        'request_contact_prompt' => 'Bonjour ! Pendant que nous examinons cela, pourriez-vous partager votre numéro de téléphone avec le bouton ci-dessous ? Cela nous aide à vous reconnaître si vous nous avez déjà contactés.',
+        'request_contact_button' => 'Partager le numéro de téléphone',
+        'ack_matched' => 'Merci — votre compte a été trouvé. Décrivez votre problème, nous nous en occupons.',
+        'ack_new' => 'Merci ! Décrivez votre problème, nous nous en occupons.',
+    ],
     'channel_composer' => [
         'label_webchat' => 'Chat web',
         'reply_title' => 'Répondre au client via {channel}',
@@ -552,6 +558,10 @@ return [
         'summarise_title' => 'Résumer cette conversation dans le ticket',
         'summarise' => 'Résumer',
         'send' => 'Envoyer',
+        'attach' => 'Joindre',
+        'attach_title' => 'Joindre un fichier (image, document…)',
+        'attachment_sent' => 'Pièce jointe envoyée',
+        'attachment_send_failed' => 'Échec de l\'envoi de la pièce jointe',
         'window_closed' => '⏳ La fenêtre de réponse de 24 heures est fermée. Les réponses en texte libre sont bloquées par WhatsApp — envoyez un modèle pré-approuvé pour rouvrir la conversation.',
         'template_label' => 'Modèle',
         'loading_templates' => 'Chargement des modèles…',
