@@ -71,6 +71,13 @@ function notificationsHandleEvent(string $event, array $payload): void
             return;
         }
 
+        // The assignment email (2.10.0) - its own personal switch, separate from
+        // the bell's, because somebody can want the email and not the bell or
+        // the other way round.
+        if ($event === 'task.assigned') {
+            notificationsTaskAssignedEmail($conn, $payload, $actorId, $actorName);
+        }
+
         foreach ($recipients as $recipientId) {
             // Rule 1 — your own action, applied PER PERSON. This is what makes a
             // multi-recipient event behave: comment on a task and the other four
@@ -288,4 +295,97 @@ function notificationsBodyFor(string $event, ?string $actorName): string
     // The bell renders 'notifications.body.<event>' with {actor} substituted.
     // Stored as the raw actor so the string itself can be translated per reader.
     return $actorName !== null ? $actorName : '';
+}
+
+/**
+ * "A task has been assigned to you", by email - for an analyst who has turned on
+ * Preferences -> Notifications -> "Email me when a task is assigned to me"
+ * (user_preferences.task_assigned_email = 'on'; off unless they ask).
+ *
+ * Rides on task.assigned, which fires on creation with an assignee and on every
+ * reassignment, from every path that assigns a task (the board, the API, a
+ * workflow, a repeat). The same rules as the bell where they apply: never for
+ * your own action, and not during a bulk run (the caller returns before here).
+ *
+ * Sent through ssSendSystemEmail() - the first mailbox able to send, the same
+ * route the portal and the training reminders use - and logged in the send log
+ * under 'task'. Written in the RECIPIENT's interface language, not the language
+ * of whoever did the assigning. Never throws.
+ */
+function notificationsTaskAssignedEmail(PDO $conn, array $payload, int $actorId, ?string $actorName): void
+{
+    try {
+        $taskId   = isset($payload['task']['id']) ? (int)$payload['task']['id'] : 0;
+        $assignee = isset($payload['task']['assignee_id']) ? (int)$payload['task']['assignee_id'] : 0;
+        if ($taskId <= 0 || $assignee <= 0 || $assignee === $actorId) {
+            return;
+        }
+
+        $prefs = $conn->prepare("SELECT preference_key, preference_value FROM user_preferences
+                                  WHERE analyst_id = ? AND preference_key IN ('task_assigned_email', 'interface_language')");
+        $prefs->execute([$assignee]);
+        $p = $prefs->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+        if (($p['task_assigned_email'] ?? '') !== 'on') {
+            return;
+        }
+
+        $a = $conn->prepare("SELECT email, full_name FROM analysts WHERE id = ? AND is_active = 1");
+        $a->execute([$assignee]);
+        $analyst = $a->fetch(PDO::FETCH_ASSOC);
+        $to = $analyst ? trim((string)$analyst['email']) : '';
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $t = $conn->prepare("SELECT t.title, t.start_date, t.due_date, tp.name AS priority, pt.title AS parent_title
+                               FROM tasks t
+                               LEFT JOIN task_priorities tp ON tp.id = t.priority_id
+                               LEFT JOIN tasks pt ON pt.id = t.parent_task_id
+                              WHERE t.id = ?");
+        $t->execute([$taskId]);
+        $task = $t->fetch(PDO::FETCH_ASSOC);
+        if (!$task) {
+            return;
+        }
+
+        require_once __DIR__ . '/i18n.php';
+        require_once __DIR__ . '/public_url.php';
+        require_once __DIR__ . '/self_service_email.php';
+        $loc = (string)($p['interface_language'] ?? 'en');
+        $tr  = fn(string $k, array $args = []) => I18n::tFor($loc, 'tasks.email.' . $k, $args);
+        $h   = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $day = fn($d) => $d ? date('j M Y', strtotime((string)$d)) : '';
+
+        $title   = (string)$task['title'];
+        $subject = $tr('assigned_subject', ['title' => $title]);
+        $heading = $actorName
+            ? $tr('assigned_by', ['actor' => $actorName])
+            : $tr('assigned_plain');
+        $url = publicAbsoluteUrl($conn, NotificationsService::linkFor('task', $taskId) ?? ('tasks/?task=' . $taskId));
+
+        $rows = '';
+        foreach ([
+            [$tr('subtask_of'), $task['parent_title'] ?? ''],
+            [$tr('priority'),   $task['priority'] ?? ''],
+            [$tr('start'),      $day($task['start_date'] ?? null)],
+            [$tr('due'),        $day($task['due_date'] ?? null)],
+        ] as [$label, $value]) {
+            if ((string)$value === '') continue;
+            $rows .= '<tr><td style="padding:3px 16px 3px 0;color:#6b7280;">' . $h($label) . '</td>'
+                   . '<td style="padding:3px 0;color:#111827;">' . $h($value) . '</td></tr>';
+        }
+
+        $html = '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#111827;max-width:560px;">'
+              . '<p style="margin:0 0 6px;color:#6b7280;">' . $h($heading) . '</p>'
+              . '<p style="margin:0 0 14px;font-size:18px;font-weight:600;">' . $h($title) . '</p>'
+              . ($rows !== '' ? '<table style="border-collapse:collapse;margin:0 0 18px;font-size:14px;">' . $rows . '</table>' : '')
+              . '<p style="margin:0 0 22px;"><a href="' . $h($url) . '" style="display:inline-block;padding:9px 18px;background:#7c3aed;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">'
+              . $h($tr('open')) . '</a></p>'
+              . '<p style="margin:0;font-size:12px;color:#9ca3af;">' . $h($tr('why')) . '</p>'
+              . '</div>';
+
+        ssSendSystemEmail($conn, $to, $subject, $html, 'task');
+    } catch (Throwable $e) {
+        error_log('[notificationsTaskAssignedEmail] ' . $e->getMessage());
+    }
 }

@@ -48,6 +48,8 @@ const EMAIL_LOG_ROUTES = [
     'training'       => 'Training reminder',
     // Domains (#154): expiry/certificate digests and change-detection warnings.
     'domain_alert'   => 'Domain alert',
+    // A task assigned to an analyst who asked to be emailed about it (2.10.0).
+    'task'           => 'Task assigned',
 ];
 
 /**

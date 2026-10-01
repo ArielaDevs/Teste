@@ -730,6 +730,7 @@ function renderWaffleMenuJS() {
     $toastAnim = 'slide';
     $notifSound = 'off';                // silence unless this analyst asked for a chime
     $searchDismiss = '';                // '' = only the ✕ or Escape closes the search panel
+    $desktopNotif = '';                 // 'on' = desktop notifications for new bell items
     if (isset($_SESSION['analyst_id'])) {
         try {
             if (!function_exists('connectToDatabase')) {
@@ -738,7 +739,7 @@ function renderWaffleMenuJS() {
             $conn = connectToDatabase();
             $stmt = $conn->prepare(
                 "SELECT preference_key, preference_value FROM user_preferences
-                 WHERE analyst_id = ? AND preference_key IN ('toast_position', 'toast_animation', 'notification_sound', 'search_panel_close_outside')"
+                 WHERE analyst_id = ? AND preference_key IN ('toast_position', 'toast_animation', 'notification_sound', 'search_panel_close_outside', 'desktop_notifications')"
             );
             $stmt->execute([(int)$_SESSION['analyst_id']]);
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -750,6 +751,8 @@ function renderWaffleMenuJS() {
                     $notifSound = $row['preference_value'];
                 } elseif ($row['preference_key'] === 'search_panel_close_outside' && $row['preference_value']) {
                     $searchDismiss = $row['preference_value'];
+                } elseif ($row['preference_key'] === 'desktop_notifications' && $row['preference_value']) {
+                    $desktopNotif = $row['preference_value'];
                 }
             }
         } catch (Exception $e) {
@@ -771,6 +774,9 @@ function renderWaffleMenuJS() {
          war-room alerts both call window.playNotificationSound(); the value
          below is what decides whether anything is heard. -->
     <script>window.NOTIFICATION_SOUND = <?php echo json_encode($notifSound); ?>;</script>
+    <!-- Desktop notifications for new bell items (per analyst, off by default).
+         Shown by assets/js/notification-bell.js; the portal bell never sets this. -->
+    <script>window.DESKTOP_NOTIFICATIONS = <?php echo json_encode($desktopNotif === 'on'); ?>;</script>
     <script src="<?php echo BASE_URL; ?>assets/js/notification-sound.js?v=1"></script>
     <!-- App-wide notification primitives (#451). showToast + showConfirm are
          available on every page that includes the waffle menu (i.e. every

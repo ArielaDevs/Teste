@@ -829,4 +829,16 @@ return [
         'link'     => 'system/integrations/tika.php',
         'check'    => ['setting', 'tika_url', 'nonempty'],
     ],
+    [
+        'id'       => 'system.desktop_notifications',
+        'module'   => 'system',
+        'tier'     => 'extra',
+        'category' => 'productivity',
+        'title'    => 'Notifications on the desktop',
+        'what'     => 'Preferences -> Notifications -> "Show desktop notifications", so new items in the bell pop up on your computer - in Edge on Windows, as Windows notifications - while FreeITSM is open in a tab.',
+        'why'      => 'An assignment or a reply is noticed while you are working in another window, without watching the bell.',
+        'done'     => 'Somebody has turned on desktop notifications.',
+        'link'     => 'system/preferences/',
+        'check'    => ['rows', 'user_preferences', "preference_key = 'desktop_notifications' AND preference_value = 'on'"],
+    ],
 ];

@@ -311,6 +311,7 @@ return [
         'clear_failed'      => 'Could not clear notifications.',
         'clear_nothing'     => 'Nothing to clear — all of these are unread.',
         'empty'       => 'Nothing new.',
+        'desktop_more' => 'And {n} more new notifications',
         'loading'     => 'Loading…',
         'load_failed' => 'Could not load notifications.',
         'someone'     => 'Someone',

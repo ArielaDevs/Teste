@@ -45,6 +45,14 @@ $prefDefaults = [
     // Read on every analyst page by renderWaffleMenuJS(); played by
     // assets/js/notification-sound.js.
     'notification_sound'         => 'off',
+    // Desktop notifications (2.10.0): a Windows/macOS notification from the
+    // browser - in Edge, a Windows notification - for each new item in the bell,
+    // while FreeITSM is open in a tab. 'on' or ''. The browser's own permission
+    // is asked for when it is switched on. Read by renderWaffleMenuJS().
+    'desktop_notifications'      => '',
+    // Email me when a task is assigned to me (2.10.0). 'on' or ''. Read by
+    // notificationsTaskAssignedEmail() in includes/notifications_router.php.
+    'task_assigned_email'        => '',
     // How a task opens: 'panel' is the right-hand drawer, 'modal' is a large
     // near-full-screen window that lays the same content out in two columns.
     // Per analyst rather than per install, because it is a working-style
@@ -391,7 +399,7 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
         [data-theme-mode="dark"] .anim-option:not(.active):hover { background: var(--surface-hover, #39414f); }
     </style>
     <!-- Mobile layer LAST, after this page's own <style> (Techniques §9). -->
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=153">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=154">
 </head>
 <body data-mobile-module="system" data-mobile-page="settings" data-mobile-shell="own">
     <div class="settings-shell">
@@ -787,6 +795,37 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
                 <p class="pref-hint" style="margin-top:8px;color:var(--text-muted,#666);font-size:12px;"><?php echo htmlspecialchars(t('system.preferences.sound_note')); ?></p>
             </div>
 
+            <!-- Desktop notifications. Beside the chime because it is the same
+                 kind of choice: how you are told about what reaches the bell. -->
+            <div class="pref-section">
+                <h3><?php echo htmlspecialchars(t('system.preferences.desktop_heading')); ?></h3>
+                <p><?php echo htmlspecialchars(t('system.preferences.desktop_desc')); ?></p>
+                <label class="toggle-group">
+                    <span class="toggle-switch">
+                        <input type="checkbox" id="desktopNotifToggle" <?php echo $prefs['desktop_notifications'] === 'on' ? 'checked' : ''; ?>>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span class="toggle-label"><?php echo htmlspecialchars(t('system.preferences.desktop_label')); ?></span>
+                </label>
+                <button type="button" class="sig-btn sig-btn-secondary" id="desktopNotifTest" style="margin-top:10px;"><?php echo htmlspecialchars(t('system.preferences.desktop_test')); ?></button>
+                <span class="pref-saving-hint" id="desktopNotifHint"><?php echo htmlspecialchars(t('system.preferences.saving')); ?></span>
+                <p class="pref-hint" id="desktopNotifState" style="margin-top:8px;color:var(--text-muted,#666);font-size:12px;"></p>
+            </div>
+
+            <!-- Task assignment by email. -->
+            <div class="pref-section">
+                <h3><?php echo htmlspecialchars(t('system.preferences.task_email_heading')); ?></h3>
+                <p><?php echo htmlspecialchars(t('system.preferences.task_email_desc')); ?></p>
+                <label class="toggle-group">
+                    <span class="toggle-switch">
+                        <input type="checkbox" id="taskEmailToggle" <?php echo $prefs['task_assigned_email'] === 'on' ? 'checked' : ''; ?>>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span class="toggle-label"><?php echo htmlspecialchars(t('system.preferences.task_email_label')); ?></span>
+                </label>
+                <span class="pref-saving-hint" id="taskEmailHint"><?php echo htmlspecialchars(t('system.preferences.saving')); ?></span>
+            </div>
+
             <div class="pref-section">
                 <h3><?php echo htmlspecialchars(t('system.preferences.position_heading')); ?></h3>
                 <p><?php echo htmlspecialchars(t('system.preferences.position_desc')); ?></p>
@@ -1080,6 +1119,72 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
                 taskViewHint.classList.add('show');
                 await savePref('tasks_detail_view', taskViewSelect.value);
                 setTimeout(() => taskViewHint.classList.remove('show'), 1200);
+            });
+        }
+
+        // ===== Desktop notifications (desktop_notifications) =====
+        // Switching it on asks the BROWSER for permission - that has to happen
+        // inside the click, which is why it lives here and not in the bell. If the
+        // browser says no, the switch goes back off: a setting that is on but can
+        // never show anything would be a promise the page cannot keep.
+        const desktopToggle = document.getElementById('desktopNotifToggle');
+        const desktopHint   = document.getElementById('desktopNotifHint');
+        const desktopState  = document.getElementById('desktopNotifState');
+        const desktopTest   = document.getElementById('desktopNotifTest');
+        function paintDesktopState() {
+            if (!desktopState) return;
+            let key;
+            if (!('Notification' in window)) key = 'desktop_unsupported';
+            else if (!window.isSecureContext) key = 'desktop_insecure';
+            else if (Notification.permission === 'denied') key = 'desktop_blocked';
+            else if (Notification.permission === 'granted') key = 'desktop_allowed';
+            else key = 'desktop_ask';
+            desktopState.textContent = window.t('system.preferences.' + key);
+            if (desktopTest) desktopTest.hidden = !(desktopToggle.checked && 'Notification' in window && Notification.permission === 'granted');
+        }
+        if (desktopToggle) {
+            paintDesktopState();
+            desktopToggle.addEventListener('change', async function () {
+                if (desktopToggle.checked) {
+                    if (!('Notification' in window) || !window.isSecureContext) {
+                        desktopToggle.checked = false; paintDesktopState(); return;
+                    }
+                    let perm = Notification.permission;
+                    if (perm === 'default') {
+                        try { perm = await Notification.requestPermission(); } catch (e) { perm = 'denied'; }
+                    }
+                    if (perm !== 'granted') {
+                        desktopToggle.checked = false; paintDesktopState(); return;
+                    }
+                }
+                desktopHint.classList.add('show');
+                await savePref('desktop_notifications', desktopToggle.checked ? 'on' : '');
+                window.DESKTOP_NOTIFICATIONS = desktopToggle.checked;
+                paintDesktopState();
+                setTimeout(() => desktopHint.classList.remove('show'), 1200);
+            });
+        }
+        if (desktopTest) {
+            desktopTest.addEventListener('click', function () {
+                try {
+                    const n = new Notification(window.t('system.preferences.desktop_test_title'), {
+                        body: window.t('system.preferences.desktop_test_body'),
+                        icon: (document.querySelector('link[rel="icon"]') || {}).href,
+                        tag: 'freeitsm-test'
+                    });
+                    n.onclick = () => { window.focus(); n.close(); };
+                } catch (e) { paintDesktopState(); }
+            });
+        }
+
+        // ===== Email me when a task is assigned to me (task_assigned_email) =====
+        const taskEmailToggle = document.getElementById('taskEmailToggle');
+        const taskEmailHint   = document.getElementById('taskEmailHint');
+        if (taskEmailToggle) {
+            taskEmailToggle.addEventListener('change', async function () {
+                taskEmailHint.classList.add('show');
+                await savePref('task_assigned_email', taskEmailToggle.checked ? 'on' : '');
+                setTimeout(() => taskEmailHint.classList.remove('show'), 1200);
             });
         }
 

@@ -70,7 +70,7 @@ $para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspec
             --on-accent:    var(--dom-on-accent, #fff);
         }
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=153">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>

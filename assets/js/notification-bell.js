@@ -107,10 +107,70 @@ window.NotificationBell = {
             try { prev = sessionStorage.getItem(SEEN_KEY); } catch (e) { /* ignore */ }
             recordSeen(unread);
             if (prev === null) return;                      // first poll in this tab
-            if (unread > parseInt(prev, 10) && typeof window.playNotificationSound === 'function') {
-                window.playNotificationSound();
+            if (unread > parseInt(prev, 10)) {
+                if (typeof window.playNotificationSound === 'function') window.playNotificationSound();
+                desktopNotify();
             }
         }
+
+        // Desktop notifications (2.10.0, Preferences -> Notifications). In Edge
+        // on Windows these are Windows notifications. They come from this page,
+        // so they arrive while FreeITSM is open in a tab - minimised or behind
+        // other windows is fine, closed is not.
+        //
+        // "What is new" is kept in localStorage, which every tab shares, as the
+        // newest updated_datetime already shown: three open tabs must not raise
+        // the same notification three times. The tag is a second guard - the
+        // browser replaces a notification that carries a tag it already shows.
+        // The very first run only records where things stand, or switching the
+        // setting on would replay every unread notification at once.
+        const DESK_KEY = 'nbDesktopShownUntil';
+        async function desktopNotify() {
+            if (!window.DESKTOP_NOTIFICATIONS || !('Notification' in window) || Notification.permission !== 'granted') return;
+            let items;
+            try {
+                const d = await (await fetch(LIST, { credentials: 'same-origin' })).json();
+                if (!d.success) return;
+                items = (d.notifications || []).filter(n => !n.is_read);
+            } catch (e) { return; }
+            let shownUntil = null;
+            try { shownUntil = localStorage.getItem(DESK_KEY); } catch (e) { /* private mode */ }
+            const newest = items.reduce((m, n) => String(n.updated_datetime || '') > m ? String(n.updated_datetime) : m, shownUntil || '');
+            try { localStorage.setItem(DESK_KEY, newest); } catch (e) { /* ignore */ }
+            if (shownUntil === null) return;                    // first run: baseline only
+            const fresh = items.filter(n => String(n.updated_datetime || '') > shownUntil);
+            if (!fresh.length) return;
+
+            const iconEl = document.querySelector('link[rel="icon"]');
+            const icon   = iconEl ? iconEl.href : undefined;
+            // A handful at most; past that, one line saying how many more.
+            fresh.slice(0, 3).forEach(n => {
+                try {
+                    const title = (n.entity_ref ? n.entity_ref + ' - ' : '') + (n.title || '');
+                    const note = new Notification(title || describe(n), {
+                        body: describe(n),
+                        icon: icon,
+                        tag: 'freeitsm-nb-' + n.id + '-' + n.updated_datetime
+                    });
+                    note.onclick = function () {
+                        window.focus();
+                        if (n.link) location.href = PREFIX + n.link;
+                        note.close();
+                    };
+                } catch (e) { /* a browser refusing is not worth an error on screen */ }
+            });
+            if (fresh.length > 3) {
+                try {
+                    const more = new Notification(window.t('common.notifications.desktop_more', { n: fresh.length - 3 }), {
+                        icon: icon, tag: 'freeitsm-nb-more'
+                    });
+                    more.onclick = function () { window.focus(); open(); more.close(); };
+                } catch (e) { /* ignore */ }
+            }
+        }
+        // Record the starting point as soon as the page loads, so the first
+        // thing that arrives afterwards is shown rather than taken as the baseline.
+        desktopNotify();
 
         async function poll() {
             try {

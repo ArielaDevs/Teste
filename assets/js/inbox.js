@@ -1474,6 +1474,7 @@ let dragHoverFolderId = null;
 function attachEmailDragHandlers() {
     document.querySelectorAll('#emailList .email-item').forEach(el => {
         el.addEventListener('dragstart', (e) => {
+            if (ticketMenuIsSheet()) { e.preventDefault(); return; }
             const mailId = Number(el.dataset.emailId);
 
             // Dragging a row that is part of the selection drags the WHOLE
@@ -9044,6 +9045,10 @@ let ctxCmdbSessionCount = 0;
 
 function openTicketContextMenu(event, ticketId, ticketRef) {
     event.preventDefault();
+    // Android fires a native contextmenu on a long press as well as the
+    // long-press timer below firing, so the sheet would open twice and the
+    // second open would throw away a level somebody had already tapped into.
+    if (ticketMenuSheetOpenedAt && Date.now() - ticketMenuSheetOpenedAt < 900) return;
     ctxTargetTicketId = ticketId;
     ctxTargetTicketRef = ticketRef || ('Ticket ' + ticketId);
     const menu = document.getElementById('ticketContextMenu');
@@ -9108,6 +9113,13 @@ function openTicketContextMenu(event, ticketId, ticketRef) {
     populateContextAssigneeSubmenu();
     populateContextTeamSubmenu();
     populateContextCompanySubmenu();
+
+    // On a phone the menu is a full-screen sheet, not a popup at the finger:
+    // a 220px flyout menu with hover submenus cannot be used with a thumb.
+    if (ticketMenuIsSheet()) {
+        openTicketMenuSheet(menu);
+        return;
+    }
 
     // Position at cursor — flip if it would overflow the viewport
     menu.classList.add('active');
@@ -9643,8 +9655,130 @@ async function setStatusFromContext(statusName) {
 
 function closeTicketContextMenu() {
     const menu = document.getElementById('ticketContextMenu');
-    if (menu) menu.classList.remove('active');
+    if (menu) {
+        menu.classList.remove('active', 'ctx-sheet', 'ctx-drilled');
+        const level2 = menu.querySelector('.ctx-sheet-level2');
+        if (level2) level2.innerHTML = '';
+    }
+    ticketMenuSheetOpenedAt = 0;
 }
+
+// ── The ticket menu on a phone: long press, full-screen sheet, drill-down ────
+//
+// Ed's design: a long press on a ticket opens the SAME menu the desktop gets on
+// a right-click, as a full-screen panel. A row that leads to a further level
+// (Set priority, Assign to...) slides the first level off to the left and its
+// options slide in, with a Back button to return.
+//
+// The sheet IS the desktop menu - the same element, the same items, the same
+// handlers - restyled by .ctx-sheet in mobile.css. The second level is a copy of
+// the submenu the desktop shows on hover; its items call the same functions by
+// inline onclick, so a copy behaves exactly like the original. Nothing here runs
+// above 768px.
+let ticketMenuSheetOpenedAt = 0;
+
+function ticketMenuIsSheet() {
+    return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function openTicketMenuSheet(menu) {
+    // Built once: the close button, and the panel the second level slides into.
+    if (!menu.querySelector('.ctx-sheet-close')) {
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'ctx-sheet-close';
+        x.setAttribute('aria-label', t('common.close'));
+        x.innerHTML = '&times;';
+        x.onclick = closeTicketContextMenu;
+        menu.appendChild(x);
+
+        const level2 = document.createElement('div');
+        level2.className = 'ctx-sheet-level2';
+        level2.setAttribute('role', 'menu');
+        menu.appendChild(level2);
+
+        // A tap on a row with a further level drills into it. Delegated, and
+        // inert outside sheet mode, so the desktop's hover flyouts are untouched.
+        menu.addEventListener('click', function (e) {
+            if (!menu.classList.contains('ctx-sheet')) return;
+            const parent = e.target.closest('.ticket-context-menu-parent');
+            if (!parent || !menu.contains(parent) || e.target.closest('.ctx-sheet-level2')) return;
+            const sub = parent.querySelector('.ticket-context-submenu');
+            if (!sub) return;
+            const label = parent.querySelector('span') ? parent.querySelector('span').textContent : '';
+            openTicketMenuLevel(menu, label, sub);
+        });
+    }
+    menu.style.left = '';
+    menu.style.top  = '';
+    menu.classList.remove('ctx-drilled', 'flip-sub');
+    menu.querySelector('.ctx-sheet-level2').innerHTML = '';
+    menu.classList.add('active', 'ctx-sheet');
+    menu.scrollTop = 0;
+    ticketMenuSheetOpenedAt = Date.now();
+}
+
+function openTicketMenuLevel(menu, label, sub) {
+    const level2 = menu.querySelector('.ctx-sheet-level2');
+    level2.innerHTML =
+        '<div class="ctx-sheet-level2-head">'
+      +   '<button type="button" class="ctx-sheet-back">'
+      +     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
+      +     '<span>' + escapeHtml(t('common.back')) + '</span>'
+      +   '</button>'
+      +   '<span class="ctx-sheet-level2-title">' + escapeHtml(label) + '</span>'
+      + '</div>'
+      + '<div class="ctx-sheet-level2-list">' + sub.innerHTML + '</div>';
+    level2.querySelector('.ctx-sheet-back').onclick = function () {
+        menu.classList.remove('ctx-drilled');
+    };
+    level2.scrollTop = 0;
+    // Read a layout value first, so the panel is laid out off-screen before
+    // the class moves it - otherwise the browser skips the slide.
+    void level2.offsetWidth;
+    menu.classList.add('ctx-drilled');
+}
+
+// The long press itself. Touch only: a mouse has a right button.
+(function wireTicketLongPress() {
+    const HOLD_MS = 500;
+    const SLOP_PX = 10;          // a finger that moves this far is scrolling, not holding
+    let timer = null, startX = 0, startY = 0, fired = false;
+
+    function cancel() { if (timer) { clearTimeout(timer); timer = null; } }
+
+    document.addEventListener('touchstart', function (e) {
+        fired = false;
+        if (!ticketMenuIsSheet() || e.touches.length !== 1) return;
+        const row = e.target.closest && e.target.closest('#emailList .email-item');
+        if (!row) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        cancel();
+        timer = setTimeout(function () {
+            timer = null;
+            fired = true;
+            try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) { /* optional */ }
+            openTicketContextMenu({
+                preventDefault: function () {}, target: row, clientX: startX, clientY: startY
+            }, Number(row.dataset.ticketId), row.dataset.ticketNumber || '');
+        }, HOLD_MS);
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (e) {
+        if (!timer) return;
+        const p = e.touches[0];
+        if (Math.abs(p.clientX - startX) > SLOP_PX || Math.abs(p.clientY - startY) > SLOP_PX) cancel();
+    }, { passive: true });
+
+    // Lifting the finger after the menu opened must not ALSO open the ticket:
+    // preventing the touchend stops the browser making a click out of it.
+    document.addEventListener('touchend', function (e) {
+        cancel();
+        if (fired) { fired = false; if (e.cancelable) e.preventDefault(); }
+    }, { passive: false });
+    document.addEventListener('touchcancel', cancel, { passive: true });
+})();
 
 // Right-click a ticket -> Move to trash (soft-delete the context-menu target).
 async function contextMoveToTrash() {
@@ -10321,7 +10455,12 @@ document.addEventListener('keydown', function (e) {
 });
 // Right-clicking a different row should reopen, not stack
 window.addEventListener('blur', closeTicketContextMenu);
-window.addEventListener('scroll', closeTicketContextMenu, true);
+window.addEventListener('scroll', function (e) {
+    // The phone sheet scrolls itself; only a scroll somewhere else closes it.
+    const menu = document.getElementById('ticketContextMenu');
+    if (menu && e.target instanceof Node && menu.contains(e.target)) return;
+    closeTicketContextMenu();
+}, true);
 
 /* --- Context menu action: Link CMDB object --- */
 /**

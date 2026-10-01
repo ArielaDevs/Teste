@@ -351,4 +351,16 @@ return [
         'link'     => 'system/preferences/',
         'check'    => ['rows', 'user_preferences', "preference_key = 'tasks_hide_done_subtasks' AND preference_value = 'on'"],
     ],
+    [
+        'id'       => 'tasks.assigned_email',
+        'module'   => 'tasks',
+        'tier'     => 'extra',
+        'category' => 'productivity',
+        'title'    => 'An email when a task lands on you',
+        'what'     => 'Preferences -> Notifications -> "Email me when a task is assigned to me", so a task created for you or handed to you arrives in your inbox.',
+        'why'      => 'People who live in their inbox rather than on the task board still hear about new work the moment it is theirs.',
+        'done'     => 'Somebody has turned on task assignment emails.',
+        'link'     => 'system/preferences/',
+        'check'    => ['rows', 'user_preferences', "preference_key = 'task_assigned_email' AND preference_value = 'on'"],
+    ],
 ];

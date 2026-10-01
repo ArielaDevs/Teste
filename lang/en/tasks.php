@@ -262,6 +262,20 @@ return [
         'no_status'      => 'No status',
     ],
 
+    // The task-assigned email (Preferences -> Notifications). Sent in the
+    // recipient's own language.
+    'email' => [
+        'assigned_subject' => 'Task assigned to you: {title}',
+        'assigned_by'      => '{actor} assigned this task to you',
+        'assigned_plain'   => 'This task has been assigned to you',
+        'subtask_of'       => 'Subtask of',
+        'priority'         => 'Priority',
+        'start'            => 'Start',
+        'due'              => 'Due',
+        'open'             => 'Open',
+        'why'              => 'You are getting this because "Email me when a task is assigned to me" is turned on in your Preferences.',
+    ],
+
     'toast' => [
         'task_created'   => 'Task created',
         'task_updated'   => 'Task updated',

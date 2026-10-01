@@ -13863,3 +13863,134 @@
         padding-bottom: calc(var(--chk-bar-h, 62px) + 10px + env(safe-area-inset-bottom));
     }
 }
+
+@media (max-width: 768px) {
+    /* ── Tickets: the right-click menu as a full-screen sheet (2.10.0) ────────
+       A long press on a ticket row opens it (inbox.js, wireTicketLongPress).
+       Same element and items as the desktop popup; .ctx-sheet is only ever
+       added below 768px. A row with a further level slides the first level off
+       to the left and its options in from the right (.ctx-drilled).
+       ────────────────────────────────────────────────────────────────────── */
+    #emailList .email-item {
+        -webkit-touch-callout: none;   /* iOS: no "copy / look up" bubble on a hold */
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    .ticket-context-menu.ctx-sheet {
+        inset: 0;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100%;
+        min-width: 0;
+        height: 100%;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 0 0 env(safe-area-inset-bottom);
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        z-index: 3000;
+    }
+    .ticket-context-menu.ctx-sheet > * {
+        transition: transform 0.25s ease;
+    }
+    .ticket-context-menu.ctx-sheet .ticket-context-menu-header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--surface, #fff);
+        margin: 0;
+        padding: 18px 56px 14px 18px;
+        font-size: 13px;
+    }
+    .ticket-context-menu.ctx-sheet .ticket-context-menu-item {
+        min-height: 52px;
+        padding: 12px 18px;
+        font-size: 16px;
+        gap: 14px;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    .ticket-context-menu.ctx-sheet .ticket-context-menu-item svg { width: 20px; height: 20px; }
+    .ticket-context-menu.ctx-sheet .ticket-context-menu-parent .ctx-sub-arrow { width: 14px; height: 14px; }
+    /* The hover flyouts never show here - their copy opens as the second level. */
+    .ticket-context-menu.ctx-sheet .ticket-context-submenu { display: none !important; }
+
+    .ticket-context-menu.ctx-sheet .ctx-sheet-close {
+        position: fixed;
+        top: 8px;
+        right: 8px;
+        z-index: 3;
+        width: 44px;
+        height: 44px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted, #666);
+        font-size: 30px;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .ticket-context-menu:not(.ctx-sheet) .ctx-sheet-close,
+    .ticket-context-menu:not(.ctx-sheet) .ctx-sheet-level2 { display: none; }
+
+    /* Level two: its own scrolling panel over the first, waiting off to the right. */
+    .ticket-context-menu.ctx-sheet .ctx-sheet-level2 {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        background: var(--surface, #fff);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        transform: translateX(100%);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .ticket-context-menu.ctx-sheet.ctx-drilled > :not(.ctx-sheet-level2):not(.ctx-sheet-close) {
+        transform: translateX(-100%);
+    }
+    .ticket-context-menu.ctx-sheet.ctx-drilled .ctx-sheet-level2 { transform: translateX(0); }
+    .ctx-sheet-level2-head {
+        position: sticky;
+        top: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 56px 8px 6px;
+        background: var(--surface, #fff);
+        border-bottom: 1px solid var(--border, #ddd);
+    }
+    .ctx-sheet-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        min-height: 44px;
+        padding: 0 10px 0 4px;
+        border: none;
+        background: transparent;
+        color: var(--accent, #0078d4);
+        font-size: 16px;
+        cursor: pointer;
+    }
+    .ctx-sheet-level2-title {
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-dim, #888);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .ctx-sheet-level2-list .ticket-context-submenu-item {
+        min-height: 52px;
+        padding: 12px 18px;
+        font-size: 16px;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    .ctx-sheet-level2-list .ticket-context-submenu-item .ctx-status-swatch { width: 16px; height: 16px; }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+    .ticket-context-menu.ctx-sheet > *,
+    .ticket-context-menu.ctx-sheet .ctx-sheet-level2 { transition: none; }
+}
