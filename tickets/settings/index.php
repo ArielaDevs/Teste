@@ -4484,7 +4484,7 @@ $translationNamespaces = ['common', 'tickets'];
                 const data = await res.json();
                 if (!data.success) {
                     showToast('Test failed: ' + (data.error || 'unknown error'), 'error');
-                    if (out) out.innerHTML = `<div style="padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#b91c1c;">Test failed: ${escapeHtml(data.error || 'unknown error')}</div>`;
+                    if (out) out.innerHTML = `<div style="padding:10px 12px;background:var(--danger-bg, #fef2f2);border:1px solid var(--danger-border, #fecaca);border-radius:8px;color:var(--danger-text, #b91c1c);">Test failed: ${escapeHtml(data.error || 'unknown error')}</div>`;
                     return;
                 }
                 const labels = { credentials: 'Credentials', reachability: 'Webhook reachability', simulation: 'Inbound handling' };
@@ -4493,20 +4493,20 @@ $translationNamespaces = ['common', 'tickets'];
                 const rows = keys.map(k => {
                     const r = data.results[k];
                     const icon = r.ok ? '✅' : '❌';
-                    const color = r.ok ? '#166534' : '#b91c1c';
+                    const color = r.ok ? 'var(--success-text, #166534)' : 'var(--danger-text, #b91c1c)';
                     return `<div style="display:flex;gap:8px;padding:6px 0;">
                         <span>${icon}</span>
                         <span><strong>${labels[k] || k}:</strong> <span style="color:${color};">${escapeHtml(r.detail || '')}</span></span>
                     </div>`;
                 }).join('');
                 if (out) {
-                    out.innerHTML = `<div style="padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">${rows}</div>`;
+                    out.innerHTML = `<div style="padding:12px 14px;background:var(--app-bg, #f9fafb);border:1px solid var(--border, #e5e7eb);border-radius:8px;">${rows}</div>`;
                     out.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
                 showToast(failed === 0 ? 'All channel tests passed ✓' : `${failed} of ${keys.length} checks failed — see details above the table`, failed === 0 ? 'success' : 'error');
             } catch (e) {
                 showToast('Channel test request failed', 'error');
-                if (out) out.innerHTML = `<div style="padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#b91c1c;">Channel test request failed.</div>`;
+                if (out) out.innerHTML = `<div style="padding:10px 12px;background:var(--danger-bg, #fef2f2);border:1px solid var(--danger-border, #fecaca);border-radius:8px;color:var(--danger-text, #b91c1c);">Channel test request failed.</div>`;
             } finally {
                 if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = original; }
             }
@@ -4562,7 +4562,20 @@ $translationNamespaces = ['common', 'tickets'];
                 if (data.success) {
                     showToast(data.message || 'Saved', 'success');
                     closeChannelModal();
-                    loadChannels();
+                    await loadChannels();
+                    // A Telegram bot is not finished until Connect has told Telegram
+                    // where to deliver - and Connect only exists on a SAVED channel.
+                    // Closing the dialog here meant a new bot never showed Connect at
+                    // all, and messages silently went nowhere. Reopen it on the saved
+                    // channel so the next step is right in front of the admin.
+                    if (selectedProvider === 'telegram' && data.id) {
+                        editChannel(data.id);
+                        const out = document.getElementById('telegramConnectResult');
+                        if (out) {
+                            out.style.color = 'var(--text-muted, #666)';
+                            out.textContent = window.t('tickets.settings.modals.channel.connect_next');
+                        }
+                    }
                 } else {
                     showToast('Error: ' + (data.error || ''), 'error');
                 }

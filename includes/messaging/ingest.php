@@ -383,6 +383,20 @@ function resolveSlackRequester(PDO $conn, array $channel, string $slackUserId): 
  *   - The chat's reply never says whether an account was found.
  */
 
+/** Has Database Verification created messaging_identity_links yet? Cached per request. */
+function messagingIdentityLinksReady(PDO $conn): bool
+{
+    static $ready = null;
+    if ($ready === null) {
+        try {
+            $ready = (bool) $conn->query("SHOW COLUMNS FROM messaging_identity_links LIKE 'channel_id'")->fetch();
+        } catch (PDOException $e) {
+            $ready = false;
+        }
+    }
+    return $ready;
+}
+
 /** The placeholder's synthetic address - MUST match getOrCreateChannelUser(). */
 function messagingTelegramPlaceholderEmail(string $chatId): string
 {
@@ -409,6 +423,15 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
 {
     $channelId = (int) $channel['id'];
     $userId    = 0;
+
+    // 🔴 Before Database Verification has created messaging_identity_links (an
+    // upgraded install always spends a while in that state), every query below
+    // fails - and the message, and its ticket, would be lost. Degrade to what
+    // every other channel does: a placeholder requester, no phone matching.
+    if (!messagingIdentityLinksReady($conn)) {
+        $userId = getOrCreateChannelUser($conn, $chatId, $profileName !== '' ? $profileName : $chatId, 'telegram');
+        return ['user_id' => (int) $userId, 'display_name' => '', 'contact_only' => false, 'is_new_placeholder' => false];
+    }
     // Telegram's language_code is the person's own app setting - the one signal
     // this early for which language the bot's own text should be in.
     $locale = messagingNormaliseLocale((string) ($msg['language_code'] ?? ''));

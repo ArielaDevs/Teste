@@ -1386,6 +1386,7 @@ return [
                 'connected'                => 'Connected - Telegram will now deliver this bot\'s messages here.',
                 'connect_failed'           => 'Could not connect to Telegram.',
                 'connect_save_first'       => 'You changed the token or secret - save the channel first, then Connect.',
+                'connect_next'             => 'Saved. Now click Connect so Telegram starts delivering messages.',
                 'ingress'                  => 'Inbound delivery',
                 'ingress_direct'           => 'Direct — the provider hits this install\'s webhook URL',
                 'ingress_relay'            => 'Relay — a hosted relay forwards messages here',
