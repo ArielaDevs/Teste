@@ -247,18 +247,22 @@ function getHelpTopics() {
         ],
         'preferences' => [
             'hero' => 'Preferences',
-            'sub'  => 'Your own personal settings — interface language, where notifications pop up, how left-hand panels behave, a couple of display options and your work calendar. Each choice is saved to your account and follows you to any browser you sign in from.',
+            'sub'  => 'Your own personal settings — interface language, where toasts pop up, what reaches the notification bell (and whether it shows on your desktop or emails you about tasks), how left-hand panels behave, a few display and task options and your work calendar. Each choice is saved to your account and follows you to any browser you sign in from.',
             'sections' => [
                 ['id' => 'overview', 'label' => 'Overview'],
                 ['id' => 'language', 'label' => 'Interface language'],
-                ['id' => 'toasts',   'label' => 'Notifications'],
+                ['id' => 'toasts',   'label' => 'Toasts'],
+                ['id' => 'bell',     'label' => 'Notification bell'],
                 ['id' => 'panels',   'label' => 'Left panels'],
                 ['id' => 'display',  'label' => 'Display options'],
+                ['id' => 'tasks',    'label' => 'Tasks'],
                 ['id' => 'workcal',  'label' => 'My work calendar'],
             ],
             'terms' => 'my settings personal language locale translate toast popup dark mode timezone'
                      . ' my work calendar outlook caldav nextcloud icloud subscribe link which calendar sign in to my calendar'
-                     . ' search panel closing close when i click away click outside escape dismiss search window search popup',
+                     . ' search panel closing close when i click away click outside escape dismiss search window search popup'
+                     . ' notification bell chime sound desktop notifications windows notification edge push popup'
+                     . ' email when a task is assigned task assigned email subtasks board hide completed subtasks opening a task',
         ],
         'demo-data' => [
             'hero' => 'Demo data',

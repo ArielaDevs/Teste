@@ -52,7 +52,7 @@ require __DIR__ . '/_top.php';
         <tr><td><strong>You are…</strong></td><td>One organisation running FreeITSM for your own staff and users.</td><td>An MSP (or group) supporting several separate client companies from one install.</td></tr>
         <tr><td><strong>How many companies?</strong></td><td>Just one (the silent “Default”).</td><td>Two or more (System &rarr; Companies).</td></tr>
         <tr><td><strong>Identity providers</strong></td><td>Your own IdP(s), shared by everyone.</td><td>Each client brings <em>their own</em> IdP.</td></tr>
-        <tr><td><strong>Portal login shows…</strong></td><td>Provider buttons up front.</td><td>Email first, then that person's company's provider(s).</td></tr>
+        <tr><td><strong>Portal login shows…</strong></td><td>Provider buttons up front.</td><td>Email first, then that person's company's provider(s). Global providers can still have a button.</td></tr>
     </table></div>
     <div class="help-note"><strong>How FreeITSM decides which you are:</strong> it counts companies. With one company it behaves as a single-company install; the moment you add a second company in System &rarr; Companies, the multi-company behaviour switches on automatically. You don't toggle a setting.</div>
     <p>Pick your section below.</p>
@@ -102,7 +102,7 @@ require __DIR__ . '/_top.php';
     </div>
 
     <h4>How the routing then works</h4>
-    <p>On a multi-company install the portal login shows <strong>just an email box</strong> — no provider buttons up front (that would leak every client's IdP). When someone enters their email:</p>
+    <p>On a multi-company install the portal login leads with an <strong>email box</strong>. A client company's own providers never get a button there — that would show every visitor which IdP each of your clients uses. Your <strong>Global</strong> providers are the exception: they belong to you rather than to a client, so they show as buttons, as on a single-company install (untick <strong>Show the button on the portal login</strong> to hide one). When someone enters their email:</p>
     <ul>
         <li><strong>Their company has no IdP</strong> &rarr; they get the email + password form.</li>
         <li><strong>One IdP</strong> &rarr; they're sent straight to it.</li>

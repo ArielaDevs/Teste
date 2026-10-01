@@ -304,6 +304,7 @@ try {
                         <div><?php echo t('tickets.help.working.rightclick_cmdb'); ?></div>
                         <div><?php echo t('tickets.help.working.rightclick_time'); ?></div>
                     </div>
+                    <p><?php echo t('tickets.help.working.rightclick_phone'); ?></p>
                     <p class="help-note"><?php echo t('tickets.help.working.rightclick_tip'); ?></p>
 
                     <p style="margin-top: 20px;"><?php echo t('tickets.help.working.time_heading'); ?></p>
@@ -569,6 +570,7 @@ try {
                     <p style="margin-top: 16px;"><?php echo t('tickets.help.users.edit_heading'); ?></p>
                     <p><?php echo t('tickets.help.users.edit_body'); ?></p>
                     <p><?php echo t('tickets.help.users.company_body'); ?></p>
+                    <p><?php echo t('tickets.help.users.signin_body'); ?></p>
 
                     <p style="margin-top: 16px;"><?php echo t('tickets.help.users.managed_heading'); ?></p>
                     <p><?php echo t('tickets.help.users.managed_body'); ?></p>
