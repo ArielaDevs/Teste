@@ -943,6 +943,18 @@ return [
         'created_datetime' => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
     ],
 
+    // One chat-channel identity (e.g. a Telegram chat id) linked to a `users`
+    // row via a shared phone number. See freeitsm.sql for the full comment.
+    'messaging_identity_links' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'channel_type'     => 'VARCHAR(20) NOT NULL',
+        'external_id'      => 'VARCHAR(190) NOT NULL',
+        'user_id'          => 'INT NOT NULL',
+        'phone'            => 'VARCHAR(40) NULL',
+        'locale'           => 'VARCHAR(10) NULL',
+        'linked_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+
     // Embed config for one website chat widget. Drives a messaging_channels row
     // (channel_type='webchat', provider='freeitsm'); company routing + active flag
     // live there. widget_key is public (ships in the site's <script>) — abuse is

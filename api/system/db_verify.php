@@ -1098,6 +1098,13 @@ try {
             try { $conn->exec("ALTER TABLE messaging_templates ADD CONSTRAINT fk_messaging_templates_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE SET NULL"); } catch (Exception $e) {}
         }
     }
+    // Telegram (etc.) chat-identity → users link. CASCADE so deleting the matched
+    // user drops the link rather than leaving it dangling.
+    if ($tableExists('messaging_identity_links') && $tableExists('users') && $colExists('messaging_identity_links', 'user_id')) {
+        if (!$fkExists('messaging_identity_links', 'fk_messaging_identity_links_user')) {
+            try { $conn->exec("ALTER TABLE messaging_identity_links ADD CONSTRAINT fk_messaging_identity_links_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE"); } catch (Exception $e) {}
+        }
+    }
     // Web chat widget → its messaging channel (1:1). CASCADE so deleting the channel
     // removes its widget config. The two UNIQUE keys are built from $uniqueIndexes below.
     if ($tableExists('webchat_widgets') && $tableExists('messaging_channels') && $colExists('webchat_widgets', 'channel_id')) {

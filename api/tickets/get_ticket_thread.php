@@ -134,12 +134,14 @@ try {
     $channelProvider = '';
     if ($ticketChannel !== 'email') {
         // Channels with no provider service window at all: web chat is self-hosted,
-        // and Slack simply has no such rule — you can reply to an old thread.
+        // Slack simply has no such rule — you can reply to an old thread — and
+        // neither does Telegram (a bot may message any chat that has ever
+        // messaged it, at any time; see TelegramProvider's file header).
         //
         // ⚠️ This list MUST match the one in api/messaging/send_message.php. If the
         // two disagree the composer greys out a reply the API would have accepted
         // (or offers one it will refuse), and it reads as a broken integration.
-        if (in_array($ticketChannel, ['webchat', 'slack'], true)) {
+        if (in_array($ticketChannel, ['webchat', 'slack', 'telegram'], true)) {
             $windowOpen = true;
         } else {
             $ts = $conn->prepare("SELECT last_inbound_at FROM tickets WHERE id = ?");

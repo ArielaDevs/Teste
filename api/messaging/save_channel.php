@@ -63,14 +63,19 @@ try {
     if ($name === '') {
         throw new Exception('Name is required');
     }
-    if (!in_array($provider, ['twilio', 'meta', 'slack'], true)) {
+    if (!in_array($provider, ['twilio', 'meta', 'slack', 'telegram'], true)) {
         throw new Exception('Unknown provider');
     }
-    // Slack is always a slack-type channel; nothing else may claim that type.
+    // Slack and Telegram are each always their own channel type; nothing else
+    // may claim either type (same reasoning as the Slack-only rule below).
     if ($provider === 'slack') {
         $channelType = 'slack';
     } elseif ($channelType === 'slack') {
         throw new Exception('Only the Slack provider can create a Slack channel');
+    } elseif ($provider === 'telegram') {
+        $channelType = 'telegram';
+    } elseif ($channelType === 'telegram') {
+        throw new Exception('Only the Telegram provider can create a Telegram channel');
     }
 
     $conn = connectToDatabase();
@@ -126,6 +131,8 @@ try {
         } else {
             unset($creds['watch_channel']);
         }
+    } elseif ($provider === 'telegram') {
+        if (provided($data['bot_token'] ?? '')) $creds['bot_token'] = trim($data['bot_token']);
     } else { // meta
         if (provided($data['phone_number_id'] ?? '')) $creds['phone_number_id'] = trim($data['phone_number_id']);
         if (provided($data['access_token'] ?? ''))     $creds['access_token']     = trim($data['access_token']);

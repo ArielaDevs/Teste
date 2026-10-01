@@ -86,12 +86,14 @@ try {
     //
     // ⚠️ This is a WhatsApp Business rule, not a general one, so only the channels
     // that actually have it are checked:
-    //   webchat — self-hosted, no provider in the middle at all
-    //   slack   — Slack has no such window; you can reply to a thread from last
-    //             year. Enforcing it here would block ordinary replies and show
-    //             an error about "pre-approved template messages", which is
-    //             meaningless in Slack and would look like a broken integration.
-    if (!in_array($channelType, ['webchat', 'slack'], true)) {
+    //   webchat  — self-hosted, no provider in the middle at all
+    //   slack    — Slack has no such window; you can reply to a thread from last
+    //              year. Enforcing it here would block ordinary replies and show
+    //              an error about "pre-approved template messages", which is
+    //              meaningless in Slack and would look like a broken integration.
+    //   telegram — same story: a bot may message any chat that has ever messaged
+    //              it, at any time (see TelegramProvider's file header comment).
+    if (!in_array($channelType, ['webchat', 'slack', 'telegram'], true)) {
         $win = $conn->prepare("SELECT last_inbound_at FROM tickets WHERE id = ?");
         $win->execute([$ticketId]);
         if (!channelWindowOpen($win->fetchColumn() ?: null)) {

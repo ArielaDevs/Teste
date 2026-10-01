@@ -21,6 +21,7 @@ require_once __DIR__ . '/TwilioProvider.php';
 require_once __DIR__ . '/MetaCloudProvider.php';
 require_once __DIR__ . '/SlackProvider.php';
 require_once __DIR__ . '/FreeitsmProvider.php';
+require_once __DIR__ . '/TelegramProvider.php';
 require_once __DIR__ . '/../encryption.php';
 
 /** The 24h provider service window, in seconds. */
@@ -43,6 +44,8 @@ function messagingProvider(array $channel): MessagingProvider
             return new FreeitsmProvider($channel);
         case 'slack':
             return new SlackProvider($channel);
+        case 'telegram':
+            return new TelegramProvider($channel);
         default:
             throw new Exception('Unknown messaging provider: ' . ($channel['provider'] ?? '?'));
     }
@@ -145,6 +148,48 @@ function messagingWebhookUrl(PDO $conn, int $channelId): string
 }
 
 /**
+ * A short-lived, unguessable URL to one outbound attachment's bytes — for a
+ * provider (Twilio) that fetches media itself rather than accepting an
+ * upload. NOT a general-purpose public file host: the token is bound to this
+ * ONE attachment id and expires quickly (checked in media.php), so it only
+ * stays reachable for the brief window between sending the message and the
+ * provider fetching it — not for as long as the ticket exists.
+ */
+function messagingOutboundMediaUrl(PDO $conn, int $attachmentId): string
+{
+    $base = rtrim(messagingPublicBaseUrl($conn), '/');
+    $root = preg_replace('#/api/messaging/.*$#', '', $_SERVER['SCRIPT_NAME'] ?? '');
+    if ($root !== '' && substr($base, -strlen($root)) === $root) {
+        $root = '';
+    }
+
+    // Comfortably longer than any provider takes to fetch (usually seconds),
+    // short enough that a URL sitting in a proxy/access log doesn't stay a
+    // live attack surface indefinitely.
+    $expires = time() + 3600;
+    $token = messagingOutboundMediaToken($attachmentId, $expires);
+
+    return $base . $root . '/api/messaging/media.php?id=' . $attachmentId . '&exp=' . $expires . '&token=' . $token;
+}
+
+/** HMAC binding one attachment id to one expiry — see messagingOutboundMediaUrl() and media.php. */
+function messagingOutboundMediaToken(int $attachmentId, int $expires): string
+{
+    require_once __DIR__ . '/../encryption.php';
+    return hash_hmac('sha256', $attachmentId . ':' . $expires, getEncryptionKey());
+}
+
+/** The category Meta's Media upload endpoint wants for a mime type ('image'|'video'|'audio'|'document'). */
+function messagingMediaCategory(string $mime): string
+{
+    $mime = strtolower(trim(explode(';', $mime)[0]));
+    if (strpos($mime, 'image/') === 0) return 'image';
+    if (strpos($mime, 'video/') === 0) return 'video';
+    if (strpos($mime, 'audio/') === 0) return 'audio';
+    return 'document';
+}
+
+/**
  * Normalise a sender identifier for storage and matching.
  *
  * ⚠️ This USED to be phone-only, and silently destroyed anything that wasn't a
@@ -168,6 +213,14 @@ function normaliseChannelIdentifier(string $raw, string $channelType = 'whatsapp
         return preg_match('/^[UW][A-Z0-9]{2,}$/', $s) ? $s : '';
     }
 
+    if ($channelType === 'telegram') {
+        // A Telegram chat id — a bare (optionally negative, for group chats)
+        // integer. NOT a phone number: running it through the digit-stripping
+        // rule below would silently drop a leading '-' and collapse a group
+        // chat id onto a different, positive one.
+        return preg_match('/^-?\d+$/', $s) ? $s : '';
+    }
+
     // --- phone identifiers (whatsapp, and the default for anything else) ---
     if (stripos($s, 'whatsapp:') === 0) {
         $s = substr($s, strlen('whatsapp:'));
@@ -177,6 +230,35 @@ function normaliseChannelIdentifier(string $raw, string $channelType = 'whatsapp
         return '';
     }
     return '+' . $digits;
+}
+
+/**
+ * Map a raw client-reported language tag (e.g. Telegram's message.from.
+ * language_code — the user's own OS/app setting, "uk", "en", "pt-BR", never
+ * something they typed) onto one of this install's I18n::SUPPORTED_LOCALES
+ * keys. Unrecognised or empty input falls back to English — I18n::tFor()
+ * would do that anyway, but resolving it here keeps the fallback visible to
+ * the caller (e.g. for deciding whether to bother storing it).
+ */
+function messagingNormaliseLocale(string $raw): string
+{
+    require_once __DIR__ . '/../i18n.php';
+    $lower = strtolower(trim($raw));
+    if ($lower === '') {
+        return 'en';
+    }
+    // Our one locale whose key isn't a bare lowercase tag.
+    if ($lower === 'pt' || strpos($lower, 'pt-br') === 0) {
+        return 'pt-BR';
+    }
+    // Telegram (and browsers) may send the old generic "no" for Norwegian;
+    // bokmål is the majority written standard, so that's the sensible default
+    // — a reader who actually wants nynorsk can still switch in Settings.
+    if ($lower === 'no') {
+        return 'nb';
+    }
+    $base = strtok($lower, '-_'); // "en-US" -> "en", but "pt-BR" is handled above first
+    return array_key_exists($base, I18n::SUPPORTED_LOCALES) ? $base : 'en';
 }
 
 /**

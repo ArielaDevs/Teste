@@ -35,6 +35,8 @@ return [
     ['watchtower_items', 'uq_watchtower_items', 'unique', '(`analyst_id`,`item_key`)'],
     ['watchtower_item_members', 'uq_watchtower_members', 'unique', '(`analyst_id`,`item_key`,`entity_type`,`entity_id`)'],
     ['ticket_prefixes', 'uq_ticket_prefixes_prefix', 'unique', '(`prefix`)'],
+    ['messaging_identity_links', 'uq_messaging_identity_link', 'unique', '(`channel_type`,`external_id`)'],
+    ['messaging_identity_links', 'ix_messaging_identity_links_user', 'key', '(`user_id`)'],
     ['users', 'uq_users_email', 'unique', '(`email`)'],
     ['users', 'uq_users_username', 'unique', '(`username`)'],
     ['users', 'uq_users_dir_username', 'unique', '(`auth_provider_id`,`directory_username`)'],

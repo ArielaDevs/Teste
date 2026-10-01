@@ -127,6 +127,81 @@ class MetaCloudProvider extends MessagingProvider
         return $json['messages'][0]['id'] ?? '';
     }
 
+    /**
+     * Two Graph API calls: upload the bytes to get a media id, then send a
+     * message referencing it. $filePath is used directly (multipart upload);
+     * $publicUrl is Twilio's requirement, not Meta's, and is ignored here.
+     */
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = ''): string
+    {
+        $phoneId = $this->channel['credentials']['phone_number_id'] ?? '';
+        $token   = $this->channel['credentials']['access_token'] ?? '';
+        if ($phoneId === '' || $token === '') {
+            throw new Exception('Meta channel is missing its phone number id or access token.');
+        }
+        if (!is_file($filePath)) {
+            throw new Exception('Attachment file not found.');
+        }
+
+        $version = $this->channel['credentials']['graph_version'] ?? self::GRAPH_VERSION;
+        $category = messagingMediaCategory($mimeType); // 'image'|'video'|'audio'|'document'
+
+        // Step 1: upload the bytes to get a media id. Raw curl, not
+        // httpRequest() — that helper always sends a string body with an
+        // explicit Content-Type, but a multipart upload needs curl to build
+        // both the body AND the boundary header itself from a fields array.
+        $ch = curl_init('https://graph.facebook.com/' . $version . "/$phoneId/media");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $token"]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, [
+            'messaging_product' => 'whatsapp',
+            'type'              => $mimeType,
+            'file'              => new CURLFile($filePath, $mimeType, basename($filePath)),
+        ]);
+        sslApplyCurl($ch);
+        $resp = curl_exec($ch);
+        if ($resp === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Network error uploading attachment to Meta: ' . $err);
+        }
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $json = json_decode($resp, true);
+        if ($code < 200 || $code >= 300 || empty($json['id'])) {
+            throw new Exception('Meta rejected the attachment upload: ' . ($json['error']['message'] ?? ('HTTP ' . $code)));
+        }
+        $mediaId = $json['id'];
+
+        // Step 2: send a message referencing that media id.
+        $mediaObj = ['id' => $mediaId];
+        // Audio messages have no caption field in the Cloud API — Meta
+        // rejects the request outright if one is sent, so it's left off.
+        if ($caption !== '' && $category !== 'audio') {
+            $mediaObj['caption'] = $caption;
+        }
+        $payload = json_encode([
+            'messaging_product' => 'whatsapp',
+            'to'                => ltrim($this->ensurePlus($to), '+'),
+            'type'              => $category,
+            $category           => $mediaObj,
+        ]);
+
+        [$code2, $resp2] = $this->httpRequest('https://graph.facebook.com/' . $version . "/$phoneId/messages", [
+            'method'  => 'POST',
+            'headers' => ['Content-Type: application/json', "Authorization: Bearer $token"],
+            'body'    => $payload,
+        ]);
+        $json2 = json_decode($resp2, true);
+        if ($code2 < 200 || $code2 >= 300) {
+            throw new Exception('Meta rejected the attachment message: ' . ($json2['error']['message'] ?? ('HTTP ' . $code2)));
+        }
+        return $json2['messages'][0]['id'] ?? '';
+    }
+
     public function sendTemplate(string $to, array $template, array $vars): string
     {
         $phoneId = $this->channel['credentials']['phone_number_id'] ?? '';

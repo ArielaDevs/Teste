@@ -101,6 +101,51 @@ class TwilioProvider extends MessagingProvider
         return $json['sid'] ?? '';
     }
 
+    /**
+     * Twilio's Messages API takes no upload at all — it fetches the media
+     * itself from a URL you give it (MediaUrl), fire-and-forget, sometime
+     * after this call returns. $publicUrl (messagingOutboundMediaUrl()) is
+     * therefore REQUIRED here, unlike Meta/Telegram which take the bytes
+     * directly; $filePath is unused.
+     */
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = ''): string
+    {
+        if ($publicUrl === '') {
+            throw new Exception('Twilio needs a public URL to fetch the attachment from, and none was given.');
+        }
+        $sid   = $this->channel['credentials']['account_sid'] ?? '';
+        $token = $this->channel['credentials']['auth_token'] ?? '';
+        $from  = $this->channel['phone_number'] ?? '';
+        if ($sid === '' || $token === '' || $from === '') {
+            throw new Exception('Twilio channel is missing its Account SID, Auth Token or From number.');
+        }
+
+        $fields = [
+            'From'     => 'whatsapp:' . $this->ensurePlus($from),
+            'To'       => 'whatsapp:' . $this->ensurePlus($to),
+            'MediaUrl' => $publicUrl,
+        ];
+        if ($caption !== '') {
+            $fields['Body'] = $caption;
+        }
+
+        [$code, $resp] = $this->httpRequest(
+            "https://api.twilio.com/2010-04-01/Accounts/$sid/Messages.json",
+            [
+                'method'  => 'POST',
+                'headers' => ['Content-Type: application/x-www-form-urlencoded'],
+                'body'    => http_build_query($fields),
+                'auth'    => "$sid:$token",
+            ]
+        );
+
+        $json = json_decode($resp, true);
+        if ($code < 200 || $code >= 300) {
+            throw new Exception('Twilio rejected the attachment: ' . ($json['message'] ?? ('HTTP ' . $code)));
+        }
+        return $json['sid'] ?? '';
+    }
+
     public function sendTemplate(string $to, array $template, array $vars): string
     {
         $sid   = $this->channel['credentials']['account_sid'] ?? '';

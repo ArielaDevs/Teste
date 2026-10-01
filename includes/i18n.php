@@ -163,6 +163,31 @@ class I18n {
     }
 
     /**
+     * Same lookup as t(), but for an EXPLICIT locale rather than this request's
+     * active one — for text that goes to someone who isn't the logged-in user,
+     * e.g. a Telegram bot reply in the customer's own language_code, where
+     * there is no session locale for them at all (the webhook has no session).
+     * An unsupported/unknown locale code falls back to English, same as t().
+     */
+    public static function tFor($locale, $key, $params = []) {
+        $parts = explode('.', $key, 2);
+        if (count($parts) < 2) {
+            return self::interpolate($key, $params);
+        }
+        [$namespace, $path] = $parts;
+
+        $locale = array_key_exists($locale, self::SUPPORTED_LOCALES) ? $locale : self::FALLBACK_LOCALE;
+        $value = self::resolve($namespace, $path, $locale);
+        if ($value === null && $locale !== self::FALLBACK_LOCALE) {
+            $value = self::resolve($namespace, $path, self::FALLBACK_LOCALE);
+        }
+        if ($value === null) {
+            return $key;
+        }
+        return self::interpolate($value, $params);
+    }
+
+    /**
      * Build a flat translations object for the JS bridge: pre-merges English
      * fallback into the active locale **per key** so the frontend can do plain
      * dotted lookups without re-implementing the fallback chain. Caller passes
