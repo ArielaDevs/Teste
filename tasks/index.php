@@ -40,11 +40,13 @@ $taskModalLayout = 'columns';
 $taskView   = 'board';
 $taskFilter = 'my';
 $taskBoardGroup = 'status';
+$taskHideDoneSubtasks = false;
 try {
     $__p = connectToDatabase()->prepare(
         "SELECT preference_key, preference_value FROM user_preferences
          WHERE analyst_id = ? AND preference_key IN
-               ('tasks_detail_view', 'tasks_modal_layout', 'tasks_view', 'tasks_filter', 'tasks_board_group')"
+               ('tasks_detail_view', 'tasks_modal_layout', 'tasks_view', 'tasks_filter', 'tasks_board_group',
+                'tasks_hide_done_subtasks')"
     );
     $__p->execute([(int) ($_SESSION['analyst_id'] ?? 0)]);
     foreach ($__p->fetchAll(PDO::FETCH_KEY_PAIR) as $__k => $__v) {
@@ -58,6 +60,8 @@ try {
         // Board columns by status (default) or by analyst (2.10.0). No schema
         // change: a user_preferences row, like the board/list choice above.
         if ($__k === 'tasks_board_group' && $__v === 'analyst') { $taskBoardGroup = 'analyst'; }
+        // System -> Preferences: stop listing subtasks under a card once all are done.
+        if ($__k === 'tasks_hide_done_subtasks' && $__v === 'on') { $taskHideDoneSubtasks = true; }
     }
 } catch (Throwable $e) {
     // Un-migrated install, or no preferences row: the side panel, as before.
@@ -78,7 +82,7 @@ $translationNamespaces = ['common', 'tasks'];
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('tasks.title')); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/tasks.css?v=35">
+    <link rel="stylesheet" href="../assets/css/tasks.css?v=37">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
     <script src="../assets/js/tz.js?v=5"></script>
@@ -312,10 +316,11 @@ $translationNamespaces = ['common', 'tasks'];
     window.TASK_MODAL_LAYOUT = <?php echo json_encode($taskModalLayout); ?>;
     window.TASK_VIEW = <?php echo json_encode($taskView); ?>;
     window.TASK_BOARD_GROUP = <?php echo json_encode($taskBoardGroup); ?>;
+    window.TASK_HIDE_DONE_SUBTASKS = <?php echo json_encode($taskHideDoneSubtasks); ?>;
     window.TASK_FILTER = <?php echo json_encode($taskFilter); ?>;</script>
     <script src="../assets/js/tasks-priority.js?v=1"></script>
     <script src="../assets/js/tasks-ctx-menu.js?v=4"></script>
-    <script src="../assets/js/tasks.js?v=44"></script>
+    <script src="../assets/js/tasks.js?v=46"></script>
     <script src="../assets/js/mobile.js?v=65"></script>
 </body>
 </html>

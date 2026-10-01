@@ -7088,6 +7088,7 @@ CREATE TABLE IF NOT EXISTS `task_checklists` (
     `template_id` INT NULL,
     `title` VARCHAR(255) NOT NULL,
     `closure_mode` ENUM('warn','block') NOT NULL DEFAULT 'warn',
+    `sort_order` INT NOT NULL DEFAULT 0,
     `created_by_id` INT NULL,
     `created_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `is_demo` tinyint(1) NOT NULL DEFAULT 0,

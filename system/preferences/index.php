@@ -62,6 +62,10 @@ $prefDefaults = [
     // from two places that must agree: here, and the calendar's own Show
     // control. '' is parent tasks only, which is what the calendar always did.
     'tasks_calendar_subtasks'    => '',
+    // Whether the board stops listing a task's subtasks under its card once
+    // every one of them is complete. '' shows them regardless; 'on' tidies them
+    // away. Read by tasks/index.php into window.TASK_HIDE_DONE_SUBTASKS.
+    'tasks_hide_done_subtasks'   => '',
     // Left-panel visibility — one key per module that has a left panel.
     // Each module's header reads its key; module settings pages (where one
     // exists) edit the same key. Surfaced together below.
@@ -554,6 +558,20 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
                     <option value="only" <?php echo $prefs['tasks_calendar_subtasks'] === 'only' ? 'selected' : ''; ?>><?php echo htmlspecialchars(t('tasks.filter.subtasks_only')); ?></option>
                 </select>
                 <span class="pref-saving-hint" id="calSubtaskSavingHint"><?php echo htmlspecialchars(t('system.preferences.saving')); ?></span>
+            </div>
+
+            <!-- Subtasks listed under their card on the board. -->
+            <div class="pref-section">
+                <h3><?php echo htmlspecialchars(t('system.preferences.board_subtasks_heading')); ?></h3>
+                <p><?php echo htmlspecialchars(t('system.preferences.board_subtasks_desc')); ?></p>
+                <label class="toggle-group">
+                    <span class="toggle-switch">
+                        <input type="checkbox" id="boardSubtasksToggle" <?php echo $prefs['tasks_hide_done_subtasks'] === 'on' ? 'checked' : ''; ?>>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span class="toggle-label"><?php echo htmlspecialchars(t('system.preferences.board_subtasks_label')); ?></span>
+                </label>
+                <span class="pref-saving-hint" id="boardSubtasksSavingHint"><?php echo htmlspecialchars(t('system.preferences.saving')); ?></span>
             </div>
 
             <div class="pref-section">
@@ -1062,6 +1080,17 @@ $fmtSample = new DateTime('2026-08-05 14:30:00', new DateTimeZone(Tz::current())
                 taskViewHint.classList.add('show');
                 await savePref('tasks_detail_view', taskViewSelect.value);
                 setTimeout(() => taskViewHint.classList.remove('show'), 1200);
+            });
+        }
+
+        // ===== Subtasks under their card on the board (tasks_hide_done_subtasks) =====
+        const boardSubtasksToggle = document.getElementById('boardSubtasksToggle');
+        const boardSubtasksHint   = document.getElementById('boardSubtasksSavingHint');
+        if (boardSubtasksToggle) {
+            boardSubtasksToggle.addEventListener('change', async function() {
+                boardSubtasksHint.classList.add('show');
+                await savePref('tasks_hide_done_subtasks', boardSubtasksToggle.checked ? 'on' : '');
+                setTimeout(() => boardSubtasksHint.classList.remove('show'), 1200);
             });
         }
 

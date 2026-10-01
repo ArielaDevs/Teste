@@ -33,7 +33,7 @@ function documentsPanelAssets(string $pathPrefix = '../'): void
     if ($emitted) return;
     $emitted = true;
     echo '<link rel="stylesheet" href="' . htmlspecialchars($pathPrefix) . 'assets/css/documents.css?v=4">' . "\n";
-    echo '<script src="' . htmlspecialchars($pathPrefix) . 'assets/js/documents.js?v=6"></script>' . "\n";
+    echo '<script src="' . htmlspecialchars($pathPrefix) . 'assets/js/documents.js?v=7"></script>' . "\n";
 }
 
 /**

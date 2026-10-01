@@ -611,7 +611,31 @@ function renderCard(t) {
         ${descHtml}
         ${meta.length ? `<div class="task-card-meta">${meta.join('')}</div>` : ''}
         ${tagsHtml}
+        ${boardSubtasksHtml(t)}
     </div>`;
+}
+
+/**
+ * The subtasks listed, indented, under their card. Rides on the same Settings
+ * -> Card "subtasks" switch as the 2/5 bar: somebody who turned subtasks off
+ * the card does not want them back as a list. The personal preference in
+ * System -> Preferences tidies the list away once every one is complete.
+ *
+ * Each row opens ITS subtask, not the parent - the click stops at the row.
+ */
+function boardSubtasksHtml(t) {
+    const items = t.subtask_items || [];
+    if (!cardFields.subtasks || !items.length) return '';
+    if (window.TASK_HIDE_DONE_SUBTASKS && items.every(s => s.status_is_closed)) return '';
+    return `<div class="task-card-subtasks">${items.map(s => {
+        const due = s.due_date ? formatDueBadge(s.due_date) : '';
+        return `<div class="task-card-subtask${s.status_is_closed ? ' is-done' : ''}"
+                     onclick="event.stopPropagation(); openDetailPanel(${s.id})">
+            <span class="task-card-subtask-tick" aria-hidden="true"></span>
+            <span class="task-card-subtask-title">${esc(s.title)}</span>
+            ${due && !s.status_is_closed ? due : ''}
+        </div>`;
+    }).join('')}</div>`;
 }
 
 // Short date for the start badge, e.g. "12 Jun"
@@ -1161,13 +1185,12 @@ function applyModalTabs(body) {
         // subtasks behind a tab are indistinguishable from none, and the person
         // who never scrolled simply never learns they exist.
         if (t.count) {
-            const n = panel.querySelectorAll(t.count).length;
-            if (n) {
-                const badge = document.createElement('span');
-                badge.className = 'tdm-tab-count';
-                badge.textContent = n;
-                btn.appendChild(badge);
-            }
+            setModalTabCount(btn, panel.querySelectorAll(t.count).length);
+        }
+        // Documents load after the tabs are drawn, so their count arrives later,
+        // from the documents panel itself.
+        if (t.key === 'documents') {
+            panel.addEventListener('fd:count', e => setModalTabCount(btn, e.detail.total));
         }
         btn.onclick = () => showModalTab(t.key);
         strip.appendChild(btn);
@@ -1180,6 +1203,17 @@ function applyModalTabs(body) {
     // subtask has no Subtasks tab, so never assume a fixed key exists.
     const first = strip.querySelector('.tdm-tab');
     if (first) showModalTab(first.dataset.tab);
+}
+
+function setModalTabCount(btn, n) {
+    let badge = btn.querySelector('.tdm-tab-count');
+    if (!n) { if (badge) badge.remove(); return; }
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'tdm-tab-count';
+        btn.appendChild(badge);
+    }
+    badge.textContent = n;
 }
 
 function showModalTab(key) {
@@ -1511,45 +1545,15 @@ function renderDetailPanel(task) {
         ${!task.parent_task_id ? `
         <div class="subtask-section">
             <h4>${esc(window.t('tasks.detail.subtasks'))}</h4>
-            <div class="subtask-list" id="subtaskList">
-                ${(task.subtasks || []).map(s => {
-                    const dueBadge = s.due_date ? formatDueBadge(s.due_date) : '';
-                    const assignee = s.analyst_name ? esc(s.analyst_name) : '';
-                    // Follows the same card placement, so a board set to pills
-                    // reads the same way inside a task. Note the line below about
-                    // never deriving anything from a status NAME — this dot used
-                    // to do exactly that with the priority name, two lines apart.
-                    const priorityHtml   = TasksPriority.markup(s.priority, s.priority_colour, cardFields.priority);
-                    const priorityAccent = TasksPriority.accentAttrs(s.priority, s.priority_colour, cardFields.priority);
-                    // The propagation guard belongs on CLICK, not on CHANGE.
-                    // Ticking a checkbox fires a click on the input, which bubbles
-                    // to the row's onclick — so the row opened the subtask instead
-                    // of the box being ticked. Stopping propagation inside onchange
-                    // was both too late and on an event the row never listens for.
-                    // Ticking a box must tick the box and nothing else.
-                    //
-                    // "checked" comes from the is_closed FLAG, never from comparing
-                    // the status name to the English word Done: rename the status
-                    // and the box would never appear ticked however complete it was.
-                    return `
-                    <div class="subtask-item" onclick="openDetailPanel(${s.id})"${priorityAccent}>
-                        <input type="checkbox" ${s.status_is_closed ? 'checked' : ''}
-                               onclick="event.stopPropagation()"
-                               onchange="toggleSubtask(${s.id}, this.checked)">
-                        ${priorityHtml}
-                        <span class="subtask-title ${s.status_is_closed ? 'completed' : ''}">${esc(s.title)}</span>
-                        <span class="subtask-meta">
-                            ${assignee ? '<span class="subtask-assignee">' + assignee + '</span>' : ''}
-                            ${dueBadge || `<input type="date" class="subtask-due-set"
-                                   onclick="event.stopPropagation()"
-                                   onchange="event.stopPropagation(); setSubtaskDue(${s.id}, this.value)"
-                                   title="${escAttr(window.t('tasks.detail.subtask_set_due'))}">`}
-                        </span>
-                    </div>`;
-                }).join('')}
+            <div class="subtask-list" id="subtaskList" ondragover="subtaskDragOver(event)" ondrop="event.preventDefault()">
+                ${(task.subtasks || []).length ? subtaskHeadHtml() : ''}
+                ${(task.subtasks || []).map(subtaskRowHtml).join('')}
             </div>
             <div class="subtask-add">
                 <input type="text" placeholder="${escAttr(window.t('tasks.detail.add_subtask'))}" id="newSubtaskInput" onkeydown="if(event.key==='Enter')addSubtask()">
+                <input type="date" id="newSubtaskStart" class="subtask-add-due"
+                       title="${escAttr(window.t('tasks.detail.start_date'))}"
+                       onkeydown="if(event.key==='Enter')addSubtask()">
                 <input type="date" id="newSubtaskDue" class="subtask-add-due"
                        title="${escAttr(window.t('tasks.detail.subtask_set_due'))}"
                        onkeydown="if(event.key==='Enter')addSubtask()">
@@ -1901,7 +1905,9 @@ function renderTaskChecklists() {
                 ? `<input type="text" class="chk-step-value" id="chkValue${i.id}" value="${esc(i.response_value || '')}"
                           placeholder="${esc(i.input_placeholder || T('checklist_value_placeholder'))}" ${done ? 'disabled' : ''}>` : '';
             return `
-                <div class="chk-step${done ? ' done' : ''}">
+                <div class="chk-step${done ? ' done' : ''}" data-sort-id="${i.id}" draggable="true"
+                     ondragstart="chkDragStart(event)" ondragend="chkDragEnd(event)">
+                    <span class="chk-handle" title="${esc(T('checklist_drag'))}" onmousedown="this.closest('[data-sort-id]').dataset.grab = '1'" aria-hidden="true">&#8942;&#8942;</span>
                     <input type="checkbox" ${done ? 'checked' : ''} onchange="toggleTaskChecklistItem(${i.id}, this)">
                     <div class="chk-step-body">
                         <div class="chk-step-title">${esc(i.title)}
@@ -1913,14 +1919,16 @@ function renderTaskChecklists() {
                 </div>`;
         }).join('');
         return `
-            <div class="chk-card">
+            <div class="chk-card" data-sort-id="${c.id}" draggable="true"
+                 ondragstart="chkDragStart(event)" ondragend="chkDragEnd(event)">
                 <div class="chk-card-head">
+                    <span class="chk-handle" title="${esc(T('checklist_drag'))}" onmousedown="this.closest('[data-sort-id]').dataset.grab = '1'" aria-hidden="true">&#8942;&#8942;</span>
                     <span class="chk-card-title">${critical ? `<span title="${esc(T('checklist_critical'))}">${ICON_LOCK}</span>` : ''}${esc(c.title)}</span>
                     <span class="chk-card-progress">${esc(T('checklist_progress', { done: c.completed_items, total: c.total_items }))}</span>
                     <button type="button" class="btn-link-small" onclick="removeTaskChecklist(${c.id})">${esc(T('checklist_remove'))}</button>
                 </div>
                 <div class="chk-bar"><div class="chk-bar-fill" style="width:${Number(c.percent) || 0}%"></div></div>
-                ${steps}
+                <div class="chk-steps" data-sort="items" data-checklist-id="${c.id}" ondragover="chkDragOver(event)">${steps}</div>
             </div>`;
     }).join('');
 
@@ -1936,8 +1944,57 @@ function renderTaskChecklists() {
 
     host.innerHTML = `
         <label>${esc(T('checklist_heading'))}</label>
-        ${lists || `<div class="chk-empty">${esc(T('checklist_none'))}</div>`}
+        ${lists ? `<div class="chk-lists" data-sort="lists" ondragover="chkDragOver(event)">${lists}</div>`
+                : `<div class="chk-empty">${esc(T('checklist_none'))}</div>`}
         ${attach}`;
+}
+
+// ── Re-ordering checklists, and the steps inside one, by dragging ───────────
+// The same rule as subtasks: only the handle starts a drag. A step sits inside
+// its checklist's card and both are draggable, so each handler acts only on a
+// drag that began on ITS OWN element (e.target), and a container only re-orders
+// rows that are its own children - a step can never be dropped into another
+// checklist, nor a checklist among steps.
+let chkDragRow = null;
+
+function chkDragStart(e) {
+    const row = e.currentTarget;
+    if (e.target !== row) return;                    // a step inside this card
+    if (row.dataset.grab !== '1') { e.preventDefault(); return; }
+    chkDragRow = row;
+    row.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', row.dataset.sortId); } catch (err) {}
+}
+
+function chkDragOver(e) {
+    const box = e.currentTarget;
+    if (!chkDragRow || chkDragRow.parentElement !== box) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rows = Array.from(box.children).filter(el => el.dataset.sortId && el !== chkDragRow);
+    const before = rows.find(r => {
+        const b = r.getBoundingClientRect();
+        return e.clientY < b.top + b.height / 2;
+    });
+    if (before) box.insertBefore(chkDragRow, before);
+    else box.appendChild(chkDragRow);
+}
+
+function chkDragEnd(e) {
+    const row = e.currentTarget;
+    if (e.target !== row) return;
+    delete row.dataset.grab;
+    if (chkDragRow !== row) return;
+    row.classList.remove('dragging');
+    chkDragRow = null;
+    const box = row.parentElement;
+    const ids = Array.from(box.children).filter(el => el.dataset.sortId).map(el => Number(el.dataset.sortId));
+    if (box.dataset.sort === 'lists') {
+        postTaskChecklist({ action: 'reorder', task_id: selectedTaskId, ids });
+    } else {
+        postTaskChecklist({ action: 'reorder_items', checklist_id: Number(box.dataset.checklistId), ids });
+    }
 }
 
 async function postTaskChecklist(payload) {
@@ -2773,39 +2830,147 @@ async function stopRecurrence() {
  * subtask has no date; once it has one the row shows the ordinary due badge,
  * which carries the overdue colouring this input cannot.
  */
-async function setSubtaskDue(subtaskId, value) {
-    if (!value) return;
-    const ok = await postTaskChange({ id: subtaskId, due_date: value }, 'tasks.toast.save_failed');
-    if (ok && selectedTaskId) openDetailPanel(selectedTaskId);
+/**
+ * One subtask row in the task window: drag handle, tick box, priority, title,
+ * who has it, then Start and Due as columns that line up down the list.
+ *
+ * The dates are always editable in place. Changing one saves just that field
+ * and does NOT rebuild the window (which would throw you back to the top, and
+ * off the Subtasks tab) - the board catches up in the background.
+ *
+ * The propagation guard belongs on CLICK, not on CHANGE: ticking a checkbox
+ * fires a click on the input, which bubbles to the row's onclick and used to
+ * open the subtask instead of ticking it. Ticking a box must tick the box and
+ * nothing else. "checked" comes from the is_closed FLAG, never from comparing
+ * the status name to the English word Done.
+ */
+function subtaskRowHtml(s) {
+    const assignee = s.analyst_name ? esc(s.analyst_name) : '';
+    // Follows the same card placement, so a board set to pills reads the same
+    // way inside a task.
+    const priorityHtml   = TasksPriority.markup(s.priority, s.priority_colour, cardFields.priority);
+    const priorityAccent = TasksPriority.accentAttrs(s.priority, s.priority_colour, cardFields.priority);
+    const dateInput = (field, value, label) =>
+        `<input type="date" class="subtask-date${value ? '' : ' is-empty'}" value="${escAttr(value || '')}"
+                onclick="event.stopPropagation()"
+                onchange="setSubtaskDate(${s.id}, '${field}', this)"
+                title="${escAttr(label)}" aria-label="${escAttr(label)}">`;
+    return `
+    <div class="subtask-item" data-id="${s.id}" draggable="true"
+         ondragstart="subtaskDragStart(event)" ondragend="subtaskDragEnd(event)"
+         onclick="openDetailPanel(${s.id})"${priorityAccent}>
+        <span class="subtask-handle" title="${escAttr(window.t('tasks.detail.subtask_drag'))}"
+              onmousedown="this.closest('.subtask-item').dataset.grab = '1'"
+              onclick="event.stopPropagation()" aria-hidden="true">&#8942;&#8942;</span>
+        <input type="checkbox" ${s.status_is_closed ? 'checked' : ''}
+               onclick="event.stopPropagation()"
+               onchange="toggleSubtask(${s.id}, this.checked)">
+        <span class="subtask-name">
+            ${priorityHtml}
+            <span class="subtask-title ${s.status_is_closed ? 'completed' : ''}">${esc(s.title)}</span>
+        </span>
+        <span class="subtask-assignee">${assignee}</span>
+        ${dateInput('start_date', s.start_date, window.t('tasks.detail.start_date'))}
+        ${dateInput('due_date', s.due_date, window.t('tasks.detail.due_date'))}
+    </div>`;
 }
 
+// The column headings over the two date columns. Same grid as a row, so the
+// headings sit exactly over their dates.
+function subtaskHeadHtml() {
+    return `<div class="subtask-head" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+        <span>${esc(window.t('tasks.detail.start_date'))}</span>
+        <span>${esc(window.t('tasks.detail.due_date'))}</span>
+    </div>`;
+}
+
+async function setSubtaskDate(subtaskId, field, input) {
+    input.classList.toggle('is-empty', !input.value);
+    const ok = await postTaskChange({ id: subtaskId, [field]: input.value || null }, 'tasks.toast.save_failed');
+    if (ok) loadTasks();
+}
+
+// ── Re-ordering subtasks by dragging ────────────────────────────────────────
+// Only the handle starts a drag: the row is draggable, but a drag that did not
+// begin on the handle is cancelled, so selecting a title's text or nudging the
+// mouse while clicking a row still behaves as it always did. The order is
+// saved as each subtask's board_position, which get.php already sorts by.
+let subtaskDragRow = null;
+
+function subtaskDragStart(e) {
+    const row = e.currentTarget;
+    if (row.dataset.grab !== '1') { e.preventDefault(); return; }
+    subtaskDragRow = row;
+    row.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', row.dataset.id); } catch (err) {}
+}
+
+function subtaskDragOver(e) {
+    if (!subtaskDragRow) return;
+    e.preventDefault();
+    const list = e.currentTarget;
+    const rows = Array.from(list.querySelectorAll('.subtask-item:not(.dragging)'));
+    const before = rows.find(r => {
+        const box = r.getBoundingClientRect();
+        return e.clientY < box.top + box.height / 2;
+    });
+    if (before) list.insertBefore(subtaskDragRow, before);
+    else list.appendChild(subtaskDragRow);
+}
+
+async function subtaskDragEnd(e) {
+    const row = e.currentTarget;
+    delete row.dataset.grab;
+    if (!subtaskDragRow) return;
+    subtaskDragRow.classList.remove('dragging');
+    subtaskDragRow = null;
+    const list = row.closest('.subtask-list');
+    const ids = Array.from(list.querySelectorAll('.subtask-item')).map(r => Number(r.dataset.id));
+    if (!ids.length || !selectedTaskId) return;
+    try {
+        const data = await fetch(API_BASE + 'reorder_subtasks.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parent_id: selectedTaskId, ids })
+        }).then(r => r.json());
+        if (!data.success) {
+            showToast(data.error || window.t('tasks.toast.save_failed'), 'error');
+            openDetailPanel(selectedTaskId);   // put the list back as it is stored
+            return;
+        }
+        loadTasks();   // the board lists subtasks in this order too
+    } catch (err) {
+        console.error(err);
+        showToast(window.t('tasks.toast.save_failed'), 'error');
+    }
+}
+
+// A mouse that went down on the handle but never dragged must not leave the
+// row armed, or the next drag from anywhere on it would be let through.
+document.addEventListener('mouseup', () => {
+    document.querySelectorAll('[data-grab]').forEach(r => delete r.dataset.grab);
+});
+
 /**
- * Put one newly-created subtask into the list already on screen.
- *
- * Deliberately minimal: a new subtask has no assignee badge, no priority dot
- * and is never complete, so the row is the same shape as a freshly rendered one
- * without needing the server's copy. Anything richer would mean refetching,
- * which is the thing this exists to avoid.
+ * Put one newly-created subtask into the list already on screen, without a
+ * refetch (which is the thing addSubtask() exists to avoid).
  */
 function appendSubtaskRow(sub) {
     const list = document.querySelector('.subtask-list');
     if (!list) return;
     const empty = list.querySelector('.subtask-empty');
     if (empty) empty.remove();
-
-    const row = document.createElement('div');
-    row.className = 'subtask-item';
-    row.setAttribute('onclick', 'openDetailPanel(' + sub.id + ')');
-    const due = sub.due_date
-        ? '<span class="subtask-due">' + esc(sub.due_date) + '</span>'
-        : '<input type="date" class="subtask-due-set" onclick="event.stopPropagation()"'
-          + ' onchange="event.stopPropagation(); setSubtaskDue(' + sub.id + ', this.value)">';
-    row.innerHTML =
-        '<input type="checkbox" onclick="event.stopPropagation()" onchange="toggleSubtask(' + sub.id + ', this.checked)">'
-      + '<span class="subtask-title">' + esc(sub.title) + '</span>'
-      + '<span class="subtask-meta">' + due + '</span>';
-    list.appendChild(row);
+    if (!list.querySelector('.subtask-head')) list.insertAdjacentHTML('afterbegin', subtaskHeadHtml());
+    const tab = document.querySelector('.tdm-tab[data-tab="subtasks"]');
+    if (tab) setModalTabCount(tab, list.querySelectorAll('.subtask-item').length + 1);
+    list.insertAdjacentHTML('beforeend', subtaskRowHtml({
+        id: sub.id, title: sub.title, start_date: sub.start_date || null,
+        due_date: sub.due_date || null, status_is_closed: 0
+    }));
 }
+
 /**
  * Add a subtask to the task the panel is showing.
  *
@@ -2840,6 +3005,8 @@ async function addSubtask() {
         const dueEl   = document.getElementById('newSubtaskDue');
         const payload = { title, parent_task_id: parentId, assigned_analyst_id: ANALYST_ID };
         if (dueEl && dueEl.value) payload.due_date = dueEl.value;
+        const startEl = document.getElementById('newSubtaskStart');
+        if (startEl && startEl.value) payload.start_date = startEl.value;
 
         const data = await fetch(API_BASE + 'save.php', {
             method: 'POST',
@@ -2850,10 +3017,11 @@ async function addSubtask() {
         if (data.success) {
             input.value = '';
             if (dueEl) dueEl.value = '';
+            if (startEl) startEl.value = '';
             // Someone may have clicked into a different task while this was in
             // flight; appending then would put the row under the wrong parent.
             if (selectedTaskId === parentId) {
-                appendSubtaskRow({ id: data.id, title, due_date: payload.due_date || null });
+                appendSubtaskRow({ id: data.id, title, start_date: payload.start_date || null, due_date: payload.due_date || null });
                 input.focus();
             }
             // The board card shows "2/5", so it has to catch up - but in the

@@ -96,6 +96,13 @@ class TasksService
         $posStmt = $conn->prepare("SELECT COALESCE(MAX(board_position), -1) + 1 FROM tasks WHERE status_id = ? AND parent_task_id IS NULL");
         $posStmt->execute([$status[0]]);
         $boardPosition = (int)$posStmt->fetchColumn();
+        // A subtask goes to the end of ITS PARENT'S list instead - the order
+        // dragged in the task window is stored in the same column.
+        if ($links['parent_task_id']) {
+            $posStmt = $conn->prepare("SELECT COALESCE(MAX(board_position), -1) + 1 FROM tasks WHERE parent_task_id = ?");
+            $posStmt->execute([(int) $links['parent_task_id']]);
+            $boardPosition = (int)$posStmt->fetchColumn();
+        }
 
         // A subtask always belongs wherever its parent does — it is not an
         // independent piece of work and must never be reachable from a company

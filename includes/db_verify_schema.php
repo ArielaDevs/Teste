@@ -4681,6 +4681,7 @@ return [
         'template_id'       => 'INT DEFAULT NULL',
         'title'             => 'VARCHAR(255) NOT NULL',
         'closure_mode'      => "ENUM('warn','block') NOT NULL DEFAULT 'warn'",
+        'sort_order'        => 'INT NOT NULL DEFAULT 0',
         'created_by_id'     => 'INT DEFAULT NULL',
         'created_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
         'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',

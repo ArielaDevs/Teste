@@ -175,6 +175,8 @@ return [
         'subtask_add'    => 'Add',
         'subtask_of' => 'Subtask of',
         'subtask_set_due' => 'Give this subtask a due date',
+        'subtask_drag'    => 'Drag to change the order',
+        'checklist_drag'  => 'Drag to change the order',
         'comments'       => 'Comments',
         'add_comment'    => 'Add a comment...',
         'post'           => 'Post',
@@ -474,6 +476,7 @@ return [
         'board_rightclick_body'    => 'Right-clicking any card opens a quick-action menu &mdash; assign an analyst or team, change status or priority, or create a subtask &mdash; without opening the card at all.',
         'board_search_heading' => 'Search and filters',
         'board_search_body'    => 'The sidebar carries a <strong>Search</strong> box (filters as you type, matching the title and description &mdash; and tag names if enabled) plus filters for <strong>My Tasks / All Tasks</strong>, <strong>Team</strong>, <strong>Analyst</strong> and, when enabled, <strong>Tag</strong>. Filters and search apply to the list view too.',
+        'board_subtasks' => 'A task\'s subtasks are listed under its card - click one to open it. Inside a task, drag a subtask (or a checklist, or a checklist step) by its <strong>&#8942;&#8942;</strong> handle to change the order. To stop listing subtasks on the board once they are all complete, use <strong>Preferences &rarr; Subtasks on the task board</strong>.',
         'board_columns_by_analyst' => 'Use <strong>Columns &rarr; Analyst</strong> in the left panel to see one column per person instead (yours first, then <em>Unassigned</em>), with each card showing its status. Dragging a card to someone else\'s column assigns the task to them. Your choice is remembered.',
         'board_tip'            => 'Choose what each card shows &mdash; priority, assignee, team, dates, a description excerpt, subtask progress, tags &mdash; under Settings &rarr; Card, so you can scan tasks without opening them.',
 

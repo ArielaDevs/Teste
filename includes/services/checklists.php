@@ -454,8 +454,8 @@ class ChecklistsService
     public static function taskChecklists(PDO $conn, int $taskId): array
     {
         $tenantId = self::taskTenantId($conn, $taskId);
-        $st = $conn->prepare("SELECT id, template_id, title, closure_mode, created_datetime
-                                FROM task_checklists WHERE task_id = ? ORDER BY id ASC");
+        $st = $conn->prepare("SELECT id, template_id, title, closure_mode, sort_order, created_datetime
+                                FROM task_checklists WHERE task_id = ? ORDER BY sort_order ASC, id ASC");
         $st->execute([$taskId]);
         $lists = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
@@ -520,9 +520,10 @@ class ChecklistsService
         $own = !$conn->inTransaction();
         if ($own) $conn->beginTransaction();
         try {
-            $conn->prepare("INSERT INTO task_checklists (task_id, template_id, title, closure_mode, created_by_id, created_datetime)
-                            VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())")
-                 ->execute([$taskId, $templateId, $title, $closureMode === 'block' ? 'block' : 'warn', $createdBy]);
+            $conn->prepare("INSERT INTO task_checklists (task_id, template_id, title, closure_mode, sort_order, created_by_id, created_datetime)
+                            VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())")
+                 ->execute([$taskId, $templateId, $title, $closureMode === 'block' ? 'block' : 'warn',
+                            self::nextTaskChecklistOrder($conn, $taskId), $createdBy]);
             $chkId = (int)$conn->lastInsertId();
 
             $steps = $conn->prepare("SELECT title, suggested_role, is_mandatory, requires_input, input_placeholder, sort_order
@@ -541,6 +542,36 @@ class ChecklistsService
         } catch (Throwable $e) {
             if ($own && $conn->inTransaction()) $conn->rollBack();
             throw $e;
+        }
+    }
+
+    /** A newly attached checklist goes below the ones already on the task. */
+    private static function nextTaskChecklistOrder(PDO $conn, int $taskId): int
+    {
+        $st = $conn->prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM task_checklists WHERE task_id = ?");
+        $st->execute([$taskId]);
+        return (int)$st->fetchColumn();
+    }
+
+    /**
+     * Put a task's checklists in a new order. $ids is the whole list, top first.
+     * Each UPDATE is pinned to the task, so an id from another task matches
+     * nothing - the caller gates on $taskId and that gate then covers every row.
+     */
+    public static function reorderTaskChecklists(PDO $conn, int $taskId, array $ids): void
+    {
+        $st = $conn->prepare("UPDATE task_checklists SET sort_order = ? WHERE id = ? AND task_id = ?");
+        foreach (array_values($ids) as $i => $id) {
+            $st->execute([$i + 1, (int)$id, $taskId]);
+        }
+    }
+
+    /** The same for the steps inside one checklist, pinned to that checklist. */
+    public static function reorderTaskChecklistItems(PDO $conn, int $checklistId, array $ids): void
+    {
+        $st = $conn->prepare("UPDATE task_checklist_items SET sort_order = ? WHERE id = ? AND task_checklist_id = ?");
+        foreach (array_values($ids) as $i => $id) {
+            $st->execute([$i + 1, (int)$id, $checklistId]);
         }
     }
 
@@ -737,7 +768,7 @@ class ChecklistsService
                                           t.id AS tpl_exists, t.title AS tpl_title, t.closure_mode AS tpl_mode
                                      FROM task_checklists c
                                      LEFT JOIN checklist_templates t ON t.id = c.template_id
-                                    WHERE c.task_id = ? ORDER BY c.id ASC");
+                                    WHERE c.task_id = ? ORDER BY c.sort_order ASC, c.id ASC");
             $src->execute([$fromTaskId]);
             foreach ($src->fetchAll(PDO::FETCH_ASSOC) as $c) {
                 if ($c['tpl_exists']) {
@@ -745,9 +776,10 @@ class ChecklistsService
                         (string)$c['tpl_mode'], $c['created_by_id'] !== null ? (int)$c['created_by_id'] : null);
                     continue;
                 }
-                $conn->prepare("INSERT INTO task_checklists (task_id, template_id, title, closure_mode, created_by_id, created_datetime)
-                                VALUES (?, NULL, ?, ?, ?, UTC_TIMESTAMP())")
-                     ->execute([$toTaskId, $c['title'], $c['closure_mode'] ?: 'warn', $c['created_by_id']]);
+                $conn->prepare("INSERT INTO task_checklists (task_id, template_id, title, closure_mode, sort_order, created_by_id, created_datetime)
+                                VALUES (?, NULL, ?, ?, ?, ?, UTC_TIMESTAMP())")
+                     ->execute([$toTaskId, $c['title'], $c['closure_mode'] ?: 'warn',
+                                self::nextTaskChecklistOrder($conn, $toTaskId), $c['created_by_id']]);
                 $newId = (int)$conn->lastInsertId();
                 $conn->prepare("INSERT INTO task_checklist_items
                                   (task_checklist_id, title, suggested_role, is_mandatory, requires_input, input_placeholder, sort_order)

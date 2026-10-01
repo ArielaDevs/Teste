@@ -177,6 +177,33 @@ try {
         }
     }
 
+    // The subtasks themselves, so the board can list them indented under their
+    // card. Kept apart from the counts above (which feed the "2/5" bar) so the
+    // shape of `subtasks` stays what every existing caller expects. Same order as
+    // the task's own window: the position set by dragging there, then oldest.
+    $subtaskRows = [];
+    if (!empty($taskIds)) {
+        $placeholders = implode(',', array_fill(0, count($taskIds), '?'));
+        $stmt = $conn->prepare(
+            "SELECT t.id, t.parent_task_id, t.title, t.start_date, t.due_date,
+                    ts.is_closed AS status_is_closed,
+                    tp.name AS priority, tp.colour AS priority_colour,
+                    a.full_name AS analyst_name
+             FROM tasks t
+             LEFT JOIN task_statuses   ts ON ts.id = t.status_id
+             LEFT JOIN task_priorities tp ON tp.id = t.priority_id
+             LEFT JOIN analysts a ON a.id = t.assigned_analyst_id
+             WHERE t.parent_task_id IN ({$placeholders})
+             ORDER BY t.board_position ASC, t.created_datetime ASC"
+        );
+        $stmt->execute($taskIds);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $row['id'] = (int)$row['id'];
+            $row['status_is_closed'] = (int)$row['status_is_closed'];
+            $subtaskRows[$row['parent_task_id']][] = $row;
+        }
+    }
+
     // Get tags for all tasks
     $tagsByTask = [];
     if (!empty($taskIds)) {
@@ -206,6 +233,7 @@ try {
     // Attach subtask counts, tags and collaborators
     foreach ($tasks as &$task) {
         $task['subtasks']      = $subtaskCounts[$task['id']] ?? ['total' => 0, 'done' => 0];
+        $task['subtask_items'] = $subtaskRows[$task['id']] ?? [];
         $task['tags']          = $tagsByTask[$task['id']] ?? [];
         $task['collaborators'] = $collaboratorsByTask[$task['id']] ?? [];
         // ⭐ Ed's call: one list, with the ones you don't own marked. Worked out

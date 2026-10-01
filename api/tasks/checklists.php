@@ -99,6 +99,20 @@ try {
             ChecklistsService::removeTaskChecklist($conn, (int)$in['checklist_id']);
             break;
 
+        // Dragged into a new order in the task window. The whole list is sent,
+        // top first; the service pins every row to the task / checklist gated here.
+        case 'reorder':
+            $taskId = (int)($in['task_id'] ?? 0);
+            checklistTaskGate($conn, $taskId);
+            ChecklistsService::reorderTaskChecklists($conn, $taskId, (array)($in['ids'] ?? []));
+            break;
+
+        case 'reorder_items':
+            $taskId = ChecklistsService::taskIdForChecklist($conn, (int)($in['checklist_id'] ?? 0));
+            checklistTaskGate($conn, $taskId);
+            ChecklistsService::reorderTaskChecklistItems($conn, (int)$in['checklist_id'], (array)($in['ids'] ?? []));
+            break;
+
         default:
             throw new ServiceError('validation', 'invalid_field', 'Unknown action.');
     }

@@ -1866,38 +1866,48 @@ body {
    Chosen per analyst with the button in the panel header; columns stay the
    default. The same blocks, regrouped — see applyModalTabs() in tasks.js.
    ────────────────────────────────────────────────────────────────────────── */
+/* Folder tabs (Ed: "make them look more like tabs - and the same width"). Each
+   tab is a raised card on the rule below it; the open one takes the panel's own
+   background and drops its bottom edge, so it reads as the front of the stack.
+   flex: 1 1 0 shares the strip out evenly whatever each label says. */
 .tdm-tabs {
     display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
+    gap: 4px;
     margin: 4px 0 18px;
-    border-bottom: 1px solid var(--border-soft, #eceff3);
+    padding: 0 2px;
+    border-bottom: 1px solid var(--border, #e0e0e0);
 }
 .tdm-tab {
     position: relative;
+    flex: 1 1 0;
+    min-width: 0;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 7px;
-    padding: 9px 14px;
-    border: none;
-    background: transparent;
-    /* The underline is drawn on the button itself and only COLOURED when
-       active, so selecting a tab cannot change its height and shuffle the
-       fields below it by a pixel. */
-    border-bottom: 2px solid transparent;
+    padding: 9px 12px;
+    background: var(--surface-2, #fafafa);
+    border: 1px solid var(--border, #e0e0e0);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    /* Sits over the strip's rule by its own 1px, so the active tab can hide it. */
     margin-bottom: -1px;
     color: var(--text-muted, #666);
     font-family: inherit;
     font-size: 13px;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
 }
-.tdm-tab:hover { color: var(--text, #333); }
+.tdm-tab:hover { color: var(--text, #333); background: var(--surface-hover, #f0f0f0); }
 .tdm-tab.active {
+    background: var(--surface, #fff);
     color: var(--tsk-accent, #7c3aed);
-    border-bottom-color: var(--tsk-accent, #7c3aed);
+    /* The same size as every other tab - a border that only appears when active
+       would nudge the panel below by a pixel each time you switch. */
+    border-bottom: 1px solid var(--surface, #fff);
+    box-shadow: inset 0 2px 0 var(--tsk-accent, #7c3aed);
 }
-
 /* ⭐ The count is what stops a tab HIDING things: three subtasks behind a tab
    with no number are indistinguishable from none. */
 .tdm-tab-count {
@@ -1933,7 +1943,6 @@ body {
    than wrapping into three rows that eat the screen the tabs were meant to save. */
 @media (max-width: 700px) {
     .tdm-tabs {
-        flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
@@ -2283,3 +2292,155 @@ body {
     border: 1px solid var(--st);
     background: color-mix(in srgb, var(--st) 12%, transparent);
 }
+
+/* ── Subtasks in the task window: columns, and dragging to re-order ─────────
+   One grid for the rows and the heading row above them, so Start and Due line
+   up down the list: handle | tick | name | who | start | due.
+   ────────────────────────────────────────────────────────────────────────── */
+.subtask-item,
+.subtask-head {
+    display: grid;
+    grid-template-columns: 14px 16px minmax(0, 1fr) minmax(0, 110px) 128px 128px;
+    align-items: center;
+    column-gap: 8px;
+}
+.subtask-head {
+    padding: 0 10px 2px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-dim, #999);
+}
+.subtask-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.subtask-item .subtask-assignee { max-width: none; }
+.subtask-handle {
+    color: var(--text-faint, #bbb);
+    font-size: 12px;
+    letter-spacing: -3px;
+    cursor: grab;
+    user-select: none;
+    text-align: center;
+}
+.subtask-item:hover .subtask-handle { color: var(--text-muted, #888); }
+.subtask-item.dragging {
+    opacity: 0.5;
+    background: var(--accent-soft, #ede9fe);
+}
+.subtask-date {
+    width: 100%;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text, #333);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+.subtask-item:hover .subtask-date { border-color: var(--border, #e0e0e0); background: var(--surface, #fff); }
+.subtask-date:focus { outline: none; border-color: var(--tsk-accent, #7c3aed); background: var(--surface, #fff); }
+/* An unset date shows the browser's dd/mm/yyyy placeholder - faded until the
+   row is hovered, so a list of undated subtasks does not look like a form. */
+.subtask-date.is-empty { color: var(--text-faint, #bbb); }
+.subtask-item:hover .subtask-date.is-empty { color: var(--text-muted, #888); }
+
+@media (max-width: 700px) {
+    .subtask-item,
+    .subtask-head { grid-template-columns: 14px 16px minmax(0, 1fr) 112px 112px; }
+    .subtask-item .subtask-assignee,
+    .subtask-head > span:nth-child(4) { display: none; }
+}
+
+/* ── Subtasks listed under their card on the board ───────────────────────────
+   Drawn as branches of a tree (Ed): a trunk runs down from the card's meta row
+   and each subtask hangs off it on its own short branch. The last one ends the
+   trunk at its branch, like the └ in a file tree. Each row opens its subtask.
+   ────────────────────────────────────────────────────────────────────────── */
+.task-card-subtasks {
+    margin-top: 6px;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+}
+.task-card-subtask {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--text, #333);
+    cursor: pointer;
+}
+/* The trunk, full height on every row but the last... */
+.task-card-subtask::before {
+    content: '';
+    position: absolute;
+    left: -11px;
+    top: 0;
+    bottom: 0;
+    border-left: 1.5px solid var(--border, #e0e0e0);
+}
+.task-card-subtask:last-child::before { bottom: 50%; }
+/* ...and the branch out to the row. */
+.task-card-subtask::after {
+    content: '';
+    position: absolute;
+    left: -11px;
+    top: 50%;
+    width: 9px;
+    border-top: 1.5px solid var(--border, #e0e0e0);
+}
+.task-card-subtask:hover {
+    background: var(--surface-hover, #f0f0f0);
+    color: var(--tsk-accent, #7c3aed);
+}
+.task-card-subtask:hover .task-card-subtask-title { text-decoration: underline; }
+.task-card-subtask.is-done:hover .task-card-subtask-title { text-decoration: line-through underline; }
+.task-card-subtask-tick {
+    flex-shrink: 0;
+    width: 11px;
+    height: 11px;
+    border: 1.5px solid var(--text-faint, #bbb);
+    border-radius: 3px;
+}
+.task-card-subtask.is-done .task-card-subtask-tick {
+    background: var(--tsk-accent, #7c3aed);
+    border-color: var(--tsk-accent, #7c3aed);
+}
+.task-card-subtask-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.task-card-subtask.is-done .task-card-subtask-title {
+    text-decoration: line-through;
+    color: var(--text-dim, #999);
+}
+.task-card-subtask .due-badge { font-size: 10px; padding: 1px 5px; }
+
+/* Drag handles on checklists and their steps (2.10.0). */
+#taskChecklistSection .chk-handle {
+    flex-shrink: 0;
+    color: var(--text-faint, #bbb);
+    font-size: 12px;
+    letter-spacing: -3px;
+    cursor: grab;
+    user-select: none;
+    padding-right: 3px;
+}
+#taskChecklistSection .chk-step .chk-handle { margin-top: 2px; }
+#taskChecklistSection .chk-card:hover > .chk-card-head > .chk-handle,
+#taskChecklistSection .chk-step:hover > .chk-handle { color: var(--text-muted, #888); }
+#taskChecklistSection .chk-card.dragging,
+#taskChecklistSection .chk-step.dragging { opacity: 0.5; background: var(--accent-soft, #ede9fe); }

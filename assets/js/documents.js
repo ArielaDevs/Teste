@@ -257,6 +257,11 @@
     Panel.prototype.paint = function () {
         this.$count.textContent = this.total === 1
             ? t('count_one') : t('count_many', { n: this.total });
+        // Told to whoever holds the panel - the task window puts it on its
+        // Documents tab, which is drawn before the list has loaded.
+        try {
+            this.el.dispatchEvent(new CustomEvent('fd:count', { bubbles: true, detail: { total: this.total } }));
+        } catch (e) {}
 
         if (!this.items.length) {
             this.$list.innerHTML = '<div class="fd-empty">' + esc(t('none')) + '</div>';

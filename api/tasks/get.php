@@ -86,7 +86,7 @@ try {
         "SELECT t.id, t.title,
                 ts.name AS status, ts.is_closed AS status_is_closed,
                 tp.name AS priority, tp.colour AS priority_colour,
-                t.due_date,
+                t.start_date, t.due_date,
                 t.assigned_analyst_id, t.board_position, t.completed_datetime,
                 a.full_name AS analyst_name
          FROM tasks t
