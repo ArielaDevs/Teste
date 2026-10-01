@@ -41,6 +41,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2068 | Checklists        | Fix         | Security: api/tickets/ticket_checklists.php checked neither company nor Tickets access, so any signed-in analyst could read, attach, tick and remove checklists on another company's ticket by id (proven: a step ticked across companies); every action, including the step/checklist-addressed ones, is now gated on the ticket. |
 | 2069 | Checklists        | Fix         | Two root-absolute addresses left in checklists/ticket_view.js (saving a note from the checklist and the "suggest a checklist" call) broke on an install in a subfolder; both now use the page's API base like the rest of the file. |
 | 2070 | Tickets           | Improvement | The reply/forward window gives the message more room: To and Cc labels sit beside their boxes, the "Message" and "Attachments" labels are gone, the editor is taller (440px), and Templates and Signature moved to the bottom-left of the footer at the same height as Send, their menus opening upwards and one closing when the other opens. |
+| 2071 | Tasks             | Feature     | Board columns by status or by analyst: a Columns switch under View (remembered per analyst, no schema change - a user_preferences row) shows one column per person with tasks in view (yours first, Unassigned last, analysts who no longer exist labelled "Former analyst #id"), each card showing its status; dragging a card to another column reassigns it through the normal save. |
 
 
 

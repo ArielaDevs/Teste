@@ -39,11 +39,12 @@ $taskModalLayout = 'columns';
 // that is there, beyond the ordinary meaning of the button you pressed.
 $taskView   = 'board';
 $taskFilter = 'my';
+$taskBoardGroup = 'status';
 try {
     $__p = connectToDatabase()->prepare(
         "SELECT preference_key, preference_value FROM user_preferences
          WHERE analyst_id = ? AND preference_key IN
-               ('tasks_detail_view', 'tasks_modal_layout', 'tasks_view', 'tasks_filter')"
+               ('tasks_detail_view', 'tasks_modal_layout', 'tasks_view', 'tasks_filter', 'tasks_board_group')"
     );
     $__p->execute([(int) ($_SESSION['analyst_id'] ?? 0)]);
     foreach ($__p->fetchAll(PDO::FETCH_KEY_PAIR) as $__k => $__v) {
@@ -54,6 +55,9 @@ try {
         // that does not exist and renders as a blank page.
         if ($__k === 'tasks_view'   && $__v === 'list') { $taskView   = 'list'; }
         if ($__k === 'tasks_filter' && $__v === 'all')  { $taskFilter = 'all'; }
+        // Board columns by status (default) or by analyst (2.10.0). No schema
+        // change: a user_preferences row, like the board/list choice above.
+        if ($__k === 'tasks_board_group' && $__v === 'analyst') { $taskBoardGroup = 'analyst'; }
     }
 } catch (Throwable $e) {
     // Un-migrated install, or no preferences row: the side panel, as before.
@@ -74,7 +78,7 @@ $translationNamespaces = ['common', 'tasks'];
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('tasks.title')); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/tasks.css?v=33">
+    <link rel="stylesheet" href="../assets/css/tasks.css?v=35">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
     <script src="../assets/js/tz.js?v=5"></script>
@@ -115,6 +119,18 @@ $translationNamespaces = ['common', 'tasks'];
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
                         <?php echo htmlspecialchars(t('tasks.view.list')); ?>
                     </button>
+                </div>
+            </div>
+
+            <?php /* Board columns by status or by analyst (2.10.0). Built exactly like
+                     the View section above (same label, same .view-toggle / .view-btn) so
+                     it reads as the same kind of control. Board view only - switchView()
+                     hides the section in the list. */ ?>
+            <div class="sidebar-section sidebar-section--view" id="boardGroupSection"<?php echo $taskView === 'list' ? ' style="display:none"' : ''; ?>>
+                <div class="sidebar-label"><?php echo htmlspecialchars(t('tasks.board.group_label')); ?></div>
+                <div class="view-toggle" id="boardGroupToggle">
+                    <button class="view-btn<?php echo $taskBoardGroup === 'status' ? ' active' : ''; ?>" data-group="status" onclick="switchBoardGroup('status')"><?php echo htmlspecialchars(t('tasks.board.group_status')); ?></button>
+                    <button class="view-btn<?php echo $taskBoardGroup === 'analyst' ? ' active' : ''; ?>" data-group="analyst" onclick="switchBoardGroup('analyst')"><?php echo htmlspecialchars(t('tasks.board.group_analyst')); ?></button>
                 </div>
             </div>
 
@@ -295,10 +311,11 @@ $translationNamespaces = ['common', 'tasks'];
     window.TASK_DETAIL_VIEW = <?php echo json_encode($taskDetailView); ?>;
     window.TASK_MODAL_LAYOUT = <?php echo json_encode($taskModalLayout); ?>;
     window.TASK_VIEW = <?php echo json_encode($taskView); ?>;
+    window.TASK_BOARD_GROUP = <?php echo json_encode($taskBoardGroup); ?>;
     window.TASK_FILTER = <?php echo json_encode($taskFilter); ?>;</script>
     <script src="../assets/js/tasks-priority.js?v=1"></script>
     <script src="../assets/js/tasks-ctx-menu.js?v=4"></script>
-    <script src="../assets/js/tasks.js?v=41"></script>
+    <script src="../assets/js/tasks.js?v=44"></script>
     <script src="../assets/js/mobile.js?v=65"></script>
 </body>
 </html>

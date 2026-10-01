@@ -61,6 +61,14 @@ return [
         'quick_add_placeholder'=> 'Task title...',
         'overdue'              => 'Overdue',
         'due_today'            => 'Today',
+        // Board columns by status or by analyst (2.10.0).
+        'group_label'          => 'Columns',
+        'group_status'         => 'Status',
+        'group_analyst'        => 'Analyst',
+        'unassigned'           => 'Unassigned',
+        'reassigned'           => 'Assigned to {name}',
+        'reassign_failed'      => 'Could not reassign the task',
+        'former_analyst'       => 'Former analyst #{id}',
     ],
 
     'list' => [
@@ -466,6 +474,7 @@ return [
         'board_rightclick_body'    => 'Right-clicking any card opens a quick-action menu &mdash; assign an analyst or team, change status or priority, or create a subtask &mdash; without opening the card at all.',
         'board_search_heading' => 'Search and filters',
         'board_search_body'    => 'The sidebar carries a <strong>Search</strong> box (filters as you type, matching the title and description &mdash; and tag names if enabled) plus filters for <strong>My Tasks / All Tasks</strong>, <strong>Team</strong>, <strong>Analyst</strong> and, when enabled, <strong>Tag</strong>. Filters and search apply to the list view too.',
+        'board_columns_by_analyst' => 'Use <strong>Columns &rarr; Analyst</strong> in the left panel to see one column per person instead (yours first, then <em>Unassigned</em>), with each card showing its status. Dragging a card to someone else\'s column assigns the task to them. Your choice is remembered.',
         'board_tip'            => 'Choose what each card shows &mdash; priority, assignee, team, dates, a description excerpt, subtask progress, tags &mdash; under Settings &rarr; Card, so you can scan tasks without opening them.',
 
         // 3. List view

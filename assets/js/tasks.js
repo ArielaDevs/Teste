@@ -307,6 +307,8 @@ function switchView(view) {
     document.querySelector(`.view-btn[data-view="${view}"]`).classList.add('active');
     document.getElementById('boardView').style.display = view === 'board' ? 'flex' : 'none';
     document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+    const groupToggle = document.getElementById('boardGroupSection');
+    if (groupToggle) groupToggle.style.display = view === 'board' ? '' : 'none';
     if (view === 'board') renderBoard();
     else renderList();
     saveTaskPreference('tasks_view', view);
@@ -323,6 +325,8 @@ const DEFAULT_STATUSES = [
 
 // Build one board column per status — run once after statuses load
 function buildBoardColumns() {
+    // By analyst, renderBoardByAnalyst() builds the columns itself on every draw.
+    if (boardGroup === 'analyst') return;
     const board = document.getElementById('boardView');
     const cols = statusList.length ? statusList : DEFAULT_STATUSES;
     board.innerHTML = '';
@@ -413,7 +417,100 @@ function persistColumnOrder() {
     }).catch(() => showToast(window.t('tasks.toast.order_failed'), 'error'));
 }
 
+// ── Board columns: by status (default) or by analyst (2.10.0) ──────
+//
+// No schema change: the choice is a user_preferences row (tasks_board_group),
+// like the board/list switch. By analyst, the columns are worked out from the
+// tasks in view each time the board draws, because who has work changes as
+// tasks are filtered, searched and reassigned; dropping a card on another
+// analyst's column reassigns it through the ordinary save, so every rule that
+// applies to reassigning (analyst exists, notifications, workflow events)
+// applies here too.
+let boardGroup = window.TASK_BOARD_GROUP === 'analyst' ? 'analyst' : 'status';
+
+function switchBoardGroup(group) {
+    boardGroup = group === 'analyst' ? 'analyst' : 'status';
+    document.querySelectorAll('#boardGroupToggle .view-btn')
+        .forEach(b => b.classList.toggle('active', b.dataset.group === boardGroup));
+    saveTaskPreference('tasks_board_group', boardGroup);
+    buildBoardColumns();
+    renderBoard();
+}
+
+function renderBoardByAnalyst() {
+    const board = document.getElementById('boardView');
+    const visible = tasks.filter(t => taskMatchesSearch(t) && taskMatchesTag(t));
+
+    // One column per analyst who has a task in view, yours first, then by name;
+    // Unassigned last. Your own column is always there, so you can drag work
+    // to yourself even when you have none yet.
+    const groups = new Map();
+    const me = String(ANALYST_ID || '');
+    if (me) groups.set(me, { id: me, name: ((analysts.find(a => String(a.id) === me) || {}).name) || '', tasks: [] });
+    visible.forEach(t => {
+        const id = t.assigned_analyst_id ? String(t.assigned_analyst_id) : '';
+        if (!groups.has(id)) {
+            const a = analysts.find(x => String(x.id) === id);
+            // A task can point at an analyst who no longer exists (deleted, or removed
+            // with old demo data); say so rather than show a bare number.
+            groups.set(id, { id, name: id ? ((a && a.name) || t.analyst_name || window.t('tasks.board.former_analyst', { id })) : '', tasks: [] });
+        }
+        groups.get(id).tasks.push(t);
+    });
+    const unassigned = groups.get('') || { id: '', name: '', tasks: [] };
+    groups.delete('');
+    const cols = [...groups.values()].sort((a, b) =>
+        (a.id === me ? -1 : b.id === me ? 1 : a.name.localeCompare(b.name)));
+    cols.push(unassigned);
+
+    // Within a column, in status order (the board's own column order), then
+    // the board position each task already has.
+    const statusRank = name => {
+        const i = (statusList || []).findIndex(s => s.name === name);
+        return i < 0 ? 999 : i;
+    };
+
+    board.innerHTML = '';
+    cols.forEach(g => {
+        g.tasks.sort((a, b) => statusRank(a.status) - statusRank(b.status)
+            || (a.board_position || 0) - (b.board_position || 0));
+        const initials = g.id ? g.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '–';
+        const col = document.createElement('div');
+        col.className = 'board-column board-column--analyst';
+        col.dataset.analystId = g.id;
+        col.innerHTML = `
+            <div class="board-column-header">
+                <span class="column-analyst-badge">${esc(initials)}</span>
+                <span class="column-title">${esc(g.id ? g.name : window.t('tasks.board.unassigned'))}</span>
+                <span class="column-count">${g.tasks.length}</span>
+            </div>
+            <div class="board-cards">${g.tasks.length
+                ? g.tasks.map(renderCard).join('')
+                : '<div class="board-empty">' + esc(window.t('tasks.board.no_tasks')) + '</div>'}</div>`;
+        col.querySelectorAll('.task-card').forEach(card => {
+            card.addEventListener('mousedown', e => startDrag(e, card));
+        });
+        board.appendChild(col);
+    });
+}
+
+/** Drop a card on another analyst's column: reassign it. Returns true if handled. */
+async function dropOnAnalystColumn(taskId, targetColumn) {
+    const task = tasks.find(t => t.id == taskId);
+    const from = task && task.assigned_analyst_id ? String(task.assigned_analyst_id) : '';
+    const to = targetColumn.dataset.analystId || '';
+    if (from === to) { renderBoard(); return true; }   // same column: nothing to change
+    const ok = await postTaskChange({ id: taskId, assigned_analyst_id: to || null }, 'tasks.board.reassign_failed');
+    if (ok) {
+        const name = to ? ((analysts.find(a => String(a.id) === to) || {}).name || '') : window.t('tasks.board.unassigned');
+        showToast(window.t('tasks.board.reassigned', { name }), 'success');
+    }
+    loadTasks();
+    return true;
+}
+
 function renderBoard() {
+    if (boardGroup === 'analyst') { renderBoardByAnalyst(); return; }
     document.querySelectorAll('#boardView .board-column').forEach(col => {
         const status = col.dataset.status;
         const cardsEl = col.querySelector('.board-cards');
@@ -501,7 +598,15 @@ function renderCard(t) {
 
     const accent = TasksPriority.accentAttrs(t.priority, t.priority_colour, cf.priority);
 
+    // In columns-by-analyst the column no longer says what state the task is
+    // in, so the card does - a chip in the status's own colour.
+    let statusChip = '';
+    if (boardGroup === 'analyst' && t.status) {
+        const st = (statusList || []).find(s => s.name === t.status);
+        statusChip = `<span class="task-card-status" style="--st:${escAttr((st && st.colour) || '#6b7280')}">${esc(t.status)}</span>`;
+    }
     return `<div class="task-card" data-id="${t.id}" onclick="openDetailPanel(${t.id})"${accent}>
+        ${statusChip}
         <div class="task-card-title">${esc(t.title)}</div>
         ${descHtml}
         ${meta.length ? `<div class="task-card-meta">${meta.join('')}</div>` : ''}
@@ -700,6 +805,14 @@ async function endDrag(e) {
 
     if (!targetColumn) { dragState = null; return; }
 
+    // Columns by analyst: a drop reassigns the task (see dropOnAnalystColumn).
+    if (boardGroup === 'analyst') {
+        const movedId = dragState.taskId;
+        dragState = null;
+        await dropOnAnalystColumn(movedId, targetColumn);
+        return;
+    }
+
     const newStatus = targetColumn.dataset.status;
     const container = targetColumn.querySelector('.board-cards');
 
@@ -774,6 +887,14 @@ async function endDrag(e) {
     });
 
     if (!targetColumn) { dragState = null; return; }
+
+    // Columns by analyst: a drop reassigns the task (see dropOnAnalystColumn).
+    if (boardGroup === 'analyst') {
+        const movedId = dragState.taskId;
+        dragState = null;
+        await dropOnAnalystColumn(movedId, targetColumn);
+        return;
+    }
 
     const newStatus = targetColumn.dataset.status;
     const container = targetColumn.querySelector('.board-cards');
