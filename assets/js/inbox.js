@@ -769,7 +769,7 @@ function initTinyMCE() {
     tinymce.init({
         selector: '#emailBody',
         license_key: 'gpl',
-        height: 350,
+        height: 440,   // was 350: the Message label row and the To/Cc label rows were removed to give it this room (2.10.0)
         menubar: false,
         skin: isDark ? 'oxide-dark' : 'oxide',
         content_css: isDark ? 'dark' : 'default',
@@ -7200,6 +7200,9 @@ async function toggleReplyTemplateMenu(event) {
         menu.style.display = 'none';
         return;
     }
+    // Opening one menu closes the other: side by side in the footer, two open
+    // menus overlap each other.
+    closeSignatureMenu();
 
     // Always re-fetch on open: a colleague may have added a shared template since
     // this page was loaded, and the inbox stays open for a whole shift.
@@ -10889,6 +10892,7 @@ async function toggleSignatureMenu(event) {
     const menu = document.getElementById('signatureMenu');
     if (!menu) return;
     if (menu.style.display === 'block') { menu.style.display = 'none'; return; }
+    closeReplyTemplateMenu();   // one menu open at a time - see toggleReplyTemplateMenu()
     // Re-fetch on open: the analyst may have just added one in another tab.
     await loadMySignatures(true);
     renderSignatureMenu();

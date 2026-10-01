@@ -35,7 +35,7 @@ $translationNamespaces = ['common', 'tickets'];
     <title><?php echo htmlspecialchars(t('tickets.title')); ?> - <?php echo htmlspecialchars(t('tickets.nav.inbox')); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../checklists/ticket_checklist.css?v=4">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=73">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../assets/css/mobile.css?v=153">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
@@ -205,44 +205,30 @@ $translationNamespaces = ['common', 'tickets'];
                          you and gets out of the way. Filled live by the presence
                          poll, so it can appear (or clear) while you are drafting. */ ?>
                 <div class="composer-collision" id="composerCollisionWarning" hidden></div>
-                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group">
-                        <label class="form-label"><?php echo htmlspecialchars(t('tickets.reply_modal.to')); ?></label>
+                <?php /* Laid out to give the message the room (Ed, 2.10.0): To / Cc with
+                         their labels BESIDE the boxes, no "Message" label, and the editor
+                         straight underneath. Templates and Signature live in the footer,
+                         bottom left - see there. */ ?>
+                <div class="form-row reply-addr-row">
+                    <div class="form-group reply-addr">
+                        <label class="form-label" for="emailTo"><?php echo htmlspecialchars(t('tickets.reply_modal.to')); ?></label>
                         <input type="text" class="form-input" id="emailTo" autocomplete="off" placeholder="<?php echo htmlspecialchars(t('tickets.reply_modal.to_placeholder')); ?>">
                     </div>
-                    <div class="form-group">
-                        <label class="form-label"><?php echo htmlspecialchars(t('tickets.reply_modal.cc')); ?></label>
+                    <div class="form-group reply-addr">
+                        <label class="form-label" for="emailCc"><?php echo htmlspecialchars(t('tickets.reply_modal.cc')); ?></label>
                         <input type="text" class="form-input" id="emailCc" autocomplete="off" placeholder="<?php echo htmlspecialchars(t('tickets.reply_modal.cc_placeholder')); ?>">
                     </div>
                 </div>
                 <input type="hidden" id="emailSubject">
-                <div class="form-group">
-                    <?php /* The templates control sits ON the message label rather than in the
-                             footer next to Cleanup: it is something you reach for BEFORE typing,
-                             so it belongs at the top of the editor, not beside Send. */ ?>
-                    <div class="reply-tpl-labelrow">
-                        <label class="form-label" style="margin: 0;"><?php echo htmlspecialchars(t('tickets.reply_modal.message')); ?></label>
-                        <div class="reply-tpl-wrap">
-                            <button type="button" class="btn btn-secondary reply-tpl-btn" id="replyTemplatesBtn" onclick="toggleReplyTemplateMenu(event)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
-                                <?php echo htmlspecialchars(t('tickets.reply_modal.templates')); ?>
-                                <span class="reply-tpl-caret">▾</span>
-                            </button>
-                            <div class="reply-tpl-menu" id="replyTemplateMenu" style="display: none;"></div>
-                        </div>
-                        <div class="reply-tpl-wrap">
-                            <button type="button" class="btn btn-secondary reply-tpl-btn" id="signatureBtn" onclick="toggleSignatureMenu(event)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3.5 0 3.5-10 7-10s3.5 10 7 10c1.5 0 2.5-.7 4-2"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
-                                <?php echo htmlspecialchars(t("tickets.reply_modal.signature")); ?>
-                                <span class="reply-tpl-caret">▾</span>
-                            </button>
-                            <div class="reply-tpl-menu" id="signatureMenu" style="display: none;"></div>
-                        </div>
-                    </div>
+                <?php /* ⚠️ Keep #emailBody in a form-group of its own: mobile.css finds the
+                         editor's block with .form-group:has(#emailBody) to stretch it to fill
+                         the sheet on a phone. */ ?>
+                <div class="form-group reply-body-group">
                     <textarea id="emailBody"></textarea>
                 </div>
+                <?php /* No "Attachments" label (Ed, 2.10.0): the drop zone says what it is
+                         ("Drag files here or browse"), and the line it took goes to the editor. */ ?>
                 <div class="form-group">
-                    <label class="form-label"><?php echo htmlspecialchars(t('tickets.reply_modal.attachments')); ?></label>
                     <div class="attachment-dropzone" id="attachmentDropzone">
                         <input type="file" id="attachmentInput" multiple style="display: none;">
                         <div class="dropzone-content">
@@ -257,6 +243,28 @@ $translationNamespaces = ['common', 'tickets'];
                 ✨ <?php echo htmlspecialchars(t('tickets.reply_modal.cleaned_up')); ?> — <a href="#" id="replyCleanupUndoLink" style="color: #0078d4;"><?php echo htmlspecialchars(t('tickets.reply_modal.undo')); ?></a> <span id="replyCleanupUndoTimer" style="color: #999;"></span>
             </div>
             <div class="modal-footer">
+                <?php /* Templates and Signature, bottom LEFT (Ed, 2.10.0) - moved off the
+                         top of the editor so the message gets that height. Their menus
+                         open UPWARDS from here (.reply-footer-tools in inbox.css). The ids
+                         and handlers are unchanged, so inbox.js needed nothing. */ ?>
+                <div class="reply-footer-tools">
+                    <div class="reply-tpl-wrap">
+                        <button type="button" class="btn btn-secondary reply-tpl-btn" id="replyTemplatesBtn" onclick="toggleReplyTemplateMenu(event)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+                            <?php echo htmlspecialchars(t('tickets.reply_modal.templates')); ?>
+                            <span class="reply-tpl-caret">▴</span>
+                        </button>
+                        <div class="reply-tpl-menu" id="replyTemplateMenu" style="display: none;"></div>
+                    </div>
+                    <div class="reply-tpl-wrap">
+                        <button type="button" class="btn btn-secondary reply-tpl-btn" id="signatureBtn" onclick="toggleSignatureMenu(event)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3.5 0 3.5-10 7-10s3.5 10 7 10c1.5 0 2.5-.7 4-2"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+                            <?php echo htmlspecialchars(t("tickets.reply_modal.signature")); ?>
+                            <span class="reply-tpl-caret">▴</span>
+                        </button>
+                        <div class="reply-tpl-menu" id="signatureMenu" style="display: none;"></div>
+                    </div>
+                </div>
                 <button class="btn btn-secondary" onclick="closeEmailModal()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
                 <button class="btn btn-cleanup" id="replyCleanupBtn" onclick="cleanupReplyDraft()" style="display:none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><path d="M12 3l1.9 5.8L20 10l-5 4.5L16.5 21 12 17.8 7.5 21 9 14.5 4 10l6.1-1.2z"/></svg>
@@ -1003,7 +1011,7 @@ $translationNamespaces = ['common', 'tickets'];
     <script src="../assets/js/schedule.js?v=1"></script>
     <script src="../checklists/search_scoring.js?v=1"></script>
     <script src="../checklists/ticket_view.js?v=9"></script>
-    <script src="../assets/js/inbox.js?v=141"></script>
+    <script src="../assets/js/inbox.js?v=143"></script>
     <script src="../assets/js/mobile.js?v=65"></script>
     <script>
     // Auto-check mailboxes every 60 seconds

@@ -3973,6 +3973,27 @@ body .tox-tinymce-aux {
     display: flex; align-items: center; justify-content: space-between;
     gap: 12px; margin-bottom: 6px;
 }
+
+/* Reply window laid out to give the message the room (Ed, 2.10.0).
+   To / Cc: label beside the box, one line each, two columns. */
+#emailModal .reply-addr-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
+}
+#emailModal .reply-addr {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+#emailModal .reply-addr .form-label { margin: 0; flex-shrink: 0; min-width: 22px; }
+#emailModal .reply-addr .form-input { flex: 1; min-width: 0; }
+/* Templates and Signature, bottom left of the footer; Cancel / Cleanup / Send
+   stay right. Their menus open UPWARDS from here, or they would drop off the
+   bottom of the window. */
+#emailModal .reply-footer-tools { display: flex; gap: 8px; margin-right: auto; align-items: center; }
+/* Same size as Cancel / Cleanup / Send beside them (.btn's padding and font),
+   rather than the compact size they had sitting on the editor's label row. */
+#emailModal .reply-footer-tools .reply-tpl-btn { padding: 10px 16px; font-size: 14px; line-height: normal; }
+#emailModal .reply-footer-tools .reply-tpl-menu {
+    top: auto; bottom: calc(100% + 6px); left: 0; right: auto;
+}
 .reply-tpl-wrap { position: relative; }
 .reply-tpl-btn {
     display: inline-flex; align-items: center; gap: 6px;

@@ -81,7 +81,7 @@ foreach ($providers as $pk => $pmeta) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('system.integrations.title')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../../assets/css/integrations.css?v=1">
     <style>
         /* Only the card grid — the container, title and warning come from

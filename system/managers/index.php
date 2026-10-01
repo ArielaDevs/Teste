@@ -36,7 +36,7 @@ $m = fn(string $k) => t('system.managers.' . $k);
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <script src="../../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
     <style>
         body {
             --accent: var(--sys-accent, #546e7a);

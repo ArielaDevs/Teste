@@ -29,7 +29,7 @@ if (!isset($_SESSION['analyst_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('system.demo.heading')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
     <style>
         /* System module accent (blue-grey) */
         body {

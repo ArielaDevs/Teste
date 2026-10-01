@@ -35,7 +35,7 @@ $translationNamespaces = ['common', 'lms'];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('lms.settings.heading')); ?></title>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/inbox.css?v=73">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/inbox.css?v=76">
     <style>
         /* Pin the shared accent to the LMS blue so the tabs, buttons and focus
            rings read on-brand, as every other settings page does. */

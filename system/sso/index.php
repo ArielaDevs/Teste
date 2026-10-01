@@ -50,7 +50,7 @@ $signoutPortalUri  = $signoutAnalystUri . 'self-service/login.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('system.sso.title')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
     <style>
         /* System module accent (blue-grey) — pin the generic --accent to it. */
         body {

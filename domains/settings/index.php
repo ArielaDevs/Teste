@@ -44,7 +44,7 @@ $tt = fn(string $k) => htmlspecialchars(t('domains.settings.' . $k));
     <script src="../../assets/js/tz.js?v=5"></script>
     <script src="../../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=25">
-    <link rel="stylesheet" href="../../assets/css/inbox.css?v=74">
+    <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../../assets/css/domains.css?v=1">
     <style>
         /* Full-width settings page. ⚠️ max-width alone is not enough: inbox.css's

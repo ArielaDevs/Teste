@@ -59,7 +59,7 @@ $para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspec
     <script src="../assets/js/tz.js?v=5"></script>
     <script src="../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=25">
-    <link rel="stylesheet" href="../assets/css/inbox.css?v=74">
+    <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../assets/css/help.css?v=3">
     <style>
         /* The only thing a help page should need to say for itself: its colour. */
