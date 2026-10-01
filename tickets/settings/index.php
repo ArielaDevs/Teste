@@ -2726,7 +2726,7 @@ $translationNamespaces = ['common', 'tickets'];
 
                     <!-- How to connect: only meaningful once the secret is set and (for the
                          exact webhook URL) the channel has been saved at least once. -->
-                    <div class="form-group provider-telegram" style="grid-column: span 2; background:var(--bg-secondary, #f5f7fa); border:1px solid var(--border-color, #e0e0e0); border-radius:8px; padding:12px 14px;">
+                    <div class="form-group provider-telegram" style="grid-column: span 2; background:var(--app-bg, #f5f7fa); border:1px solid var(--border, #e0e0e0); border-radius:8px; padding:12px 14px;">
                         <label style="font-weight:600; display:block; margin-bottom:6px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_title')); ?></label>
                         <ol style="margin:0 0 10px 18px; padding:0; font-size:13px; color:var(--text-muted, #555); line-height:1.6;">
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step1')); ?></li>
@@ -2957,7 +2957,7 @@ $translationNamespaces = ['common', 'tickets'];
 
             <!-- Inbound / Outbound. The inbound log existed on its own for a long time,
                  which meant you could see everything that arrived and nothing that left. -->
-            <div class="mbx-log-tabs" style="display:flex; gap:4px; border-bottom:1px solid var(--border-color,#e0e0e0); margin-bottom:15px;">
+            <div class="mbx-log-tabs" style="display:flex; gap:4px; border-bottom:1px solid var(--border, #e0e0e0); margin-bottom:15px;">
                 <button type="button" id="mbxTabInbound" class="mbx-log-tab active" onclick="switchMailboxLogTab('inbound')"><?php echo htmlspecialchars(t('tickets.settings.modals.activity.tab_inbound')); ?></button>
                 <button type="button" id="mbxTabOutbound" class="mbx-log-tab" onclick="switchMailboxLogTab('outbound')"><?php echo htmlspecialchars(t('tickets.settings.modals.activity.tab_outbound')); ?> <span id="mbxOutboundBadge" class="mbx-fail-badge" style="display:none;"></span></button>
             </div>
@@ -4396,7 +4396,7 @@ $translationNamespaces = ['common', 'tickets'];
             const out = document.getElementById('telegramConnectResult');
             const btn = document.getElementById('telegramConnectBtn');
             if (telegramFormDirty) {
-                out.style.color = 'var(--danger, #c62828)';
+                out.style.color = 'var(--danger-text, #c62828)';
                 out.textContent = window.t('tickets.settings.modals.channel.connect_save_first');
                 return;
             }
@@ -4409,12 +4409,12 @@ $translationNamespaces = ['common', 'tickets'];
                     body: JSON.stringify({ id: document.getElementById('channelId').value })
                 });
                 const data = await res.json();
-                out.style.color = data.success ? 'var(--success, #2e7d32)' : 'var(--danger, #c62828)';
+                out.style.color = data.success ? 'var(--success-text, #2e7d32)' : 'var(--danger-text, #c62828)';
                 out.textContent = data.success
                     ? window.t('tickets.settings.modals.channel.connected')
                     : (data.error || window.t('tickets.settings.modals.channel.connect_failed'));
             } catch (e) {
-                out.style.color = 'var(--danger, #c62828)';
+                out.style.color = 'var(--danger-text, #c62828)';
                 out.textContent = window.t('tickets.settings.modals.channel.connect_failed');
             } finally {
                 btn.disabled = false;
@@ -5774,7 +5774,7 @@ $translationNamespaces = ['common', 'tickets'];
             // Acknowledged items stay visible and reversible. Dismissing is meant to
             // say "I know", not to delete the fact.
             if (acked.length) {
-                html += `<div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color,#e0e0e0);">
+                html += `<div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border, #e0e0e0);">
                     <div style="font-size:12px; font-weight:600; color:var(--text-muted,#666); margin-bottom:8px;">
                         ${escapeHtml(t('tickets.settings.modals.mailbox.problems_dismissed_heading'))}
                     </div>
