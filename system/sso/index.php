@@ -569,6 +569,19 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                         <option value="block"><?php echo htmlspecialchars(t('system.sso.fallback_mode_block')); ?></option>
                     </select>
                 </div>
+                <?php /* GH #147. OIDC only: a directory has nothing to redirect to
+                         and no button. */ ?>
+                <div id="portalRoutingFields">
+                    <div class="form-field">
+                        <label for="fPortalDomains"><?php echo htmlspecialchars(t('system.sso.field_portal_domains')); ?></label>
+                        <div class="hint"><?php echo htmlspecialchars(t('system.sso.field_portal_domains_hint')); ?></div>
+                        <textarea id="fPortalDomains" rows="3" placeholder="company.com" style="width:100%;padding:8px;border:1px solid var(--border,#ccc);border-radius:4px;background:var(--surface,#fff);color:var(--text,#333);font-family:inherit;box-sizing:border-box;"></textarea>
+                    </div>
+                    <div class="checkbox-field">
+                        <input type="checkbox" id="fPortalShowButton" checked>
+                        <div class="cb-label"><strong><?php echo htmlspecialchars(t('system.sso.cb_portal_show_button')); ?></strong><span><?php echo htmlspecialchars(t('system.sso.cb_portal_show_button_desc')); ?></span></div>
+                    </div>
+                </div>
                 <?php if ($ssoMultiTenant): ?>
                 <div class="form-field" id="tenantField">
                     <label><?php echo htmlspecialchars(t('system.sso.field_company')); ?></label>
@@ -811,6 +824,7 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         const autoAnalysts = $('fAutoCreateAnalysts').checked;
         $('analystFallbackField').style.display = (isOidc && !autoAnalysts) ? '' : 'none';
         $('profileSyncModeField').style.display = isOidc ? '' : 'none';
+        $('portalRoutingFields').style.display = isOidc ? '' : 'none';   // GH #147
         // "Default module access for auto-created analysts" describes the
         // accounts JIT sign-in creates, so it only shows while that is on.
         // Nothing signs in through an address book, so there are none.
@@ -900,6 +914,8 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
         document.getElementById('fRequireVerified').checked = p ? !!p.require_verified_email : false;
         document.getElementById('fProfileSyncMode').value = (p && p.profile_sync_mode) ? p.profile_sync_mode : 'never';
         document.getElementById('fDefaultModules').value = p ? (p.default_modules || '') : '';
+        $('fPortalDomains').value = p ? (p.portal_email_domains || '') : '';
+        $('fPortalShowButton').checked = p ? p.portal_show_button !== 0 : true;
         const tenantSel = document.getElementById('fTenant');
         if (tenantSel) tenantSel.value = (p && p.tenant_id) ? String(p.tenant_id) : '';
         const secret = document.getElementById('fClientSecret');
@@ -1122,6 +1138,8 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
             require_verified_email: document.getElementById('fRequireVerified').checked ? 1 : 0,
             profile_sync_mode: document.getElementById('fProfileSyncMode').value || 'never',
             default_modules: document.getElementById('fDefaultModules').value.trim(),
+            portal_email_domains: $('fPortalDomains').value,
+            portal_show_button: $('fPortalShowButton').checked ? 1 : 0,
             tenant_id: (document.getElementById('fTenant') ? (document.getElementById('fTenant').value || null) : null)
         };
         if (isLdap) Object.assign(payload, ldapPayload(), { id: payload.id });

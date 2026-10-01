@@ -357,6 +357,18 @@ return [
         'check'    => ['rows', 'auth_providers', "protocol = 'oidc' AND enabled = 1 AND profile_sync_mode IN ('initial', 'always')"],
     ],
     [
+        'id'       => 'system.sso_portal_email_domains',
+        'module'   => 'system',
+        'tier'     => 'extra',
+        'category' => 'customer',
+        'title'    => 'Portal sends your staff straight to single sign-on',
+        'what'     => 'On the self-service portal, typing an email address on one of your domains goes straight to your identity provider - even the first time - while everyone else gets the password box.',
+        'why'      => 'One email box works for staff and outside customers alike, so nobody has to know which button is theirs.',
+        'done'     => 'At least one enabled OIDC provider has Email domains set.',
+        'link'     => 'system/sso/',
+        'check'    => ['rows', 'auth_providers', "protocol = 'oidc' AND enabled = 1 AND portal_email_domains IS NOT NULL AND portal_email_domains <> ''"],
+    ],
+    [
         'id'       => 'system.sso_default_modules',
         'module'   => 'system',
         'tier'     => 'extra',

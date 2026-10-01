@@ -28,6 +28,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2055 | Tickets           | Improvement | Email sent through an SMTP (basic IMAP) mailbox now carries Date and Message-ID headers, which RFC 5322 requires and spam filters score; the Gmail API already stamped its own (GH #158 follow-up). |
 | 2056 | Tickets           | Fix         | The CSAT page follows the company switcher: KPIs, distribution, per-analyst table and recent responses show the selected company, or every company the analyst may see under All companies - they read every company's responses before, whatever the analyst's access (GH #157). |
 | 2057 | Tickets           | Feature     | CSAT page filters: a custom From/To range, a rating band (list only), analyst and customer (whole page), 25-a-page paging with the customer on each response, and on a phone a sticky Filters button that opens them full-screen; score percentages now add up to 100 (GH #157). |
+| 2058 | System            | Feature     | SSO providers gain Email domains and a "Show the button on the portal login" switch: on the portal an address on a listed domain goes straight to that OIDC provider even on a first visit, so the page can be just the email box (never for an account already assigned to a provider or directory; public email domains and a domain claimed by two providers are refused; analyst login unchanged) (GH #147). |
 
 
 

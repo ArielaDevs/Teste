@@ -160,6 +160,32 @@ require __DIR__ . '/_top.php';
     </ul>
     <p>When sync is on, FreeITSM also asks the provider's userinfo endpoint for anything missing from the ID token. What the ID token says always wins.</p>
 </div>
+
+<!-- 4a3. Portal email domains (GH #147) -->
+<div class="help-section" id="portal-domains">
+    <div class="help-section-header"><?php echo helpSectionNum('portal-domains'); ?>
+        <div>
+            <h3>Sending portal users straight to SSO by email domain</h3>
+        </div>
+    </div>
+    <p>Normally the portal's email box only sends someone to single sign-on once it knows them: after their first SSO sign-in, or (on a multi-company install) because their company owns a provider. A first-timer who types their email and presses <strong>Continue</strong> gets the password box, and has to know to use the provider button instead.</p>
+    <p>An OpenID Connect provider's <strong>Email domains</strong> box fixes that. List your domains, one per line, for example <code>company.com</code>, and on the portal:</p>
+    <ul>
+        <li>an address on one of those domains goes <strong>straight to the provider</strong>, even the first time;</li>
+        <li>any other address gets the password box, exactly as before.</li>
+    </ul>
+    <p>Untick <strong>Show the button on the portal login</strong> as well and the page is just the email box and Continue. One box works for your staff and your outside customers, and nobody has to choose.</p>
+    <h4>Worth knowing</h4>
+    <ul>
+        <li><strong>It includes people who use a password today.</strong> Anyone on a listed domain is sent to the provider. When they sign in there, their existing portal account is linked by email, and their tickets stay with them.</li>
+        <li><strong>New people need auto-create.</strong> If someone on the domain has no portal account yet, turn on <em>Auto-create portal requesters</em>, or the portal will refuse them after they sign in.</li>
+        <li><strong>The whole domain only.</strong> <code>company.com</code> does not cover <code>uk.company.com</code>; add that on its own line.</li>
+        <li><strong>One provider per domain</strong>, and never a public email domain such as <code>gmail.com</code>. Saving refuses both.</li>
+        <li><strong>Directory users are left alone.</strong> Someone already assigned to an LDAP directory, or to another provider, keeps signing in the way they do now.</li>
+        <li><strong>The portal only.</strong> The analyst login is not affected; analysts are assigned to a provider one by one or through their team.</li>
+        <li><strong><code>?local=1</code> still works</strong> as the way back to the password form.</li>
+    </ul>
+</div>
 <!-- 4b. LDAP / Active Directory -->
 <div class="help-section" id="ldap">
     <div class="help-section-header"><?php echo helpSectionNum('ldap'); ?>
@@ -478,7 +504,7 @@ require __DIR__ . '/_top.php';
             <p>Only your global (internal) providers ever appear here — clients' IdPs are never shown to staff.</p>
         </div>
     </div>
-    <div class="help-note"><strong>First portal sign-in tip:</strong> a brand-new portal user typing their email may land on the password form, because the email-first router only auto-routes people it has seen before. They should use the <strong>provider button</strong> (single-company) or it routes by company (multi-company); after that first sign-in they're remembered and email-first routing is automatic.</div>
+    <div class="help-note"><strong>First portal sign-in tip:</strong> a brand-new portal user typing their email may land on the password form, because the email-first router only auto-routes people it has seen before. They should use the <strong>provider button</strong> (single-company) or it routes by company (multi-company); after that first sign-in they're remembered and email-first routing is automatic. To route them on the very first visit, list your domains under the provider's <strong>Email domains</strong> &mdash; see <a href="#portal-domains">Sending portal users straight to SSO</a>.</div>
 </div>
 
 <!-- 6. Break-glass -->
@@ -510,7 +536,7 @@ require __DIR__ . '/_top.php';
     <p>The redirect URI registered in the IdP must <em>exactly</em> match <code><?php echo htmlspecialchars($redirectUri); ?></code> — scheme, host and path. Copy it from this page (or the SSO settings page) rather than typing it.</p>
 
     <h4>A portal user typed their email but got the password form, not SSO</h4>
-    <p>Single-company: they should click the provider button for their first sign-in. Multi-company: check the company that owns their email domain actually has an enabled provider, and that the domain is listed under System &rarr; Companies. Unmapped domains and personal/free-email addresses are sent to local login by design.</p>
+    <p>Single-company: they should click the provider button for their first sign-in, or list their domain under the provider's <strong>Email domains</strong> so the email box routes them. If the domain is listed and they still get the password form, check they are not already assigned to a different provider or a directory. Multi-company: check the company that owns their email domain actually has an enabled provider, and that the domain is listed under System &rarr; Companies. Unmapped domains and personal/free-email addresses are sent to local login by design.</p>
 
     <h4>“Your email is not verified with the identity provider”</h4>
     <p>The provider sent <code>email_verified: false</code>, or you've turned on <em>Require a verified-email claim</em> for a provider whose tokens omit it. Leave that toggle off unless your IdP lets users self-register unverified addresses.</p>

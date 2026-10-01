@@ -151,7 +151,7 @@ return [
         'security_keywords' => 'security password expiry lockout trusted device mfa 2fa login policy brute force',
         'sso_title'         => 'Authentication',
         'sso_desc'          => 'Choose how people sign in — single sign-on through an identity provider (OpenID Connect), or against your LDAP / Active Directory — and bring contacts in from a CardDAV address book.',
-        'sso_keywords'      => 'authentication auth sso single sign-on single sign on oidc openid connect saml identity provider idp keycloak entra azure ad okta google oauth federation login ldap active directory ad domain directory bind samba openldap carddav card dav addressbook vcard vcf sabredav sabre baikal nextcloud owncloud thunderbird contact sync import people two-way two way write back writeback sync back update contacts push changes refused conflict drift compare not writing read-only permission add to address book new contact add people jit just-in-time auto-create auto create analyst portal fallback requester profile sync job title department claims',
+        'sso_keywords'      => 'authentication auth sso single sign-on single sign on oidc openid connect saml identity provider idp keycloak entra azure ad okta google oauth federation login ldap active directory ad domain directory bind samba openldap carddav card dav addressbook vcard vcf sabredav sabre baikal nextcloud owncloud thunderbird contact sync import people two-way two way write back writeback sync back update contacts push changes refused conflict drift compare not writing read-only permission add to address book new contact add people jit just-in-time auto-create auto create analyst portal fallback requester profile sync job title department claims email domain domains route redirect microsoft 365 hide button email only',
         'api_title'         => 'API',
         'api_desc'          => 'Create API keys with granular permissions, and explore the REST API with interactive documentation.',
         'api_keywords'      => 'api rest keys tokens integration webhook endpoints documentation swagger developer external',
@@ -1319,6 +1319,11 @@ return [
         'field_company'        => 'Company',
         'field_company_hint'   => 'Which client company owns this identity provider — its requesters are routed here on the self-service portal. Leave as Global for an MSP-internal provider (e.g. analyst sign-in).',
         'field_company_global' => 'Global (internal / all)',
+        // GH #147 - portal email-first routing
+        'field_portal_domains'      => 'Email domains',
+        'field_portal_domains_hint' => 'One per line, e.g. company.com. On the portal, an email address on one of these domains goes straight to this provider, even the first time. That includes people who sign in with a password today. Everyone else gets the password box as usual. A subdomain needs its own line. Leave blank to route nobody.',
+        'cb_portal_show_button'     => 'Show the button on the portal login',
+        'cb_portal_show_button_desc'=> 'Untick for a page with just the email box. People on the domains above still reach this provider through it. The analyst login is not affected.',
         'cancel'           => 'Cancel',
 
         // --- LDAP / Active Directory ---

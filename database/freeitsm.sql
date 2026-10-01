@@ -209,6 +209,14 @@ CREATE TABLE IF NOT EXISTS `auth_providers` (
     `default_modules`        VARCHAR(500) NULL,
     `sort_order`             INT NOT NULL DEFAULT 0,
     `tenant_id`              INT NULL,
+    -- Portal email-first routing (GH #147). Email domains, one per line,
+    -- lowercase: an address on one of them goes straight to this provider from
+    -- the portal's email box, even on a first visit. NULL = no domain routing.
+    -- OIDC only, and a domain may belong to one provider.
+    `portal_email_domains`   TEXT NULL,
+    -- Whether the "Sign in with ..." button shows on the portal login. Off
+    -- gives the email-box-only page; the analyst login is unaffected.
+    `portal_show_button`     TINYINT(1) NOT NULL DEFAULT 1,
     `created_datetime`       DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
     `last_modified_datetime` DATETIME NULL,
     PRIMARY KEY (`id`)

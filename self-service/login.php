@@ -59,7 +59,24 @@ try {
         // redirect to. Directory users type their password into the ordinary
         // form and api/self-service/login.php checks it by bind, so LDAP never
         // needs a button; it only changes what the first field will accept.
-        $ssoProviders = $ssoConn->query("SELECT id, display_name FROM auth_providers WHERE enabled = 1 AND tenant_id IS NULL AND protocol = 'oidc' ORDER BY sort_order, display_name")->fetchAll(PDO::FETCH_ASSOC);
+        //
+        // GH #147: a provider can hide its button here (portal_show_button = 0)
+        // for an email-box-only page, and can claim email domains so the box
+        // sends those addresses straight to it. Both columns only once Database
+        // Verification has added them.
+        require_once '../includes/sso_identity.php';
+        $portalRouting = ssoPortalRoutingColumnsReady($ssoConn);
+        $ssoProviders = $ssoConn->query("SELECT id, display_name FROM auth_providers WHERE enabled = 1 AND tenant_id IS NULL AND protocol = 'oidc'"
+            . ($portalRouting ? ' AND portal_show_button = 1' : '')
+            . " ORDER BY sort_order, display_name")->fetchAll(PDO::FETCH_ASSOC);
+        // 🔑 With every button hidden the list above is empty, and the email box
+        // must still appear: it routes people on a listed domain, and people
+        // already linked to a provider. Hiding a button must never switch the
+        // router off.
+        $routerNeeded = $portalRouting && (int)$ssoConn->query(
+            "SELECT COUNT(*) FROM auth_providers WHERE enabled = 1 AND protocol = 'oidc'
+                AND (tenant_id IS NULL OR (portal_email_domains IS NOT NULL AND portal_email_domains <> ''))"
+        )->fetchColumn() > 0;
     }
     $multiTenant = isMultiTenant($ssoConn);
 
@@ -74,7 +91,9 @@ try {
 $hasLdap = $hasLdap ?? false;
 // On a multi-tenant install the router is active whenever SSO is on (companies
 // own their own providers, resolved per-email — there may be no global ones).
-$ssoActive = $ssoOn && ($multiTenant || !empty($ssoProviders));
+// It also stays active when buttons are hidden (GH #147), see $routerNeeded.
+$routerNeeded = $routerNeeded ?? false;
+$ssoActive = $ssoOn && ($multiTenant || !empty($ssoProviders) || $routerNeeded);
 // Break-glass: ?local=1 always reveals the local form, even when local login is "off".
 $forceLocal   = isset($_GET['local']);
 $localAllowed = $localOn || $forceLocal;

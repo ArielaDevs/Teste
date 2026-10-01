@@ -10,6 +10,7 @@
  * Shared: enabled, auto_create_users, require_verified_email, default_modules,
  *         sort_order, tenant_id, auto_create_analysts (discussion #155).
  * OIDC only in practice: analyst_fallback_mode, profile_sync_mode (#155).
+ * OIDC only: portal_email_domains, portal_show_button (GH #147).
  *
  * Secrets (client_secret / ldap_bind_password) are encrypted at rest via
  * encryptValue(). On update, a blank or masked ("****") secret means "leave the
@@ -95,6 +96,14 @@ $sortOrder       = (int)($data['sort_order'] ?? 0);
 // Which client company owns this provider. Empty/0 = a global (MSP-internal) one.
 $tenantId        = !empty($data['tenant_id']) ? (int)$data['tenant_id'] : null;
 $id              = isset($data['id']) ? (int)$data['id'] : 0;
+// GH #147 - portal routing. Only an OIDC provider can be redirected to, so
+// the per-protocol branches below reset these for LDAP and CardDAV.
+$portalShowButton = array_key_exists('portal_show_button', $data) ? (!empty($data['portal_show_button']) ? 1 : 0) : 1;
+$portalDomains    = ssoParseEmailDomains($data['portal_email_domains'] ?? '');
+if ($portalDomains['invalid']) {
+    bail('"' . implode('", "', $portalDomains['invalid']) . '" is not an email domain. Type just the part after the @, for example company.com.');
+}
+$portalDomainList = $portalDomains['domains'];
 
 // --- Per-protocol fields ---
 // The unused column group is written empty, so switching a provider's protocol
@@ -198,6 +207,8 @@ if ($protocol === 'carddav') {
     $autoCreateAnalysts = 0;
     $requireVerified    = 0;
     $profileSyncMode    = 'never';
+    $portalDomainList   = [];
+    $portalShowButton   = 1;
 
 } elseif ($protocol === 'oidc') {
     $issuerUrl = rtrim(trim($data['issuer_url'] ?? ''), '/');
@@ -226,6 +237,9 @@ if ($protocol === 'carddav') {
     $issuerUrl = '';
     $clientId  = '';
     $scopes    = 'openid email profile'; // column default; unused by LDAP
+    // A directory has no redirect and no portal button (GH #147).
+    $portalDomainList = [];
+    $portalShowButton = 1;
 
     $host   = trim($data['ldap_host'] ?? '');
     $baseDn = trim($data['ldap_base_dn'] ?? '');
@@ -327,6 +341,10 @@ try {
              $ldap['attr_phone'], $ldap['attr_mobile'], $ldap['attr_employee_id'], $ldap['attr_manager'],
              $carddav['url'], $carddav['username'], $carddav['addressbook'], $carddav['auth'],
              $carddav['scope'], $carddav['scope_value'], $carddav['write_back'], $carddav['allow_create']];
+    $cols[] = 'portal_email_domains';
+    $vals[] = $portalDomainList ? implode("\n", $portalDomainList) : null;
+    $cols[] = 'portal_show_button';
+    $vals[] = $portalShowButton;
 
     // 🔴 ON UPDATE, A SETTING THE REQUEST DOES NOT MENTION KEEPS ITS STORED VALUE.
     //
@@ -354,7 +372,8 @@ try {
         if ($existing['protocol'] === $protocol) {
             $readable = ['enabled', 'default_modules', 'sort_order', 'tenant_id'];
             if ($protocol === 'oidc') {
-                $readable = array_merge($readable, ['auto_create_users', 'auto_create_analysts', 'analyst_fallback_mode', 'require_verified_email', 'profile_sync_mode', 'issuer_url', 'client_id', 'scopes']);
+                $readable = array_merge($readable, ['auto_create_users', 'auto_create_analysts', 'analyst_fallback_mode', 'require_verified_email', 'profile_sync_mode', 'issuer_url', 'client_id', 'scopes',
+                                                    'portal_email_domains', 'portal_show_button']);
             } elseif ($protocol === 'ldap') {
                 $readable = array_merge($readable, ['auto_create_users', 'auto_create_analysts', 'analyst_fallback_mode', 'require_verified_email', 'profile_sync_mode'],
                     array_values(array_filter($cols, fn($c) => strpos($c, 'ldap_') === 0 || strpos($c, 'sync_') === 0)));
@@ -399,6 +418,43 @@ try {
     if (!ssoJitColumnsReady($conn)) {
         foreach (['auto_create_analysts', 'analyst_fallback_mode', 'profile_sync_mode'] as $jitCol) {
             $i = array_search($jitCol, $cols, true);
+            if ($i !== false) {
+                array_splice($cols, $i, 1);
+                array_splice($vals, $i, 1);
+            }
+        }
+    }
+
+    // GH #147 portal routing. Checked on the FINAL value (sent or kept), so a
+    // rename that does not mention the domains is still held to the same rules.
+    if (ssoPortalRoutingColumnsReady($conn)) {
+        $finalDomains = (string)($vals[array_search('portal_email_domains', $cols, true)] ?? '');
+        $finalDomains = $finalDomains === '' ? [] : explode("\n", $finalDomains);
+        if ($finalDomains) {
+            // A public email domain would send every Gmail or Outlook user on the
+            // portal to this provider - the same reason System -> Companies will
+            // not map one to a company.
+            require_once '../../includes/tenancy.php';
+            foreach ($finalDomains as $d) {
+                if (isFreemailDomain($conn, $d)) {
+                    bail("$d is a public email domain, so it cannot be sent to one provider - everyone who uses it would be.");
+                }
+            }
+            // One provider per domain, or which one wins would be decided by sort order
+            // and nobody would be able to see why.
+            $others = $conn->prepare("SELECT display_name, portal_email_domains FROM auth_providers
+                                       WHERE id <> ? AND portal_email_domains IS NOT NULL AND portal_email_domains <> ''");
+            $others->execute([$id]);
+            foreach ($others->fetchAll(PDO::FETCH_ASSOC) as $o) {
+                $clash = array_intersect($finalDomains, explode("\n", $o['portal_email_domains']));
+                if ($clash) {
+                    bail(implode(', ', $clash) . ' is already sent to ' . $o['display_name'] . '. A domain can only go to one provider.');
+                }
+            }
+        }
+    } else {
+        foreach (['portal_email_domains', 'portal_show_button'] as $c) {
+            $i = array_search($c, $cols, true);
             if ($i !== false) {
                 array_splice($cols, $i, 1);
                 array_splice($vals, $i, 1);

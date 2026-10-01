@@ -210,6 +210,11 @@ return [
         'default_modules'        => 'VARCHAR(500) NULL',
         'sort_order'             => 'INT NOT NULL DEFAULT 0',
         'tenant_id'              => 'INT NULL',
+        // GH #147 - portal email-first routing. Domains one per line; an
+        // address on one goes straight to this provider. NULL = none.
+        'portal_email_domains'   => 'TEXT NULL',
+        // DEFAULT 1 so an upgrade keeps every portal button where it was.
+        'portal_show_button'     => 'TINYINT(1) NOT NULL DEFAULT 1',
         'created_datetime'       => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
         'last_modified_datetime' => 'DATETIME NULL',
     ],
