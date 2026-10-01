@@ -8,6 +8,9 @@ require __DIR__ . '/_init.php';
 // The redirect URI the admin registers in their IdP (same one for every provider).
 $scheme = requestScheme();
 $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . 'api/auth/oidc_callback.php';
+// Where the two sign-outs send people back (same as auth/analyst_logout.php and self-service/logout.php).
+$signoutAnalystUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL;
+$signoutPortalUri  = $signoutAnalystUri . 'self-service/login.php';
 
 $helpSlug = 'sso';
 require __DIR__ . '/_top.php';
@@ -65,7 +68,7 @@ require __DIR__ . '/_top.php';
     </div>
 
     <div class="help-steps">
-        <div class="help-step"><div class="help-step-num">1</div><div><strong>Register an app in your identity provider.</strong> Create an app/registration in Entra, Okta, Google, etc. Set its redirect URI to the address below, and note the <strong>issuer URL</strong>, <strong>client ID</strong> and a <strong>client secret</strong>.<br><br>Redirect URI to register: <code><?php echo htmlspecialchars($redirectUri); ?></code></div></div>
+        <div class="help-step"><div class="help-step-num">1</div><div><strong>Register an app in your identity provider.</strong> Create an app/registration in Entra, Okta, Google, etc. Set its redirect URI to the address below, and note the <strong>issuer URL</strong>, <strong>client ID</strong> and a <strong>client secret</strong>.<br><br>Redirect URI to register: <code><?php echo htmlspecialchars($redirectUri); ?></code><br>Sign-out (post-logout) addresses to register as well: <code><?php echo htmlspecialchars($signoutAnalystUri); ?></code> and <code><?php echo htmlspecialchars($signoutPortalUri); ?></code></div></div>
         <div class="help-step"><div class="help-step-num">2</div><div><strong>Add the provider here.</strong> System &rarr; Single Sign-On &rarr; <em>Add provider</em>. Paste the issuer URL, client ID and secret, give it a display name (e.g. “Sign in with Microsoft”), tick <strong>Enabled</strong>, and use <strong>Test</strong> to confirm the issuer is reachable. Turn on the master <strong>Enable single sign-on</strong> switch.</div></div>
         <div class="help-step"><div class="help-step-num">3</div><div><strong>Decide who uses it.</strong> For <strong>analysts</strong>, set the <em>Sign-in method</em> on their team in System &rarr; Teams, and everyone set to <em>Follow team</em> uses it — or set it for one person in System &rarr; Analysts. To have analysts created the first time they sign in, tick <em>Auto-create IT analysts</em>. For <strong>portal users</strong>, tick <em>Auto-create portal requesters</em> and they're created on first sign-in — or they're matched to an existing record by verified email. The two switches are separate, so you can let customers in without creating analysts (see <a href="#jit-rules">Auto-create rules</a>).</div></div>
     </div>
@@ -534,6 +537,10 @@ require __DIR__ . '/_top.php';
 
     <h4>“Redirect URI mismatch” after signing in at the provider</h4>
     <p>The redirect URI registered in the IdP must <em>exactly</em> match <code><?php echo htmlspecialchars($redirectUri); ?></code> — scheme, host and path. Copy it from this page (or the SSO settings page) rather than typing it.</p>
+    <p>If you moved FreeITSM to a new address (for example from <code>http://localhost/...</code> to an https name), add the new address in the IdP too. FreeITSM builds it from the address you are using.</p>
+
+    <h4>“Invalid redirect uri” when signing out</h4>
+    <p>The provider was asked to send you back to an address it does not allow. Register both sign-out addresses as allowed post-logout redirect URLs: <code><?php echo htmlspecialchars($signoutAnalystUri); ?></code> for the analyst login and <code><?php echo htmlspecialchars($signoutPortalUri); ?></code> for the self-service portal. They are on the Single Sign-On page with a Copy button each. In Keycloak this is <em>Clients &rarr; your client &rarr; Valid post logout redirect URIs</em>; in Okta, <em>Sign-out redirect URIs</em>.</p>
 
     <h4>A portal user typed their email but got the password form, not SSO</h4>
     <p>Single-company: they should click the provider button for their first sign-in, or list their domain under the provider's <strong>Email domains</strong> so the email box routes them. If the domain is listed and they still get the password form, check they are not already assigned to a different provider or a directory. Multi-company: check the company that owns their email domain actually has an enabled provider, and that the domain is listed under System &rarr; Companies. Unmapped domains and personal/free-email addresses are sent to local login by design.</p>

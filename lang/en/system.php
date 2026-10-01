@@ -1239,6 +1239,10 @@ return [
 
         'redirect_heading' => 'Redirect URI',
         'redirect_desc'    => "Register this exact URL in each identity provider as an allowed redirect / callback URL. It's where the provider sends users back after they sign in.",
+        'signout_heading'  => 'Sign-out addresses',
+        'signout_desc'     => 'Register both in each identity provider as allowed sign-out (post-logout) redirect URLs. Signing out of FreeITSM also signs people out of the provider, which then sends them back to one of these. Keycloak and Okta refuse any address that is not listed exactly.',
+        'signout_analyst'  => 'Analyst login',
+        'signout_portal'   => 'Self-service portal',
         'copy'             => 'Copy',
 
         'providers_heading' => 'Sign-in methods',
@@ -1663,6 +1667,7 @@ return [
         'error'          => 'Error: {error}',
         'save_failed'    => 'Failed to save',
         'redirect_copied'=> 'Redirect URI copied',
+        'signout_copied' => 'Sign-out address copied',
         'enter_issuer'   => 'Enter an issuer URL first.',
         'discovery_ok'   => '✓ Discovery OK — issuer: {issuer}',
         'discovery_err'  => '✗ {error}',

@@ -30,6 +30,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2057 | Tickets           | Feature     | CSAT page filters: a custom From/To range, a rating band (list only), analyst and customer (whole page), 25-a-page paging with the customer on each response, and on a phone a sticky Filters button that opens them full-screen; score percentages now add up to 100 (GH #157). |
 | 2058 | System            | Feature     | SSO providers gain Email domains and a "Show the button on the portal login" switch: on the portal an address on a listed domain goes straight to that OIDC provider even on a first visit, so the page can be just the email box (never for an account already assigned to a provider or directory; public email domains and a domain claimed by two providers are refused; analyst login unchanged) (GH #147). |
 | 2059 | System            | Fix         | System → Companies and Tickets → Triage could not be scrolled: their content box relied on a flex column the page body never was, so anything below the window (public email domains; a long triage queue) was cut off; the body is now a flex column, checked at desktop and phone sizes. |
+| 2060 | System            | Improvement | System → Single Sign-On shows the two sign-out (post-logout) addresses under the redirect URI, each with Copy, and the help page and Keycloak guide now list both - the guide gave only the analyst one, so signing out of the portal ended on Keycloak's "Invalid redirect uri" page. |
 
 
 

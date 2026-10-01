@@ -35,6 +35,12 @@ $ssoColspan = $ssoMultiTenant ? 8 : 7; // providers table column count (Company 
 // deployment's BASE_URL so it's correct whatever path the app is served at.
 $scheme = requestScheme();
 $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . 'api/auth/oidc_callback.php';
+// Where each sign-out asks the provider to send people back. 🔴 Must stay the
+// same as auth/analyst_logout.php and self-service/logout.php build them:
+// Keycloak and Okta refuse any address not registered exactly, and the portal
+// one was missing from the setup guide, so portal sign-out failed there.
+$signoutAnalystUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL;
+$signoutPortalUri  = $signoutAnalystUri . 'self-service/login.php';
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
@@ -114,6 +120,8 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
            item that scrolls its own overflow, and without it a long URI refuses
            to shrink and pushes the card sideways. */
         .redirect-uri-box { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 10px; }
+        .signout-heading { margin: 22px 0 4px; font-size: 14px; color: var(--text, #333); }
+        .signout-label { font-size: 12px; font-weight: 600; color: var(--text-dim, #666); margin-bottom: -4px; }
         .redirect-uri-box code { align-self: stretch; min-width: 0; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-radius: 4px; padding: 8px 10px; font-size: 12px; color: var(--text, #333); overflow-x: auto; white-space: nowrap; }
 
         /* Providers table */
@@ -279,6 +287,16 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
                 <code id="redirectUri"><?php echo htmlspecialchars($redirectUri); ?></code>
                 <button class="btn btn-secondary" id="copyRedirectBtn"><?php echo htmlspecialchars(t('system.sso.copy')); ?></button>
             </div>
+
+            <h4 class="signout-heading"><?php echo htmlspecialchars(t('system.sso.signout_heading')); ?></h4>
+            <p class="card-desc"><?php echo htmlspecialchars(t('system.sso.signout_desc')); ?></p>
+            <?php foreach ([['signout_analyst', $signoutAnalystUri], ['signout_portal', $signoutPortalUri]] as [$soKey, $soUri]): ?>
+            <div class="redirect-uri-box">
+                <span class="signout-label"><?php echo htmlspecialchars(t('system.sso.' . $soKey)); ?></span>
+                <code><?php echo htmlspecialchars($soUri); ?></code>
+                <button class="btn btn-secondary copy-signout-btn" type="button"><?php echo htmlspecialchars(t('system.sso.copy')); ?></button>
+            </div>
+            <?php endforeach; ?>
         </div>
 
         <!-- Providers -->
@@ -669,6 +687,12 @@ $redirectUri = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_U
             ok ? window.t('system.sso.redirect_copied') : 'Could not copy - your browser blocked it.',
             ok ? 'success' : 'error'));
     });
+    document.querySelectorAll('.copy-signout-btn').forEach(btn => btn.addEventListener('click', function () {
+        const txt = this.parentElement.querySelector('code').textContent;
+        copyToClipboard(txt).then(ok => showToast(
+            ok ? window.t('system.sso.signout_copied') : 'Could not copy - your browser blocked it.',
+            ok ? 'success' : 'error'));
+    }));
 
     // ---------- Providers list ----------
     function esc(s) { return (s ?? '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
