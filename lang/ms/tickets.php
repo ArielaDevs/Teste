@@ -546,7 +546,6 @@ return [
     'telegram_bot' => [
         'request_contact_prompt' => 'Hai! Semasa kami menyiasat ini, bolehkah anda kongsikan nombor telefon anda menggunakan butang di bawah? Ini membantu kami mengenali anda jika anda pernah menghubungi kami sebelum ini.',
         'request_contact_button' => 'Kongsi nombor telefon',
-        'ack_matched' => 'Terima kasih — akaun anda dijumpai. Sila huraikan masalah anda dan kami akan uruskannya.',
         'ack_new' => 'Terima kasih! Sila huraikan masalah anda dan kami akan uruskannya.',
     ],
     'channel_composer' => [
@@ -1139,9 +1138,6 @@ Terima kasih kerana menghubungi kami...',
                 'setup_step1' => 'Dalam Telegram, mesej @BotFather → /newbot (atau /mybots untuk bot sedia ada) → salin token API ke dalam "Token bot" di atas.',
                 'setup_step2' => 'Pilih token rahsia di atas, atau klik "Jana" — walau apa pun, catatkannya; anda memerlukannya pada langkah 4.',
                 'setup_step3' => 'Simpan saluran ini (butang di bawah). URL webhook sebenar akan muncul di sini.',
-                'setup_step4' => 'Jalankan arahan ini sekali (terminal, atau tampal URL dalam pelayar) supaya Telegram mula menghantar mesej ke webhook itu dengan token rahsia yang sama:',
-                'setup_command_label' => 'Arahan setWebhook',
-                'setup_save_first_hint' => 'Simpan saluran dahulu — URL webhooknya, dan arahan untuk mendaftarkannya dengan Telegram, akan muncul di sini sebaik sahaja ia mempunyainya.',
                 'ingress' => 'Penghantaran masuk',
                 'ingress_direct' => 'Langsung — pembekal menghantar terus ke URL webhook pemasangan ini',
                 'ingress_relay' => 'Geganti — geganti dihoskan meneruskan mesej ke sini',

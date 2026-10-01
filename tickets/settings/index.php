@@ -2712,13 +2712,13 @@ $translationNamespaces = ['common', 'tickets'];
                     <!-- Telegram credentials -->
                     <div class="form-group provider-telegram" style="grid-column: span 2;">
                         <label for="channelBotToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.bot_token')); ?> *</label>
-                        <input type="password" id="channelBotToken" placeholder="123456789:AA••••••••••••••••••••••••••••••••" oninput="updateTelegramSetupCommand()">
+                        <input type="password" id="channelBotToken" placeholder="123456789:AA••••••••••••••••••••••••••••••••" oninput="updateTelegramSetupCommand(true)">
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.bot_token_help')); ?></small>
                     </div>
                     <div class="form-group provider-telegram" style="grid-column: span 2;">
                         <label for="channelTelegramSecret"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret')); ?></label>
                         <div style="display:flex; gap:8px;">
-                            <input type="text" id="channelTelegramSecret" style="flex:1;" placeholder="<?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_placeholder')); ?>" oninput="updateTelegramSetupCommand()">
+                            <input type="text" id="channelTelegramSecret" style="flex:1;" placeholder="<?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_placeholder')); ?>" oninput="updateTelegramSetupCommand(true)">
                             <button type="button" class="btn btn-secondary" onclick="generateTelegramSecret()" style="white-space:nowrap; padding:8px 12px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.generate')); ?></button>
                         </div>
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_help')); ?></small>
@@ -2732,13 +2732,16 @@ $translationNamespaces = ['common', 'tickets'];
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step1')); ?></li>
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step2')); ?></li>
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step3')); ?></li>
-                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step4')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_step4_connect')); ?></li>
                         </ol>
-                        <div id="telegramSetupCommandWrap" style="display:none;">
-                            <label style="font-size:12px; color:var(--text-muted, #666); display:block; margin-bottom:4px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_command_label')); ?></label>
-                            <input type="text" id="telegramSetupCommand" readonly onclick="this.select()" style="font-family:monospace; font-size:12px; width:100%;">
+                        <?php /* Connect registers the webhook server-side (api/messaging/
+                                 telegram_connect.php). It replaced a copy-paste curl command
+                                 that put the bot token in the browser and the clipboard. */ ?>
+                        <div id="telegramConnectWrap" style="display:none; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-secondary" id="telegramConnectBtn" onclick="connectTelegram()"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.connect')); ?></button>
+                            <span id="telegramConnectResult" style="font-size:13px;"></span>
                         </div>
-                        <small id="telegramSetupHint" style="color:var(--text-muted, #666); display:block;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_save_first_hint')); ?></small>
+                        <small id="telegramSetupHint" style="color:var(--text-muted, #666); display:block;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.setup_save_first_connect')); ?></small>
                     </div>
 
                     <div class="form-group" style="grid-column: span 2;">
@@ -4370,32 +4373,52 @@ $translationNamespaces = ['common', 'tickets'];
             (window.crypto || window.msCrypto).getRandomValues(bytes);
             const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
             document.getElementById('channelTelegramSecret').value = hex;
-            updateTelegramSetupCommand();
+            updateTelegramSetupCommand(true);
         }
 
         /**
-         * Rebuilds the copy-pasteable `setWebhook` command from whatever is
-         * currently in the form. The bot token is a secret this page never
-         * gets back from the server (write-only, like every other credential
-         * here) — so on an existing channel, until the admin retypes it, the
-         * command shows a placeholder instead of silently using a blank one.
+         * Show Connect once the channel is saved (it then has a webhook URL);
+         * until then, the "save first" hint. Connect uses the SAVED token and
+         * secret, so typing a new one marks the form unsaved and Connect says so.
          */
-        function updateTelegramSetupCommand() {
-            const wrap = document.getElementById('telegramSetupCommandWrap');
-            const hint = document.getElementById('telegramSetupHint');
-            const cmdField = document.getElementById('telegramSetupCommand');
-            const webhookUrl = document.getElementById('channelWebhookHint').value.trim();
-            if (!webhookUrl) {
-                wrap.style.display = 'none';
-                hint.style.display = '';
+        let telegramFormDirty = false;
+        function updateTelegramSetupCommand(fromTyping) {
+            if (fromTyping === true) telegramFormDirty = true;
+            const saved = document.getElementById('channelWebhookHint').value.trim() !== ''
+                       && document.getElementById('channelId').value !== '';
+            document.getElementById('telegramConnectWrap').style.display = saved ? 'flex' : 'none';
+            document.getElementById('telegramSetupHint').style.display = saved ? 'none' : '';
+            if (fromTyping !== true) document.getElementById('telegramConnectResult').textContent = '';
+        }
+
+        /** Register the saved channel's webhook with Telegram, server-side. */
+        async function connectTelegram() {
+            const out = document.getElementById('telegramConnectResult');
+            const btn = document.getElementById('telegramConnectBtn');
+            if (telegramFormDirty) {
+                out.style.color = 'var(--danger, #c62828)';
+                out.textContent = window.t('tickets.settings.modals.channel.connect_save_first');
                 return;
             }
-            const rawToken = document.getElementById('channelBotToken').value.trim();
-            const token = (rawToken === '' || /^\*+$/.test(rawToken)) ? '<BOT_TOKEN>' : rawToken;
-            const secret = document.getElementById('channelTelegramSecret').value.trim() || '<SECRET_TOKEN>';
-            cmdField.value = 'curl "https://api.telegram.org/bot' + token + '/setWebhook?url=' + encodeURIComponent(webhookUrl) + '&secret_token=' + encodeURIComponent(secret) + '"';
-            wrap.style.display = '';
-            hint.style.display = 'none';
+            btn.disabled = true;
+            out.style.color = 'var(--text-muted, #666)';
+            out.textContent = window.t('tickets.settings.modals.channel.connecting');
+            try {
+                const res = await fetch(MSG_API + 'telegram_connect.php', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+                    body: JSON.stringify({ id: document.getElementById('channelId').value })
+                });
+                const data = await res.json();
+                out.style.color = data.success ? 'var(--success, #2e7d32)' : 'var(--danger, #c62828)';
+                out.textContent = data.success
+                    ? window.t('tickets.settings.modals.channel.connected')
+                    : (data.error || window.t('tickets.settings.modals.channel.connect_failed'));
+            } catch (e) {
+                out.style.color = 'var(--danger, #c62828)';
+                out.textContent = window.t('tickets.settings.modals.channel.connect_failed');
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         function toggleChannelIngressFields() {
@@ -4430,6 +4453,7 @@ $translationNamespaces = ['common', 'tickets'];
             populateChannelCompanies(channel ? channel.tenant_id : null);
             toggleChannelProviderFields();
             toggleChannelIngressFields();
+            telegramFormDirty = false;
             updateTelegramSetupCommand();
             document.getElementById('channelModal').classList.add('active');
         }

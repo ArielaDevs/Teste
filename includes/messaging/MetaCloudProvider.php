@@ -132,7 +132,7 @@ class MetaCloudProvider extends MessagingProvider
      * message referencing it. $filePath is used directly (multipart upload);
      * $publicUrl is Twilio's requirement, not Meta's, and is ignored here.
      */
-    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = ''): string
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = '', string $filename = ''): string
     {
         $phoneId = $this->channel['credentials']['phone_number_id'] ?? '';
         $token   = $this->channel['credentials']['access_token'] ?? '';
@@ -146,29 +146,17 @@ class MetaCloudProvider extends MessagingProvider
         $version = $this->channel['credentials']['graph_version'] ?? self::GRAPH_VERSION;
         $category = messagingMediaCategory($mimeType); // 'image'|'video'|'audio'|'document'
 
-        // Step 1: upload the bytes to get a media id. Raw curl, not
-        // httpRequest() — that helper always sends a string body with an
-        // explicit Content-Type, but a multipart upload needs curl to build
-        // both the body AND the boundary header itself from a fields array.
-        $ch = curl_init('https://graph.facebook.com/' . $version . "/$phoneId/media");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $token"]);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, [
-            'messaging_product' => 'whatsapp',
-            'type'              => $mimeType,
-            'file'              => new CURLFile($filePath, $mimeType, basename($filePath)),
-        ]);
-        sslApplyCurl($ch);
-        $resp = curl_exec($ch);
-        if ($resp === false) {
-            $err = curl_error($ch);
-            curl_close($ch);
-            throw new Exception('Network error uploading attachment to Meta: ' . $err);
-        }
-        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        // Step 1: upload the bytes to get a media id (multipart, shared helper).
+        $displayName = $this->outboundFilename($filePath, $filename);
+        [$code, $resp] = $this->httpMultipart(
+            'https://graph.facebook.com/' . $version . "/$phoneId/media",
+            [
+                'messaging_product' => 'whatsapp',
+                'type'              => $mimeType,
+                'file'              => new CURLFile($filePath, $mimeType, $displayName),
+            ],
+            ["Authorization: Bearer $token"]
+        );
 
         $json = json_decode($resp, true);
         if ($code < 200 || $code >= 300 || empty($json['id'])) {
@@ -182,6 +170,11 @@ class MetaCloudProvider extends MessagingProvider
         // rejects the request outright if one is sent, so it's left off.
         if ($caption !== '' && $category !== 'audio') {
             $mediaObj['caption'] = $caption;
+        }
+        // A document shows its file name in the chat; without this WhatsApp
+        // shows "Untitled".
+        if ($category === 'document') {
+            $mediaObj['filename'] = $displayName;
         }
         $payload = json_encode([
             'messaging_product' => 'whatsapp',

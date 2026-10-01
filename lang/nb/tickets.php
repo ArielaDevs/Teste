@@ -546,7 +546,6 @@ return [
     'telegram_bot' => [
         'request_contact_prompt' => 'Hei! Mens vi ser på dette, kan du dele telefonnummeret ditt med knappen nedenfor? Det hjelper oss å kjenne deg igjen hvis du har kontaktet oss før.',
         'request_contact_button' => 'Del telefonnummer',
-        'ack_matched' => 'Takk — fant kontoen din. Beskriv problemet ditt, så tar vi det herfra.',
         'ack_new' => 'Takk! Beskriv problemet ditt, så tar vi det herfra.',
     ],
     'channel_composer' => [
@@ -1139,9 +1138,6 @@ Takk for at du tok kontakt med oss ...',
                 'setup_step1' => 'Skriv til @BotFather i Telegram → /newbot (eller /mybots for en eksisterende bot) → kopier API-tokenet inn i «Bot-token» ovenfor.',
                 'setup_step2' => 'Velg et hemmelig token ovenfor, eller klikk «Generer» — noter det uansett; du trenger det i trinn 4.',
                 'setup_step3' => 'Lagre denne kanalen (knappen nedenfor). Den nøyaktige webhook-URL-en vises da her.',
-                'setup_step4' => 'Kjør denne kommandoen én gang (terminal, eller lim inn URL-en i en nettleser), slik at Telegram begynner å levere meldinger til denne webhooken med samme hemmelige token:',
-                'setup_command_label' => 'setWebhook-kommando',
-                'setup_save_first_hint' => 'Lagre kanalen først — webhook-URL-en og kommandoen for å registrere den hos Telegram vises her så snart den har en.',
                 'ingress' => 'Innkommende levering',
                 'ingress_direct' => 'Direkte — leverandøren kaller webhook-URL-en til denne installasjonen',
                 'ingress_relay' => 'Videresending — en driftet mellomtjener sender meldingene hit',

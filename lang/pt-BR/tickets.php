@@ -546,7 +546,6 @@ return [
     'telegram_bot' => [
         'request_contact_prompt' => 'Olá! Enquanto analisamos isso, você poderia compartilhar seu número de telefone usando o botão abaixo? Isso nos ajuda a reconhecê-lo caso já tenha entrado em contato antes.',
         'request_contact_button' => 'Compartilhar número de telefone',
-        'ack_matched' => 'Obrigado — encontramos sua conta. Descreva seu problema que cuidaremos disso.',
         'ack_new' => 'Obrigado! Descreva seu problema que cuidaremos disso.',
     ],
     'channel_composer' => [
@@ -1139,9 +1138,6 @@ Obrigado por entrar em contato conosco…',
                 'setup_step1' => 'No Telegram, fale com @BotFather → /newbot (ou /mybots para um bot existente) → copie o token de API para "Token do bot" acima.',
                 'setup_step2' => 'Escolha um token secreto acima, ou clique em "Gerar" — de qualquer forma, anote-o; você precisará dele no passo 4.',
                 'setup_step3' => 'Salve este canal (botão abaixo). A URL exata do webhook aparecerá aqui.',
-                'setup_step4' => 'Execute este comando uma vez (terminal, ou cole a URL em um navegador) para que o Telegram comece a entregar mensagens a esse webhook com o mesmo token secreto:',
-                'setup_command_label' => 'Comando setWebhook',
-                'setup_save_first_hint' => 'Salve o canal primeiro — sua URL de webhook, e o comando para registrá-lo no Telegram, aparecerão aqui assim que ele tiver uma.',
                 'ingress' => 'Entrega de entrada',
                 'ingress_direct' => 'Direta — o provedor acessa o URL do webhook desta instalação',
                 'ingress_relay' => 'Relay — um relay hospedado encaminha as mensagens para cá',

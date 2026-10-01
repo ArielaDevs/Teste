@@ -111,7 +111,7 @@ try {
             <?php endif; ?>
             <a href="#whatsapp" class="help-nav-link" data-section="whatsapp">
                 <span class="help-nav-num"><?php echo $showTenancyHelp ? 14 : 13; ?></span>
-                WhatsApp channel
+                WhatsApp &amp; Telegram
             </a>
             <a href="#confidential" class="help-nav-link" data-section="confidential">
                 <span class="help-nav-num"><?php echo $showTenancyHelp ? 15 : 14; ?></span>
@@ -1064,8 +1064,8 @@ try {
                     <div class="help-section-header">
                         <span class="help-section-num"><?php echo $showTenancyHelp ? 14 : 13; ?></span>
                         <div>
-                            <h3>WhatsApp channel</h3>
-                            <p>Let customers chat with an analyst over WhatsApp — each message becomes a ticket, just like email.</p>
+                            <h3>WhatsApp &amp; Telegram channels</h3>
+                            <p>Let customers chat with an analyst over WhatsApp or Telegram — each message becomes a ticket, just like email.</p>
                         </div>
                     </div>
                     <p>
@@ -1086,6 +1086,37 @@ try {
                         Testing on a laptop? Providers can only reach a public address, so run a tunnel
                         (e.g. <code>ngrok http 80</code>) and use the HTTPS URL it gives you as the webhook host. See the
                         <a href="https://github.com/edmozley/freeitsm/wiki/WhatsApp" target="_blank" rel="noopener">WhatsApp wiki page</a> for a full walkthrough.
+                    </p>
+
+                    <h4>Telegram</h4>
+                    <p>
+                        Create a bot by messaging <strong>@BotFather</strong> in Telegram (<code>/newbot</code>) and copy the token it gives you.
+                        In <strong>Settings &rarr; Messaging</strong>, add a channel with provider <strong>Telegram</strong>, paste the
+                        <strong>Bot token</strong>, click <strong>Generate</strong> for a secret token, and <strong>Save</strong>. Then click
+                        <strong>Connect</strong>: FreeITSM tells Telegram to deliver the bot's messages to this install. Telegram only delivers to an
+                        <strong>https://</strong> address, so the public URL on the Messaging tab must be one.
+                    </p>
+                    <p>
+                        Telegram has <strong>no 24-hour window</strong> &mdash; you can reply to a chat at any time &mdash; and the bot writes to each
+                        person in the language their Telegram app is set to.
+                    </p>
+                    <p>
+                        <strong>Who is this?</strong> Telegram does not tell us a person's phone number, so the first message from a new chat is raised
+                        under a temporary contact named after their Telegram profile, and the bot asks them to tap <strong>Share phone number</strong>.
+                        If exactly one person <em>in the bot's company</em> has that number (phone or mobile), the chat is linked to them and its
+                        tickets move to them. If nobody has it, or several people do, the temporary contact stays and nothing is guessed. Either way the
+                        ticket's <strong>Audit</strong> window says what happened. Once a chat is linked to someone, sharing a number again never
+                        changes who they are.
+                    </p>
+
+                    <h4>Sending files</h4>
+                    <p>
+                        On a Telegram or WhatsApp ticket, <strong>Attach</strong> in the reply box sends a picture or document to the customer; anything
+                        typed in the box goes with it as a caption. The file is checked like any other attachment and appears in the thread.
+                    </p>
+                    <p class="help-note">
+                        The full Telegram guide is on the
+                        <a href="https://github.com/edmozley/freeitsm/wiki/Telegram" target="_blank" rel="noopener">Telegram wiki page</a>.
                     </p>
                 </div>
 

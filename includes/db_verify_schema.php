@@ -943,10 +943,11 @@ return [
         'created_datetime' => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
     ],
 
-    // One chat-channel identity (e.g. a Telegram chat id) linked to a `users`
-    // row via a shared phone number. See freeitsm.sql for the full comment.
+    // Which requester a chat belongs to, on ONE channel (Telegram, PR #159).
+    // Keyed per channel, not per chat id - see freeitsm.sql for why.
     'messaging_identity_links' => [
         'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'channel_id'       => 'INT NOT NULL',
         'channel_type'     => 'VARCHAR(20) NOT NULL',
         'external_id'      => 'VARCHAR(190) NOT NULL',
         'user_id'          => 'INT NOT NULL',

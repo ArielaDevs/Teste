@@ -172,11 +172,24 @@ function messagingOutboundMediaUrl(PDO $conn, int $attachmentId): string
     return $base . $root . '/api/messaging/media.php?id=' . $attachmentId . '&exp=' . $expires . '&token=' . $token;
 }
 
-/** HMAC binding one attachment id to one expiry — see messagingOutboundMediaUrl() and media.php. */
+/**
+ * HMAC binding one attachment id to one expiry — see messagingOutboundMediaUrl()
+ * and media.php.
+ *
+ * Keyed with a key DERIVED from the install's encryption key, not the encryption
+ * key itself: one key, one job. The AES key protects every stored secret, and a
+ * signing scheme should never be the thing that has to be reasoned about when
+ * asking what that key is exposed to. The label versions the scheme, so changing
+ * it later invalidates old links rather than silently accepting them.
+ *
+ * Throws if there is no encryption key (getEncryptionKey()); callers that face
+ * the internet catch that and answer 404 rather than a fatal.
+ */
 function messagingOutboundMediaToken(int $attachmentId, int $expires): string
 {
     require_once __DIR__ . '/../encryption.php';
-    return hash_hmac('sha256', $attachmentId . ':' . $expires, getEncryptionKey());
+    $signingKey = hash_hmac('sha256', 'freeitsm/messaging-outbound-media/v1', getEncryptionKey(), true);
+    return hash_hmac('sha256', $attachmentId . ':' . $expires, $signingKey);
 }
 
 /** The category Meta's Media upload endpoint wants for a mime type ('image'|'video'|'audio'|'document'). */
@@ -346,6 +359,24 @@ function messagingBuildTranscript(PDO $conn, int $ticketId): string
  * (a 'Y-m-d H:i:s' UTC string, or null)? Outside the window, free-text replies
  * are blocked by the provider and only template messages are allowed.
  */
+/**
+ * Does this channel type have a provider reply window at all?
+ *
+ * Only WhatsApp does: it is a WhatsApp Business rule, not a general one. Web chat
+ * is self-hosted, Slack lets you answer a thread from last year, and a Telegram
+ * bot may message any chat that has ever messaged it.
+ *
+ * 🔴 The ONE place this list lives. It used to be written out by hand in
+ * send_message.php and get_ticket_thread.php (with a comment begging the two to
+ * agree), and PR #159 added a third copy in send_attachment.php. If the composer
+ * and the API disagree, the composer greys out a reply the API would accept, or
+ * offers one it will refuse, and it reads as a broken integration.
+ */
+function channelHasServiceWindow(string $channelType): bool
+{
+    return !in_array($channelType, ['webchat', 'slack', 'telegram'], true);
+}
+
 function channelWindowOpen(?string $lastInboundAt): bool
 {
     if (!$lastInboundAt) {

@@ -1098,11 +1098,17 @@ try {
             try { $conn->exec("ALTER TABLE messaging_templates ADD CONSTRAINT fk_messaging_templates_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE SET NULL"); } catch (Exception $e) {}
         }
     }
-    // Telegram (etc.) chat-identity → users link. CASCADE so deleting the matched
-    // user drops the link rather than leaving it dangling.
+    // Telegram chat-identity links (PR #159). CASCADE both ways: deleting the
+    // matched person, or the channel, drops the link rather than leaving it
+    // dangling - a dangling link would resolve a chat to an id that is gone.
     if ($tableExists('messaging_identity_links') && $tableExists('users') && $colExists('messaging_identity_links', 'user_id')) {
         if (!$fkExists('messaging_identity_links', 'fk_messaging_identity_links_user')) {
             try { $conn->exec("ALTER TABLE messaging_identity_links ADD CONSTRAINT fk_messaging_identity_links_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE"); } catch (Exception $e) {}
+        }
+    }
+    if ($tableExists('messaging_identity_links') && $tableExists('messaging_channels') && $colExists('messaging_identity_links', 'channel_id')) {
+        if (!$fkExists('messaging_identity_links', 'fk_messaging_identity_links_channel')) {
+            try { $conn->exec("ALTER TABLE messaging_identity_links ADD CONSTRAINT fk_messaging_identity_links_channel FOREIGN KEY (channel_id) REFERENCES messaging_channels (id) ON DELETE CASCADE"); } catch (Exception $e) {}
         }
     }
     // Web chat widget → its messaging channel (1:1). CASCADE so deleting the channel
@@ -1363,6 +1369,17 @@ try {
             if ((int) $chk->fetchColumn() === 0) {
                 $conn->exec("INSERT INTO ticket_origins (name, description, display_order, is_active, tenant_id) VALUES ('Slack', 'Messages received via Slack', 52, 1, NULL)");
                 $results[] = ['table' => 'ticket_origins', 'status' => 'updated', 'details' => ['Seeded the Slack ticket origin']];
+            }
+        } catch (Exception $e) {}
+        // Telegram origin (PR #159 shipped without one). Same reason as Slack:
+        // getChannelOriginId() looks the origin up BY NAME - ucfirst('telegram') -
+        // and without this row every Telegram ticket has no origin at all.
+        try {
+            $chk = $conn->prepare("SELECT COUNT(*) FROM ticket_origins WHERE name = 'Telegram' AND tenant_id IS NULL");
+            $chk->execute();
+            if ((int) $chk->fetchColumn() === 0) {
+                $conn->exec("INSERT INTO ticket_origins (name, description, display_order, is_active, tenant_id) VALUES ('Telegram', 'Messages received via a Telegram bot', 53, 1, NULL)");
+                $results[] = ['table' => 'ticket_origins', 'status' => 'updated', 'details' => ['Seeded the Telegram ticket origin']];
             }
         } catch (Exception $e) {}
     }

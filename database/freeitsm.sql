@@ -1822,21 +1822,25 @@ CREATE TABLE IF NOT EXISTS `messaging_templates` (
     CONSTRAINT `fk_messaging_templates_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- One chat-channel identity (e.g. a Telegram chat id) matched/linked to a
--- `users` row, via a phone number the person shared. Some channels (WhatsApp)
--- already identify the sender by phone; others (Telegram) identify by an
--- opaque chat id, so the FIRST message on such a channel is gated — no ticket
--- is created — until the person shares their phone via the provider's native
--- "share contact" flow (TelegramProvider::requestContact) and it is matched
--- against `users`.phone/mobile, or failed to match and a placeholder user is
--- created instead. Either way, the match is remembered here so every later
--- message from the same chat resolves straight to the same user without
--- asking again. UNIQUE so one chat id links to exactly one identity.
+-- Which requester a chat belongs to, on ONE channel. Telegram identifies a chat
+-- by an opaque number rather than a phone number, so the first message from a
+-- chat gets a placeholder requester (the ticket is never held up), the bot asks
+-- once for the person's phone number, and if exactly one person in the
+-- channel's company has that number the chat is linked to them. Every later
+-- message from the chat then resolves straight to the same person.
+--
+-- Contributed in PR #159 and reworked at merge time (wiki:
+-- Telegram-Channel-Developer-Guide). 🔑 Keyed per CHANNEL, not per chat id: a
+-- Telegram chat id is the same on every bot, and company A's bot linking someone
+-- must not decide who they are on company B's bot. Deleting the channel or the
+-- person removes the link (CASCADE).
 CREATE TABLE IF NOT EXISTS `messaging_identity_links` (
     `id`               INT NOT NULL AUTO_INCREMENT,
+    `channel_id`       INT NOT NULL,
     `channel_type`     VARCHAR(20) NOT NULL,
     `external_id`      VARCHAR(190) NOT NULL,
     `user_id`          INT NOT NULL,
+    -- The number the person shared (Telegram-verified), whatever it matched.
     `phone`            VARCHAR(40) NULL,
     -- The chat's own reported language (Telegram's language_code, normalised
     -- to one of I18n::SUPPORTED_LOCALES) — the bot's prompts and replies to
@@ -1844,8 +1848,9 @@ CREATE TABLE IF NOT EXISTS `messaging_identity_links` (
     `locale`           VARCHAR(10) NULL,
     `linked_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_messaging_identity_link` (`channel_type`,`external_id`),
+    UNIQUE KEY `uq_messaging_identity_link` (`channel_id`,`external_id`),
     KEY `ix_messaging_identity_links_user` (`user_id`),
+    CONSTRAINT `fk_messaging_identity_links_channel` FOREIGN KEY (`channel_id`) REFERENCES `messaging_channels` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_messaging_identity_links_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

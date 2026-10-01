@@ -704,7 +704,6 @@ return [
     'telegram_bot' => [
         'request_contact_prompt' => 'Hi! While we look into this, could you share your phone number using the button below? It helps us recognise you if you\'ve contacted us before.',
         'request_contact_button' => 'Share phone number',
-        'ack_matched'            => 'Thanks — found your account. Please describe your issue and we\'ll take it from here.',
         'ack_new'                => 'Thanks! Please describe your issue and we\'ll take it from here.',
     ],
 
@@ -1379,9 +1378,14 @@ return [
                 'setup_step1'              => 'In Telegram, message @BotFather → /newbot (or /mybots for an existing bot) → copy its API token into "Bot token" above.',
                 'setup_step2'              => 'Choose a Secret token above, or click "Generate" — either way, note it down; you\'ll need it in step 4.',
                 'setup_step3'              => 'Save this channel (button below). Its exact webhook URL will then appear here.',
-                'setup_step4'              => 'Run this command once (terminal, or paste the URL into a browser) so Telegram starts delivering messages to that webhook with the same secret token:',
-                'setup_command_label'      => 'setWebhook command',
-                'setup_save_first_hint'    => 'Save the channel first — its webhook URL, and the command to register it with Telegram, will appear here once it has one.',
+                // Connect replaced PR #159's copy-paste setWebhook command at merge time.
+                'setup_step4_connect'      => 'Click Connect. FreeITSM tells Telegram to deliver this bot\'s messages here, with your secret token - your bot token never leaves the server.',
+                'setup_save_first_connect' => 'Save the channel first - Connect appears here once it has a webhook URL.',
+                'connect'                  => 'Connect',
+                'connecting'               => 'Connecting…',
+                'connected'                => 'Connected - Telegram will now deliver this bot\'s messages here.',
+                'connect_failed'           => 'Could not connect to Telegram.',
+                'connect_save_first'       => 'You changed the token or secret - save the channel first, then Connect.',
                 'ingress'                  => 'Inbound delivery',
                 'ingress_direct'           => 'Direct — the provider hits this install\'s webhook URL',
                 'ingress_relay'            => 'Relay — a hosted relay forwards messages here',

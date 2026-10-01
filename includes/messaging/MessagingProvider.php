@@ -99,8 +99,13 @@ abstract class MessagingProvider
      *                you give it — so a provider that needs this throws if
      *                it's blank rather than silently sending nothing.
      * A provider uses whichever it needs and ignores the other.
+     *
+     *   $filename  — the name the RECIPIENT sees. On disk the file has our own
+     *                random name (uploadStoreFile()), which is right for the
+     *                server and meaningless to a customer. Blank falls back to
+     *                the stored name.
      */
-    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = ''): string
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = '', string $filename = ''): string
     {
         throw new Exception('Sending attachments is not supported for this channel yet.');
     }
@@ -164,5 +169,50 @@ abstract class MessagingProvider
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         return [$code, $body];
+    }
+
+    /**
+     * POST multipart/form-data — for uploading a file to a provider. Returns
+     * [httpCode, bodyString], like httpRequest().
+     *
+     * Separate from httpRequest() because a multipart upload is the one shape that
+     * helper cannot express: it always sends a STRING body, and a file upload needs
+     * cURL to build the body AND the boundary header itself from an ARRAY of
+     * fields (a CURLFile among them). Do not set a Content-Type header here; cURL
+     * must write it, boundary included.
+     *
+     * PR #159 wrote this out twice (Telegram and Meta). One copy means the SSL
+     * setting, timeout and error wording cannot drift between providers.
+     *
+     * @param array $fields  form fields; a file is a CURLFile
+     * @param array $headers extra headers, e.g. ["Authorization: Bearer …"]
+     */
+    protected function httpMultipart(string $url, array $fields, array $headers = []): array
+    {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);   // an upload, not a ping
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $fields);
+        if ($headers) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        }
+        sslApplyCurl($ch);
+        $body = curl_exec($ch);
+        if ($body === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Network error uploading to messaging provider: ' . $err);
+        }
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return [$code, $body];
+    }
+
+    /** The name a recipient sees for an outbound file: the given one, else the stored one. */
+    protected function outboundFilename(string $filePath, string $filename): string
+    {
+        $name = trim(str_replace(["\r", "\n", '"'], '', $filename));
+        return $name !== '' ? $name : basename($filePath);
     }
 }

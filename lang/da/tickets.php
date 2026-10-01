@@ -546,7 +546,6 @@ return [
     'telegram_bot' => [
         'request_contact_prompt' => 'Hej! Mens vi ser nærmere på dette, kan du dele dit telefonnummer med knappen nedenfor? Det hjælper os med at genkende dig, hvis du har kontaktet os før.',
         'request_contact_button' => 'Del telefonnummer',
-        'ack_matched' => 'Tak — fandt din konto. Beskriv venligst dit problem, så tager vi det herfra.',
         'ack_new' => 'Tak! Beskriv venligst dit problem, så tager vi det herfra.',
     ],
     'channel_composer' => [
@@ -1139,9 +1138,6 @@ Tak fordi du kontaktede os...',
                 'setup_step1' => 'Skriv til @BotFather i Telegram → /newbot (eller /mybots for en eksisterende bot) → kopiér API-tokenet ind i "Bot-token" ovenfor.',
                 'setup_step2' => 'Vælg en hemmelig nøgle ovenfor, eller klik på "Generér" — notér den under alle omstændigheder; du skal bruge den i trin 4.',
                 'setup_step3' => 'Gem denne kanal (knappen nedenfor). Den præcise webhook-URL vises så her.',
-                'setup_step4' => 'Kør denne kommando én gang (terminal, eller indsæt URL\'en i en browser), så Telegram begynder at levere beskeder til denne webhook med samme hemmelige nøgle:',
-                'setup_command_label' => 'setWebhook-kommando',
-                'setup_save_first_hint' => 'Gem kanalen først — dens webhook-URL, og kommandoen til at registrere den hos Telegram, vises her, når den har en.',
                 'ingress' => 'Indgående levering',
                 'ingress_direct' => 'Direkte — udbyderen rammer denne installations webhook-URL',
                 'ingress_relay' => 'Relæ — et hostet relæ videresender beskeder hertil',

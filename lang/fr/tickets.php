@@ -546,7 +546,6 @@ return [
     'telegram_bot' => [
         'request_contact_prompt' => 'Bonjour ! Pendant que nous examinons cela, pourriez-vous partager votre numéro de téléphone avec le bouton ci-dessous ? Cela nous aide à vous reconnaître si vous nous avez déjà contactés.',
         'request_contact_button' => 'Partager le numéro de téléphone',
-        'ack_matched' => 'Merci — votre compte a été trouvé. Décrivez votre problème, nous nous en occupons.',
         'ack_new' => 'Merci ! Décrivez votre problème, nous nous en occupons.',
     ],
     'channel_composer' => [
@@ -1139,9 +1138,6 @@ Merci de nous avoir contactés…',
                 'setup_step1' => 'Sur Telegram, écrivez à @BotFather → /newbot (ou /mybots pour un bot existant) → copiez son jeton API dans « Jeton du bot » ci-dessus.',
                 'setup_step2' => 'Choisissez un jeton secret ci-dessus, ou cliquez sur « Générer » — notez-le dans tous les cas ; vous en aurez besoin à l\'étape 4.',
                 'setup_step3' => 'Enregistrez ce canal (bouton ci-dessous). Son URL de webhook exacte apparaîtra alors ici.',
-                'setup_step4' => 'Exécutez cette commande une fois (terminal, ou collez l\'URL dans un navigateur) pour que Telegram commence à livrer les messages à ce webhook avec le même jeton secret :',
-                'setup_command_label' => 'Commande setWebhook',
-                'setup_save_first_hint' => 'Enregistrez d\'abord le canal — son URL de webhook, et la commande pour l\'enregistrer auprès de Telegram, apparaîtront ici dès qu\'il en aura une.',
                 'ingress' => 'Livraison entrante',
                 'ingress_direct' => 'Direct — le fournisseur appelle l\'URL webhook de cette installation',
                 'ingress_relay' => 'Relais — un relais hébergé transfère les messages ici',

@@ -263,12 +263,9 @@ class TelegramProvider extends MessagingProvider
      * through sendDocument (sent byte-for-byte, no recompression, no
      * dimension limits beyond the flat 50MB bot API cap).
      *
-     * Uses multipart/form-data directly (via CURLFile) rather than the shared
-     * httpRequest() helper: that helper always sends a string body with an
-     * explicit Content-Type, but a multipart upload needs curl to build the
-     * body AND the boundary header itself from an array of fields.
+     * Uploaded as multipart/form-data through the shared httpMultipart().
      */
-    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = ''): string
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = '', string $filename = ''): string
     {
         $token = $this->channel['credentials']['bot_token'] ?? '';
         if ($token === '') {
@@ -284,7 +281,7 @@ class TelegramProvider extends MessagingProvider
 
         $fields = [
             'chat_id' => $to,
-            $field    => new CURLFile($filePath, $mimeType, basename($filePath)),
+            $field    => new CURLFile($filePath, $mimeType, $this->outboundFilename($filePath, $filename)),
         ];
         if ($caption !== '') {
             // Telegram's own caption limit; longer is silently rejected rather
@@ -292,26 +289,55 @@ class TelegramProvider extends MessagingProvider
             $fields['caption'] = mb_strimwidth($caption, 0, 1024, '');
         }
 
-        $ch = curl_init(self::API_BASE . $token . '/' . $method);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $fields); // array => curl builds the multipart body + boundary itself
-        sslApplyCurl($ch);
-        $resp = curl_exec($ch);
-        if ($resp === false) {
-            $err = curl_error($ch);
-            curl_close($ch);
-            throw new Exception('Network error sending attachment to Telegram: ' . $err);
-        }
-        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        [$code, $resp] = $this->httpMultipart(self::API_BASE . $token . '/' . $method, $fields);
 
         $json = json_decode($resp, true);
         if ($code < 200 || $code >= 300 || empty($json['ok'])) {
             throw new Exception('Telegram rejected the attachment: ' . ($json['description'] ?? ('HTTP ' . $code)));
         }
         return (string) ($json['result']['message_id'] ?? '');
+    }
+
+    /**
+     * Tell Telegram where to deliver this bot's messages, and the secret it must
+     * send back with each one (verifyWebhook() checks it).
+     *
+     * Added at merge time to replace a copy-paste `curl …/setWebhook` command in
+     * the settings dialog. That command put the bot token in the admin's browser
+     * and shell history, and asked an IT manager to run a terminal command. Here
+     * the token never leaves the server.
+     *
+     * drop_pending_updates is deliberately NOT set: messages sent while the bot
+     * was unregistered should still arrive once it is.
+     *
+     * @return string Telegram's own description, e.g. "Webhook was set"
+     */
+    public function setWebhook(string $url, string $secret): string
+    {
+        $token = $this->channel['credentials']['bot_token'] ?? '';
+        if ($token === '') {
+            throw new Exception('Telegram channel is missing its bot token.');
+        }
+        if (stripos($url, 'https://') !== 0) {
+            throw new Exception('Telegram only delivers to an https:// address. Set this install\'s public URL (Settings → Messaging) to an https address first.');
+        }
+        [$code, $resp] = $this->httpRequest(self::API_BASE . $token . '/setWebhook', [
+            'method'  => 'POST',
+            'headers' => ['Content-Type: application/json'],
+            'body'    => json_encode([
+                'url'             => $url,
+                'secret_token'    => $secret,
+                'allowed_updates' => ['message', 'edited_message'],   // all parseInbound() reads
+            ]),
+        ]);
+        $json = json_decode($resp, true);
+        if ($code === 401 || $code === 404) {
+            throw new Exception('Authentication failed — check the Bot token.');
+        }
+        if ($code < 200 || $code >= 300 || empty($json['ok'])) {
+            throw new Exception('Telegram refused the webhook: ' . ($json['description'] ?? ('HTTP ' . $code)));
+        }
+        return (string) ($json['description'] ?? 'Webhook was set');
     }
 
     public function testConnection(): string

@@ -68,7 +68,6 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
 
     $displayName = $profileName !== '' ? $profileName : $from;
     $contactOnly = false;
-    $isNewTelegramContact = false;
     if ($channelType === 'slack') {
         // Ask Slack who this is. Never fatal: a ticket must still be raised if
         // the lookup fails, just with a less useful name on it.
@@ -77,12 +76,11 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         // Never blocks a ticket on this: the placeholder requester created
         // below is usable from message one, exactly like any other channel.
         // The phone number, once/if shared, only IMPROVES the match (a real
-        // existing profile instead of a placeholder) and is surfaced to the
-        // analyst as a note on the ticket — see messagingTelegramResolveIdentity().
+        // existing profile instead of a placeholder), and what happened is put
+        // on the ticket's audit trail — see messagingTelegramResolveIdentity().
         $tg = messagingTelegramResolveIdentity($conn, $channel, $from, $msg, $profileName);
-        $userId = $tg['user_id'];
+        $userId = $tg['user_id'] ?: null;   // 0 = no usable users table; leave unset like the others
         $contactOnly = $tg['contact_only'];
-        $isNewTelegramContact = $tg['is_new_placeholder'];
         if ($tg['display_name'] !== '') {
             $displayName = $tg['display_name'];
         }
@@ -92,8 +90,13 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
 
     // A bare "here's my phone number" tap carries no question to raise (or
     // append to) a ticket about — the identity work above is already done;
-    // just acknowledge and stop.
-    if ($contactOnly && $body === '' && !$hasMedia) {
+    // just stop.
+    //
+    // ⚠️ Tested against the text AS IT ARRIVED, not $body: an empty $body has
+    // already been replaced with '[empty message]' above, so PR #159's
+    // `$body === ''` never matched, and every phone tap added an
+    // "[empty message]" entry to the ticket and bumped it as a customer reply.
+    if ($contactOnly && trim((string) ($msg['body'] ?? '')) === '' && !$hasMedia) {
         return ['status' => 'contact_linked', 'ticket_id' => null];
     }
 
@@ -132,16 +135,6 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         // it, so a default added later cannot be missed on this one.
         require_once __DIR__ . '/../ticket_sensitivity.php';
         ticketSensitivityApplyDefaults($conn, $ticketId);
-
-        // Flag it for the analyst right away, in the one place visible without
-        // opening the ticket — the ticket list. The phone-matching result (if
-        // any) may not land until a later message, so it must not look like
-        // an ordinary, already-known requester in the meantime. (No email row
-        // exists to annotate yet at this point — the inbound message is
-        // inserted just below — so this is a subject tag, not a body note.)
-        if (!empty($isNewTelegramContact)) {
-            messagingTelegramTagSubject($conn, $ticketId, true);
-        }
     } else {
         $conn->prepare("UPDATE tickets SET updated_datetime = UTC_TIMESTAMP(), last_inbound_at = UTC_TIMESTAMP() WHERE id = ?")
              ->execute([$ticketId]);
@@ -341,53 +334,104 @@ function resolveSlackRequester(PDO $conn, array $channel, string $slackUserId): 
 }
 
 /**
- * Resolve (never blocks) which `users` row a Telegram chat belongs to.
+ * ─── Telegram identity: who is this chat? ────────────────────────────────────
  *
- * Telegram identifies a chat by an opaque chat id that says nothing about who
- * the person actually is — unlike WhatsApp, where the sender's phone number
- * both identifies the chat AND is the thing an analyst recognises. So a chat
- * seen for the first time gets a placeholder requester immediately (exactly
- * like every other channel — the ticket is never held up for this), and the
- * bot separately, asynchronously asks for their phone number. If/when they
- * tap "Share phone number", that number is matched against `users`.phone/
- * mobile: a match re-points this chat (and its ticket history) at the real
- * existing profile; no match just confirms the placeholder as a genuine new
- * contact. Either outcome is written as a visible note on the chat's open
- * ticket, if it has one, so the analyst sees it happen rather than having to
- * infer it from a changed name.
+ * Contributed in PR #159 (turbay-a) and rebuilt at merge time. The full story,
+ * with the bugs the first version had, is on the wiki:
+ * Telegram-Channel-Developer-Guide.
  *
- * Returns ['user_id'=>int, 'display_name'=>string (only when it should
- * override the caller's default), 'contact_only'=>bool (this message was a
- * bare "here's my number" tap the caller should not turn into a ticket)].
+ * Telegram identifies a chat by an opaque number that says nothing about who the
+ * person is (WhatsApp, by contrast, identifies them by phone number). So:
+ *
+ *   1. The first message from a chat gets a PLACEHOLDER requester, exactly like
+ *      every other channel. The ticket is never held up.
+ *   2. The bot asks, once, for the person's phone number through Telegram's own
+ *      "Share phone number" button. Telegram vouches for that number (only the
+ *      sender's OWN contact card is accepted - see TelegramProvider::parseInbound).
+ *   3. If the number belongs to exactly one person in the right company, the
+ *      chat is linked to them and the placeholder's tickets move to them.
+ *
+ * 🔴 THE RULES THAT MAKE THIS SAFE (each one is a bug the first version had):
+ *
+ *   - Only the chat's OWN PLACEHOLDER is ever merged away. Once a chat is linked
+ *     to a real person, a later phone share changes NOBODY: no tickets move, no
+ *     account is deleted, no phone field is overwritten. The first version
+ *     treated "whoever the chat is linked to" as the placeholder, so a second
+ *     share moved a real person's every ticket - email ones included - to
+ *     someone else and then deleted them.
+ *   - Only tickets that came in through THIS channel move. A placeholder is
+ *     keyed on the chat id, which is the same on every bot, so another company's
+ *     bot can share it.
+ *   - Matching is scoped to the company the channel files tickets into, and only
+ *     an UNAMBIGUOUS number matches. Office phone fields are often a shared
+ *     switchboard, and "first match wins" handed one person's tickets to another.
+ *   - The link is per CHANNEL (bot), not per chat id: company A's bot linking
+ *     someone must not decide who they are on company B's bot.
+ *   - What happened goes in the ticket's audit trail, never into the customer's
+ *     own message text (or, as it could, an analyst's reply).
+ *   - The chat's reply never says whether an account was found.
+ */
+
+/** The placeholder's synthetic address - MUST match getOrCreateChannelUser(). */
+function messagingTelegramPlaceholderEmail(string $chatId): string
+{
+    return ltrim($chatId, '+') . '@telegram.local';
+}
+
+/** Is this user id this chat's own placeholder (and not a real person)? */
+function messagingTelegramIsPlaceholder(PDO $conn, int $userId, string $chatId): bool
+{
+    $st = $conn->prepare("SELECT email FROM users WHERE id = ?");
+    $st->execute([$userId]);
+    $email = $st->fetchColumn();
+    return $email !== false && strcasecmp((string) $email, messagingTelegramPlaceholderEmail($chatId)) === 0;
+}
+
+/**
+ * Resolve (never blocks) which `users` row this chat belongs to on this channel.
+ *
+ * Returns ['user_id'=>int, 'display_name'=>string (only when it should override
+ * the caller's default), 'contact_only'=>bool (this message was a phone-number
+ * share the caller should not turn into ticket text), 'is_new_placeholder'=>bool].
  */
 function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $chatId, array $msg, string $profileName): array
 {
-    // Telegram's own language_code is the USER's OS/app setting, not
-    // something they typed — the one signal this app has, this early, for
-    // which language the bot's own text (prompt, buttons, acks) should be in.
+    $channelId = (int) $channel['id'];
+    // Telegram's language_code is the person's own app setting - the one signal
+    // this early for which language the bot's own text should be in.
     $locale = messagingNormaliseLocale((string) ($msg['language_code'] ?? ''));
 
-    $link = $conn->prepare("SELECT user_id, locale FROM messaging_identity_links WHERE channel_type = 'telegram' AND external_id = ?");
-    $link->execute([$chatId]);
-    $row = $link->fetch(PDO::FETCH_ASSOC);
-    $userId = $row['user_id'] ?? null;
+    $find = $conn->prepare("SELECT user_id, locale FROM messaging_identity_links WHERE channel_id = ? AND external_id = ?");
+    $find->execute([$channelId, $chatId]);
+    $row = $find->fetch(PDO::FETCH_ASSOC);
 
-    $isNewPlaceholder = !$userId;
+    $isNewPlaceholder = !$row;
     if ($isNewPlaceholder) {
-        // First message ever from this chat: a placeholder requester, exactly
-        // like every other channel, so the ticket is never held up for this.
         $userId = getOrCreateChannelUser($conn, $chatId, $profileName !== '' ? $profileName : $chatId, 'telegram');
-        try {
-            $conn->prepare("INSERT INTO messaging_identity_links (channel_type, external_id, user_id, phone, locale) VALUES ('telegram', ?, ?, NULL, ?)")
-                 ->execute([$chatId, $userId, $locale]);
-        } catch (Exception $e) {
-            error_log('Telegram identity: could not save link for ' . $chatId . ': ' . $e->getMessage());
+        if (!$userId) {
+            // users table unusable - the ticket is still raised, without a requester.
+            return ['user_id' => 0, 'display_name' => '', 'contact_only' => false, 'is_new_placeholder' => false];
         }
-        // Ask, once, best-effort — never lets a failed send break ingest. Skipped
-        // for the channel-settings self-test (testSimulation() in test_channel.php),
-        // which uses a fake chat id that Telegram would reject anyway, and which
-        // must never make a real outbound call (see its own file header comment).
-        if (empty($msg['is_test'])) {
+        try {
+            $conn->prepare("INSERT INTO messaging_identity_links (channel_id, channel_type, external_id, user_id, phone, locale)
+                            VALUES (?, 'telegram', ?, ?, NULL, ?)")
+                 ->execute([$channelId, $chatId, $userId, $locale]);
+        } catch (Exception $e) {
+            // Two messages arriving together both found no link; the other one
+            // won the unique key. Use the row it wrote, and don't ask twice.
+            $find->execute([$channelId, $chatId]);
+            $row = $find->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                $isNewPlaceholder = false;
+                $userId = (int) $row['user_id'];
+            } else {
+                error_log('Telegram identity: could not save link for ' . $chatId . ': ' . $e->getMessage());
+            }
+        }
+        // Ask once, best-effort; a failed send never breaks ingest. Skipped for
+        // the settings self-test, which uses a fake chat id and promises never to
+        // make a real outbound call (test_channel.php).
+        if ($isNewPlaceholder && empty($msg['is_test'])) {
             try {
                 $provider = messagingProvider($channel);
                 if ($provider instanceof TelegramProvider) {
@@ -401,145 +445,168 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
                 error_log('Telegram contact request failed for chat ' . $chatId . ': ' . $e->getMessage());
             }
         }
-    } else {
-        // Already linked — keep the stored locale current (a person can change
-        // their Telegram app language at any time), but never fight a value a
-        // previous call already resolved from the same signal: this just keeps
-        // it in sync, it isn't a second source of truth.
-        $locale = $row['locale'] ?: $locale;
-        if (($row['locale'] ?? null) !== $locale) {
+    }
+    if ($row) {
+        $userId = (int) $row['user_id'];
+        // People change their app language, so a message that REPORTS one updates
+        // the stored value; one that doesn't (some clients omit it) keeps it.
+        $reported = trim((string) ($msg['language_code'] ?? '')) !== '';
+        if (!$reported && !empty($row['locale'])) {
+            $locale = $row['locale'];
+        } elseif (($row['locale'] ?? null) !== $locale) {
             try {
-                $conn->prepare("UPDATE messaging_identity_links SET locale = ? WHERE channel_type = 'telegram' AND external_id = ?")
-                     ->execute([$locale, $chatId]);
-            } catch (Exception $e) { /* cosmetic — never worth failing ingest over */ }
+                $conn->prepare("UPDATE messaging_identity_links SET locale = ? WHERE channel_id = ? AND external_id = ?")
+                     ->execute([$locale, $channelId, $chatId]);
+            } catch (Exception $e) { /* cosmetic - never worth failing ingest over */ }
         }
     }
-    $userId = (int) $userId;
 
     $contact = is_array($msg['contact'] ?? null) ? $msg['contact'] : null;
     $phone = trim((string) ($contact['phone'] ?? ''));
     if ($phone === '') {
-        return ['user_id' => $userId, 'display_name' => '', 'contact_only' => false, 'is_new_placeholder' => $isNewPlaceholder];
+        return ['user_id' => (int) $userId, 'display_name' => '', 'contact_only' => false, 'is_new_placeholder' => $isNewPlaceholder];
     }
 
-    [$resolvedId, $resolvedName] = messagingTelegramLinkPhone($conn, $channel, $chatId, $userId, $phone, $profileName, $locale, !empty($msg['is_test']));
-    // The phone arrived and was resolved in this same call — the note above
-    // already covers it, so don't ALSO flag "new, unverified" on the ticket.
+    [$resolvedId, $resolvedName] = messagingTelegramLinkPhone($conn, $channel, $chatId, (int) $userId, $phone, $locale, !empty($msg['is_test']));
     return ['user_id' => $resolvedId, 'display_name' => $resolvedName, 'contact_only' => true, 'is_new_placeholder' => false];
 }
 
 /**
- * The phone just arrived for this chat. Match it against an existing user
- * (same person, same ticket history — re-point the chat and every ticket the
- * placeholder had raised at them) or, failing that, confirm the placeholder
- * as a genuinely new contact. Either way, tell the analyst: a note on the
- * chat's currently open ticket (if it has one), and a short reply to the chat.
+ * A phone number has just arrived for this chat. Decide what it means, safely.
  *
- * @return array{0:int,1:string} [resolved user_id, display name override]
+ * @return array{0:int,1:string} [the user the chat now resolves to, display name override]
  */
-function messagingTelegramLinkPhone(PDO $conn, array $channel, string $chatId, int $placeholderUserId, string $phone, string $profileName, string $locale = 'en', bool $isTest = false): array
+function messagingTelegramLinkPhone(PDO $conn, array $channel, string $chatId, int $linkedUserId, string $phone, string $locale = 'en', bool $isTest = false): array
 {
+    $channelId    = (int) $channel['id'];
     $openTicketId = findOpenChannelTicket($conn, $chatId, 'telegram', '');
-    $matchedId = messagingFindUserByPhone($conn, $phone);
-    if ($matchedId === $placeholderUserId) {
-        $matchedId = null; // the placeholder already carries this exact phone — nothing to merge
-    }
 
-    if ($matchedId !== null) {
-        // A real, existing person — re-point the link and every ticket the
-        // placeholder had raised (not just the open one) at them, then retire
-        // the placeholder if nothing else still references it.
-        $conn->prepare("UPDATE messaging_identity_links SET user_id = ?, phone = ? WHERE channel_type = 'telegram' AND external_id = ?")
-             ->execute([$matchedId, $phone, $chatId]);
-        $conn->prepare("UPDATE tickets SET user_id = ? WHERE user_id = ?")->execute([$matchedId, $placeholderUserId]);
-        try {
-            $cnt = $conn->prepare("SELECT COUNT(*) FROM tickets WHERE user_id = ?");
-            $cnt->execute([$placeholderUserId]);
-            if ((int) $cnt->fetchColumn() === 0) {
-                $conn->prepare("DELETE FROM users WHERE id = ?")->execute([$placeholderUserId]);
-            }
-        } catch (Exception $e) { /* stray placeholder row — harmless, not worth failing over */ }
+    // Remember the number on the link whatever happens next - it is what the
+    // person told us, and the audit entries below quote it.
+    $conn->prepare("UPDATE messaging_identity_links SET phone = ? WHERE channel_id = ? AND external_id = ?")
+         ->execute([$phone, $channelId, $chatId]);
 
-        $nameStmt = $conn->prepare("SELECT display_name FROM users WHERE id = ?");
-        $nameStmt->execute([$matchedId]);
-        $realName = trim((string) ($nameStmt->fetchColumn() ?: ''));
-
+    // ── Already linked to a real person: change nobody ──────────────────────
+    if (!messagingTelegramIsPlaceholder($conn, $linkedUserId, $chatId)) {
         if ($openTicketId) {
-            messagingTelegramTagSubject($conn, $openTicketId, false); // known now — clear the "new contact" tag
-            messagingTelegramNote($conn, $openTicketId,
-                'Telegram contact matched to an existing profile: ' . ($realName !== '' ? $realName : ('user #' . $matchedId)) . ' (phone ' . $phone . ').');
+            messagingTelegramAudit($conn, $openTicketId, 'Telegram phone shared', null,
+                $phone . ' - this chat is already linked to ' . messagingUserLabel($conn, $linkedUserId) . '; nothing was changed.');
         }
         if (!$isTest) {
-            messagingTelegramAck($conn, $channel, $chatId, I18n::tFor($locale, 'tickets.telegram_bot.ack_matched'));
+            messagingTelegramAck($channel, $chatId, I18n::tFor($locale, 'tickets.telegram_bot.ack_new'));
         }
-
-        return [$matchedId, $realName];
+        return [$linkedUserId, ''];
     }
 
-    // No match — a genuinely new contact. Save the phone so it's visible and
-    // searchable on the placeholder, and say so plainly on the ticket.
-    $conn->prepare("UPDATE users SET phone = ? WHERE id = ?")->execute([$phone, $placeholderUserId]);
-    $conn->prepare("UPDATE messaging_identity_links SET phone = ? WHERE channel_type = 'telegram' AND external_id = ?")
-         ->execute([$phone, $chatId]);
+    // ── Still the placeholder: look for exactly one person with this number ──
+    $placeholderId = $linkedUserId;
+    $tenantId   = resolveTicketTenantForChannel($conn, $channelId, $chatId);
+    $candidates = messagingFindUsersByPhone($conn, $phone, $tenantId);
 
+    if (count($candidates) === 1) {
+        $matchedId = $candidates[0];
+        $moved = [];
+        $conn->beginTransaction();
+        try {
+            $conn->prepare("UPDATE messaging_identity_links SET user_id = ? WHERE channel_id = ? AND external_id = ?")
+                 ->execute([$matchedId, $channelId, $chatId]);
+
+            // Only the tickets this chat raised THROUGH THIS CHANNEL. The
+            // placeholder is keyed on the chat id, which another company's bot
+            // shares, so "every ticket the placeholder has" could include tickets
+            // filed in a different company.
+            $sel = $conn->prepare(
+                "SELECT DISTINCT t.id FROM tickets t
+                   JOIN emails e ON e.ticket_id = t.id
+                  WHERE t.user_id = ? AND e.channel = 'telegram' AND e.channel_id = ? AND e.direction = 'Inbound'"
+            );
+            $sel->execute([$placeholderId, $channelId]);
+            $moved = array_map('intval', $sel->fetchAll(PDO::FETCH_COLUMN));
+            if ($moved) {
+                $in = implode(',', array_fill(0, count($moved), '?'));
+                $conn->prepare("UPDATE tickets SET user_id = ? WHERE user_id = ? AND id IN ($in)")
+                     ->execute(array_merge([$matchedId, $placeholderId], $moved));
+            }
+
+            // Retire the placeholder only when nothing at all still points at it:
+            // no ticket, and no link from another bot. And only if it is STILL
+            // this chat's placeholder - re-checked inside the transaction.
+            $left = $conn->prepare("SELECT (SELECT COUNT(*) FROM tickets WHERE user_id = ?) + (SELECT COUNT(*) FROM messaging_identity_links WHERE user_id = ?)");
+            $left->execute([$placeholderId, $placeholderId]);
+            if ((int) $left->fetchColumn() === 0 && messagingTelegramIsPlaceholder($conn, $placeholderId, $chatId)) {
+                $conn->prepare("DELETE FROM users WHERE id = ? AND email = ?")
+                     ->execute([$placeholderId, messagingTelegramPlaceholderEmail($chatId)]);
+            }
+            $conn->commit();
+        } catch (Exception $e) {
+            $conn->rollBack();
+            error_log('Telegram identity: merge failed for chat ' . $chatId . ': ' . $e->getMessage());
+            return [$placeholderId, ''];
+        }
+
+        $label = messagingUserLabel($conn, $matchedId);
+        foreach ($moved as $tid) {
+            messagingTelegramAudit($conn, $tid, 'Requester', 'Telegram chat ' . $chatId,
+                $label . ' - matched by the phone number they shared (' . $phone . ')');
+        }
+        if (!$isTest) {
+            messagingTelegramAck($channel, $chatId, I18n::tFor($locale, 'tickets.telegram_bot.ack_new'));
+        }
+        $nameStmt = $conn->prepare("SELECT display_name FROM users WHERE id = ?");
+        $nameStmt->execute([$matchedId]);
+        return [$matchedId, trim((string) ($nameStmt->fetchColumn() ?: ''))];
+    }
+
+    // ── No match, or more than one: keep the placeholder ────────────────────
+    // Only the placeholder - our own record - is written to, and only an empty
+    // mobile (a Telegram number is a mobile; the office `phone` is left alone).
+    $conn->prepare("UPDATE users SET mobile = ? WHERE id = ? AND email = ? AND (mobile IS NULL OR mobile = '')")
+         ->execute([$phone, $placeholderId, messagingTelegramPlaceholderEmail($chatId)]);
     if ($openTicketId) {
-        // Already tagged from creation — left as-is, now confirmed accurate
-        // rather than just provisional.
-        messagingTelegramNote($conn, $openTicketId,
-            'New Telegram contact confirmed — phone ' . $phone . ' saved; no existing profile matched it.');
+        messagingTelegramAudit($conn, $openTicketId, 'Telegram phone shared', null, count($candidates) > 1
+            ? $phone . ' - ' . count($candidates) . ' people in this company have this number, so it was not matched to any of them.'
+            : $phone . ' - no one in this company has this number; kept as a new contact.');
     }
     if (!$isTest) {
-        messagingTelegramAck($conn, $channel, $chatId, I18n::tFor($locale, 'tickets.telegram_bot.ack_new'));
+        messagingTelegramAck($channel, $chatId, I18n::tFor($locale, 'tickets.telegram_bot.ack_new'));
     }
-
-    return [$placeholderUserId, ''];
+    return [$placeholderId, ''];
 }
 
 /**
- * Prefix (or un-prefix) a ticket's subject with a "new contact" tag — the one
- * place every analyst already looks (the ticket list) without opening the
- * ticket. Idempotent: safe to call repeatedly in either direction.
+ * Record what happened on the ticket's audit trail (Audit tab), as automation:
+ * analyst_id NULL is the established "nobody did this, the system did" marker
+ * (see the ticket_audit comment in freeitsm.sql). Best-effort.
  */
-function messagingTelegramTagSubject(PDO $conn, int $ticketId, bool $newContact): void
+function messagingTelegramAudit(PDO $conn, int $ticketId, string $field, ?string $old, string $new): void
 {
-    $tag = '🆕 New contact — ';
     try {
-        $cur = $conn->prepare("SELECT subject FROM tickets WHERE id = ?");
-        $cur->execute([$ticketId]);
-        $subject = (string) $cur->fetchColumn();
-        $tagged = (strpos($subject, $tag) === 0);
-        if ($newContact && !$tagged) {
-            $conn->prepare("UPDATE tickets SET subject = ? WHERE id = ?")->execute([$tag . $subject, $ticketId]);
-        } elseif (!$newContact && $tagged) {
-            $conn->prepare("UPDATE tickets SET subject = ? WHERE id = ?")->execute([substr($subject, strlen($tag)), $ticketId]);
-        }
+        $conn->prepare("INSERT INTO ticket_audit (ticket_id, analyst_id, field_name, old_value, new_value, created_datetime)
+                        VALUES (?, NULL, ?, ?, ?, UTC_TIMESTAMP())")
+             ->execute([$ticketId, $field, $old !== null ? mb_substr($old, 0, 500) : null, mb_substr($new, 0, 500)]);
     } catch (Exception $e) {
-        error_log('Telegram identity: subject tag failed for ticket ' . $ticketId . ': ' . $e->getMessage());
+        error_log('Telegram identity: audit entry failed for ticket ' . $ticketId . ': ' . $e->getMessage());
     }
+}
+
+/** "Alice Real <alice@example.com>" - for audit entries. */
+function messagingUserLabel(PDO $conn, int $userId): string
+{
+    $st = $conn->prepare("SELECT display_name, email FROM users WHERE id = ?");
+    $st->execute([$userId]);
+    $u = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$u) return 'user #' . $userId;
+    $name = trim((string) $u['display_name']);
+    return $name !== '' ? $name . ($u['email'] ? ' <' . $u['email'] . '>' : '') : (string) ($u['email'] ?: 'user #' . $userId);
 }
 
 /**
- * Append a short explanatory line to the ticket's most recent message body —
- * the same convention already used for media-rejection notices (see
- * saveChannelMediaAttachment / attachmentIngestNotice above). Best-effort.
+ * Best-effort reply to the chat. A failed send must never break ingest.
+ *
+ * Every outcome sends the SAME neutral text: telling a stranger "found your
+ * account" would let anyone holding a phone confirm who is in this install.
  */
-function messagingTelegramNote(PDO $conn, int $ticketId, string $text): void
-{
-    try {
-        $last = $conn->prepare("SELECT id FROM emails WHERE ticket_id = ? ORDER BY received_datetime DESC, id DESC LIMIT 1");
-        $last->execute([$ticketId]);
-        $emailId = $last->fetchColumn();
-        if ($emailId) {
-            $conn->prepare("UPDATE emails SET body_content = CONCAT(body_content, ?) WHERE id = ?")
-                 ->execute(["\n\n[" . $text . "]", $emailId]);
-        }
-    } catch (Exception $e) {
-        error_log('Telegram identity note failed for ticket ' . $ticketId . ': ' . $e->getMessage());
-    }
-}
-
-/** Best-effort reply to the chat. A failed send must never break ingest. */
-function messagingTelegramAck(PDO $conn, array $channel, string $chatId, string $text): void
+function messagingTelegramAck(array $channel, string $chatId, string $text): void
 {
     try {
         $provider = messagingProvider($channel);
@@ -552,30 +619,57 @@ function messagingTelegramAck(PDO $conn, array $channel, string $chatId, string 
 }
 
 /**
- * Find an existing user by phone number, comparing digits only so formatting
- * differences ("+1 415 555 0100" vs "14155550100") still match. Checks both
- * `phone` and `mobile`. Small, deliberate scan (not an indexed lookup) — phone
- * numbers are free-text and rarely normalised at entry, so a SQL equality or
- * prefix match would miss real matches; the users table is small enough on
- * every install this code runs on for a full scan to be the correct trade-off.
+ * Every active person whose phone or mobile is this number, compared digits-only
+ * so "+44 7700 900123" and "447700900123" agree. Returns user ids, deduplicated.
+ *
+ * Scoped to the company the channel files tickets into ($tenantId): on a
+ * multi-company install a person with no company belongs to the Default company,
+ * as everywhere else (analystCanAccessUser()). A multi-company channel that
+ * cannot say which company (triage, $tenantId null) matches NOBODY - guessing
+ * across companies is exactly what must not happen. Single-company installs
+ * search everyone.
+ *
+ * Placeholders (any *@telegram.local) are never candidates: merging one chat into
+ * another chat's placeholder is not "finding the person".
+ *
+ * ⚠️ Digits must be EQUAL. "07700 900123" (national) and "447700900123"
+ * (international) do not match, because turning one into the other needs the
+ * country, which we don't know. A missed match costs an analyst a click; a wrong
+ * one hands someone else's tickets over. Known limitation, documented on the wiki.
+ *
+ * A full scan rather than an indexed lookup: phone numbers are free text and
+ * rarely normalised at entry, so SQL equality would miss real matches.
  */
-function messagingFindUserByPhone(PDO $conn, string $phone): ?int
+function messagingFindUsersByPhone(PDO $conn, string $phone, ?int $tenantId): array
 {
     $needle = preg_replace('/\D+/', '', $phone);
     if ($needle === '' || strlen($needle) < 7) {
-        return null; // too short to be a real match, phone-vs-mobile column noise
+        return []; // too short to identify anyone
     }
-    $rows = $conn->query("SELECT id, phone, mobile FROM users WHERE (phone IS NOT NULL AND phone <> '') OR (mobile IS NOT NULL AND mobile <> '')")
-                 ->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as $row) {
-        foreach (['phone', 'mobile'] as $col) {
+    $sql = "SELECT id, phone, mobile FROM users
+             WHERE ((phone IS NOT NULL AND phone <> '') OR (mobile IS NOT NULL AND mobile <> ''))
+               AND (is_active = 1 OR is_active IS NULL)
+               AND (email IS NULL OR email NOT LIKE '%@telegram.local')";
+    $params = [];
+    if (isMultiTenant($conn)) {
+        if ($tenantId === null) {
+            return [];
+        }
+        $sql .= " AND COALESCE(tenant_id, ?) = ?";
+        $params = [getDefaultTenantId($conn), $tenantId];
+    }
+    $st = $conn->prepare($sql);
+    $st->execute($params);
+    $found = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        foreach (['mobile', 'phone'] as $col) {
             $digits = preg_replace('/\D+/', '', (string) ($row[$col] ?? ''));
             if ($digits !== '' && $digits === $needle) {
-                return (int) $row['id'];
+                $found[(int) $row['id']] = true;
             }
         }
     }
-    return null;
+    return array_keys($found);
 }
 
 /**

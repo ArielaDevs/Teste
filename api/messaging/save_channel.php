@@ -152,6 +152,22 @@ try {
     // existing value if the field came in blank/masked on edit (write-only fields).
     $verifyPlain = provided($verifyToken) ? $verifyToken : (string) ($cur['verify_token'] ?? '');
     $relayPlain  = provided($relaySecret) ? $relaySecret : (string) ($cur['relay_secret'] ?? '');
+
+    // Telegram's secret token (stored in verify_token): required, because
+    // TelegramProvider::verifyWebhook() refuses every message without one, and
+    // checked against Telegram's own rule (1-256 of A-Z a-z 0-9 _ -) here, where
+    // the admin can fix it, rather than at Connect time as a Telegram error.
+    if ($provider === 'telegram') {
+        if ($verifyPlain === '') {
+            throw new Exception('A secret token is required for Telegram - type one or click Generate.');
+        }
+        if (!preg_match('/^[A-Za-z0-9_-]{1,256}$/', $verifyPlain)) {
+            throw new Exception('The secret token may only use letters, numbers, - and _ (Telegram\'s rule), up to 256 characters.');
+        }
+        if (!$id && !provided($data['bot_token'] ?? '')) {
+            throw new Exception('The bot token is required - copy it from @BotFather.');
+        }
+    }
     $verifyToken = $verifyPlain === '' ? null : encryptValue($verifyPlain);
     $relaySecret = $relayPlain === ''  ? null : encryptValue($relayPlain);
 

@@ -33,6 +33,18 @@ function getContributors(): array
 {
     return [
         [
+            // Public GitHub name; asked in the PR #159 reply how they would like
+            // to be credited - change this if they say otherwise.
+            'name'   => 'Andrew Turbay',
+            'github' => 'turbay-a',
+            'date'   => '2026-09-30',
+            'what'   => 'Brought Telegram to FreeITSM as a full messaging channel (PR #159): the bot '
+                      . 'connection, matching a chat to the right person by the phone number they share, '
+                      . 'bot replies in each customer\'s own language, and sending pictures and documents '
+                      . 'over Telegram and WhatsApp alike - with every new string translated into thirteen '
+                      . 'languages.',
+        ],
+        [
             'name'   => 'Santhosh Srinivasan (Sandy)',
             'github' => 'srinivasansanthosh',
             'date'   => '2026-09-14',

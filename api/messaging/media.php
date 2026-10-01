@@ -22,6 +22,7 @@
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/messaging/messaging.php';
+require_once '../../includes/uploads.php';   // attachmentSendHeaders()
 
 function mediaFail(int $code): void
 {
@@ -42,7 +43,14 @@ if (time() > $exp) {
     mediaFail(410); // Gone — expired, not merely missing
 }
 
-$expected = messagingOutboundMediaToken($id, $exp);
+// A missing encryption key makes the token function throw. On an endpoint the
+// whole internet can reach, that must be a plain refusal, never a PHP fatal that
+// prints the key file's path.
+try {
+    $expected = messagingOutboundMediaToken($id, $exp);
+} catch (Exception $e) {
+    mediaFail(404);
+}
 if (!hash_equals($expected, $token)) {
     mediaFail(403);
 }
@@ -76,13 +84,19 @@ $attachmentsRoot = realpath(dirname(dirname(__DIR__)) . '/tickets/attachments');
 // is built by this app, never taken from the request, so this is defence in
 // depth rather than the primary guard — but it costs nothing and a future
 // change to how file_path is formed should not be able to reopen a traversal.
-if ($real === false || $attachmentsRoot === false || strpos($real, $attachmentsRoot) !== 0 || !is_file($real)) {
+// The trailing separator matters: without it a sibling folder whose name merely
+// STARTS with "attachments" would pass a prefix check.
+if ($real === false || $attachmentsRoot === false
+    || strpos($real, $attachmentsRoot . DIRECTORY_SEPARATOR) !== 0 || !is_file($real)) {
     mediaFail(404);
 }
 
-header('Content-Type: ' . ($row['content_type'] ?: 'application/octet-stream'));
-header('Content-Length: ' . filesize($real));
-header('Content-Disposition: inline; filename="' . addslashes((string) $row['filename']) . '"');
+// The app's one rule for serving a stored file (includes/uploads.php): the type
+// and inline-or-download come from the EXTENSION via a fixed table, never from
+// the stored content_type, plus nosniff and a header-safe name. PR #159 set these
+// by hand from content_type; the shared helper is what every other attachment
+// download uses, so a fix to it reaches this one too.
+attachmentSendHeaders((string) $row['filename'], (int) filesize($real));
 // This URL is single-purpose and expires on its own (checked above) — caching
 // it anywhere beyond the fetch that's about to happen serves no one.
 header('Cache-Control: no-store');

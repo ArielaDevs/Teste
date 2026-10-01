@@ -108,7 +108,7 @@ class TwilioProvider extends MessagingProvider
      * therefore REQUIRED here, unlike Meta/Telegram which take the bytes
      * directly; $filePath is unused.
      */
-    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = ''): string
+    public function sendMedia(string $to, string $filePath, string $mimeType, string $caption = '', string $publicUrl = '', string $filename = ''): string
     {
         if ($publicUrl === '') {
             throw new Exception('Twilio needs a public URL to fetch the attachment from, and none was given.');
