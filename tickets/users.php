@@ -172,6 +172,14 @@ $translationNamespaces = ['common', 'tickets'];
             color: var(--text, #333);
         }
 
+        /* The Unlink beside "Signs in with" - a link-weight action, not a toolbar button. */
+        .btn-link-inline {
+            background: none; border: 0; padding: 0; margin-left: 6px;
+            font: inherit; font-size: 13px; color: var(--accent, #0078d4);
+            cursor: pointer; text-decoration: underline;
+        }
+        .btn-link-inline:hover { color: var(--accent-hover, #005a9e); }
+
         .tickets-section {
             flex: 1;
             display: flex;
@@ -705,9 +713,18 @@ $translationNamespaces = ['common', 'tickets'];
             // By NAME: with two address books, "a directory" could not tell
             // them apart. A person linked but not imported (they only sign in
             // through it) says so differently.
-            if (user.source_name) {
-                add(Number(user.is_managed) === 1 ? 'tickets.users.info.source' : 'tickets.users.info.signs_in_with',
-                    userSourceLabel(user.source_name, user.managed_protocol));
+            if (user.source_name && Number(user.is_managed) !== 1) {
+                // Linked by signing in, not imported: an analyst can undo that.
+                // An imported person has no Unlink - the next sync would re-link
+                // them (unlink_user_signin.php refuses it too).
+                rows.push(`
+                    <div class="info-item">
+                        <span class="info-label">${escapeHtml(t('tickets.users.info.signs_in_with'))}</span>
+                        <span class="info-value">${escapeHtml(userSourceLabel(user.source_name, user.managed_protocol))}
+                            <button type="button" class="btn-link-inline" onclick="unlinkUserSignin(${Number(user.id)})">${escapeHtml(t('tickets.users.info.unlink'))}</button></span>
+                    </div>`);
+            } else if (user.source_name) {
+                add('tickets.users.info.source', userSourceLabel(user.source_name, user.managed_protocol));
             } else if (Number(user.is_managed) === 1) {
                 rows.push(`
                     <div class="info-item">
@@ -867,6 +884,36 @@ $translationNamespaces = ['common', 'tickets'];
                     if (savedId) selectUser(savedId);
                 }
             });
+        }
+
+        async function unlinkUserSignin(userId) {
+            const user = users.find(u => u.id == userId);
+            if (!user) return;
+            const label = user.display_name || user.email || `#${userId}`;
+            if (!(await showConfirm({
+                title: t('tickets.users.unlink.title'),
+                message: t('tickets.users.unlink.confirm', { name: label, provider: user.source_name }),
+                okLabel: t('tickets.users.info.unlink'),
+                okClass: 'primary'
+            }))) return;
+
+            try {
+                const response = await fetch(`${API_BASE}unlink_user_signin.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: userId })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    showToast(data.error || t('tickets.users.unlink.failed'), 'error');
+                    return;
+                }
+                showToast(t('tickets.users.unlink.done', { name: label }), 'success');
+                await loadUsers(document.getElementById('userSearch').value);
+                selectUser(userId);
+            } catch (err) {
+                showToast(t('tickets.users.unlink.failed'), 'error');
+            }
         }
 
         async function deleteUser(userId) {

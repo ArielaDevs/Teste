@@ -539,6 +539,9 @@ require __DIR__ . '/_top.php';
     <p>The redirect URI registered in the IdP must <em>exactly</em> match <code><?php echo htmlspecialchars($redirectUri); ?></code> — scheme, host and path. Copy it from this page (or the SSO settings page) rather than typing it.</p>
     <p>If you moved FreeITSM to a new address (for example from <code>http://localhost/...</code> to an https name), add the new address in the IdP too. FreeITSM builds it from the address you are using.</p>
 
+    <h4>Seeing, or undoing, which provider a portal user is linked to</h4>
+    <p>Open them in <strong>Tickets &rarr; Users</strong>: the <em>Signs in with</em> line names their provider. <strong>Unlink</strong> beside it removes the link, after asking. Their tickets and details stay; the email box stops sending them to that provider, and the next time they sign in through a provider they are linked again. People kept up to date from a directory have no Unlink, because the next sync would link them again. Each unlink is written to the system log.</p>
+
     <h4>“Invalid redirect uri” when signing out</h4>
     <p>The provider was asked to send you back to an address it does not allow. Register both sign-out addresses as allowed post-logout redirect URLs: <code><?php echo htmlspecialchars($signoutAnalystUri); ?></code> for the analyst login and <code><?php echo htmlspecialchars($signoutPortalUri); ?></code> for the self-service portal. They are on the Single Sign-On page with a Copy button each. In Keycloak this is <em>Clients &rarr; your client &rarr; Valid post logout redirect URIs</em>; in Okta, <em>Sign-out redirect URIs</em>.</p>
 

@@ -2078,6 +2078,13 @@ return [
             'kind_carddav'     => 'address book',
             'kind_ldap'        => 'directory',
             'kind_oidc'        => 'single sign-on',
+            'unlink'           => 'Unlink',
+        ],
+        'unlink' => [
+            'title'   => 'Unlink sign-in',
+            'confirm' => 'Unlink {name} from {provider}? Their tickets and details stay. The next time they sign in through a provider they are linked again, and a password works if they have one.',
+            'done'    => '{name} is no longer linked to a sign-in provider',
+            'failed'  => 'Could not unlink',
         ],
         'table' => [
             'ticket_number' => 'Ticket #',
