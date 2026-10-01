@@ -42,7 +42,12 @@ $translationNamespaces = ['common', 'system'];
 
         /* flex:1 (not a hardcoded 100vh-48px height) so a taller/wrapping header
            can't push the page off-screen — see the tickets/settings fix (#535). */
-        .companies-container { flex: 1; overflow-y: auto; padding: 30px 20px; }
+        /* 🔴 ...but flex:1 only means something inside a flex column. inbox.css
+           makes body 100vh + overflow:hidden and leaves it a block, so the
+           container grew to its content and the bottom of the page (public
+           email domains) was cut off with no way to scroll to it. */
+        body { display: flex; flex-direction: column; }
+        .companies-container { flex: 1; min-height: 0; overflow-y: auto; padding: 30px 20px; }
         .page-title { font-size: 22px; font-weight: 600; color: var(--text, #333); margin: 0 0 6px 0; }
         .page-subtitle { font-size: 13px; color: var(--text-dim, #888); margin: 0 0 30px 0; }
 

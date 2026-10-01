@@ -24,7 +24,12 @@ $translationNamespaces = ['common', 'tickets'];
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('tickets.triage.title')); ?></title>
     <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
     <style>
-        .triage-container { flex: 1; overflow-y: auto; padding: 30px 20px; }
+        /* 🔴 flex:1 only gives the container a height inside a flex column.
+           inbox.css makes body 100vh + overflow:hidden but leaves it a block, so
+           without this the container grew to its content and the bottom of a
+           long queue was cut off with no way to scroll to it. */
+        body { display: flex; flex-direction: column; }
+        .triage-container { flex: 1; min-height: 0; overflow-y: auto; padding: 30px 20px; }
         .page-title { font-size: 22px; font-weight: 600; color: #333; margin: 0 0 6px 0; }
         .page-subtitle { font-size: 13px; color: #888; margin: 0 0 24px 0; max-width: 760px; }
         .settings-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 24px; }
