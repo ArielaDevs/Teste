@@ -78,9 +78,13 @@ class TelegramProvider extends MessagingProvider
             'to'              => (string) ($this->channel['channel_ref'] ?? ''),
             'body'            => trim((string) ($message['text'] ?? ($message['caption'] ?? ''))),
             'profile_name'    => $name,
-            // Message ids are only unique per chat, not globally, so combine
-            // with the chat id for dedupe (see ingest.php's dedupe-by-id check).
-            'provider_msg_id' => 'tg:' . $chatId . ':' . $messageId,
+            // Message ids are only unique per (bot, chat), so the dedupe key
+            // carries all three. 🔴 PR #159 used chat + message id only - and a
+            // private chat id is the person's user id, the same on every bot,
+            // while each bot numbers its own chat from 1. So the first message
+            // a person sent to a SECOND bot matched the first one they sent to
+            // the first bot, and ingest.php dropped it as a "duplicate".
+            'provider_msg_id' => 'tg:' . (int) ($this->channel['id'] ?? 0) . ':' . $chatId . ':' . $messageId,
             'media'           => $this->extractMedia($message),
             'timestamp'       => isset($message['date']) ? (int) $message['date'] : null,
             // Telegram's own IETF language tag for this user's client (e.g.
@@ -104,6 +108,14 @@ class TelegramProvider extends MessagingProvider
             $entry['contact'] = [
                 'phone' => '+' . ltrim((string) $contact['phone_number'], '+'),
             ];
+        } elseif (is_array($contact) && $entry['body'] === '') {
+            // Somebody ELSE's contact card (a colleague's, say). Never identity -
+            // see above - but it IS what the customer sent, so keep it as text
+            // rather than letting ingest store "[empty message]" and lose it.
+            $who = trim(trim((string) ($contact['first_name'] ?? '')) . ' ' . trim((string) ($contact['last_name'] ?? '')));
+            $num = trim((string) ($contact['phone_number'] ?? ''));
+            $entry['body'] = '[Contact card: ' . ($who !== '' ? $who : 'no name')
+                           . ($num !== '' ? ', +' . ltrim($num, '+') : '') . ']';
         }
 
         return [$entry];

@@ -107,7 +107,7 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     // identifies it. In Slack the same person can have several unrelated threads
     // going at once — so the THREAD is the conversation, and matching on the
     // sender would pile every one of their questions onto a single ticket.
-    $ticketId  = findOpenChannelTicket($conn, $from, $channelType, $replyAddress);
+    $ticketId  = findOpenChannelTicket($conn, $from, $channelType, $replyAddress, (int) $channel['id']);
     $isInitial = $ticketId ? 0 : 1;
     $subject   = null;
 
@@ -243,20 +243,31 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
  *                    onto one ticket. $replyAddress is "C08HELP:1719500000.0001",
  *                    which is exactly the thread.
  */
-function findOpenChannelTicket(PDO $conn, string $from, string $channelType, string $replyAddress = ''): ?int
+function findOpenChannelTicket(PDO $conn, string $from, string $channelType, string $replyAddress = '', ?int $channelId = null): ?int
 {
     $byThread = ($channelType === 'slack' && $replyAddress !== '');
+    // 🔴 Telegram: the conversation is (bot, chat), never the chat alone. A chat
+    // id is the person's Telegram user id, the SAME on every bot, so without this
+    // a message to company B's bot threaded into the person's open ticket from
+    // company A's bot - another company's ticket. (WhatsApp is left exactly as it
+    // was: its sender rule predates this and is not part of the Telegram change.)
+    $byBot = ($channelType === 'telegram' && $channelId !== null);
 
     $sql = "SELECT t.id
             FROM tickets t
             JOIN emails e ON e.ticket_id = t.id
             WHERE e.channel = ? AND " . ($byThread ? "e.to_recipients = ?" : "e.from_address = ?") . "
+              " . ($byBot ? "AND e.channel_id = ?" : "") . "
               AND t.deleted_datetime IS NULL
               AND t.closed_datetime IS NULL
             ORDER BY t.updated_datetime DESC
             LIMIT 1";
     $stmt = $conn->prepare($sql);
-    $stmt->execute([$channelType, $byThread ? $replyAddress : $from]);
+    $params = [$channelType, $byThread ? $replyAddress : $from];
+    if ($byBot) {
+        $params[] = $channelId;
+    }
+    $stmt->execute($params);
     $id = $stmt->fetchColumn();
     return $id ? (int) $id : null;
 }
@@ -397,6 +408,7 @@ function messagingTelegramIsPlaceholder(PDO $conn, int $userId, string $chatId):
 function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $chatId, array $msg, string $profileName): array
 {
     $channelId = (int) $channel['id'];
+    $userId    = 0;
     // Telegram's language_code is the person's own app setting - the one signal
     // this early for which language the bot's own text should be in.
     $locale = messagingNormaliseLocale((string) ($msg['language_code'] ?? ''));
@@ -479,7 +491,7 @@ function messagingTelegramResolveIdentity(PDO $conn, array $channel, string $cha
 function messagingTelegramLinkPhone(PDO $conn, array $channel, string $chatId, int $linkedUserId, string $phone, string $locale = 'en', bool $isTest = false): array
 {
     $channelId    = (int) $channel['id'];
-    $openTicketId = findOpenChannelTicket($conn, $chatId, 'telegram', '');
+    $openTicketId = findOpenChannelTicket($conn, $chatId, 'telegram', '', $channelId);
 
     // Remember the number on the link whatever happens next - it is what the
     // person told us, and the audit entries below quote it.
