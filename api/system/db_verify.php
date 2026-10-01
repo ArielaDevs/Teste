@@ -1812,6 +1812,11 @@ try {
             'password_expiry_days'            => '0',
             'intune_company_id'                 => null,
             'asset_reconciliation_ignored_serials' => "TO BE FILLED BY O.E.M.\nDEFAULT STRING\nNONE\nSYSTEM SERIAL NUMBER\nNOT SPECIFIED\n123456789",
+            'asset_tag_autogen_enabled'          => '0',
+            'asset_tag_prefix'                   => 'AST-',
+            'asset_tag_suffix'                   => '',
+            'asset_tag_padding'                  => '5',
+            'asset_tag_initial_number'           => '1',
         ];
         // Secrets are seeded already encrypted. The whole block is best-effort: an
         // install that has no encryption key yet must still be able to build its

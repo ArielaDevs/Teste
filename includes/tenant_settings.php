@@ -32,9 +32,10 @@ require_once __DIR__ . '/tenancy.php';
  *
  * @param ?int $tenantId  null = ask the install-wide value only
  */
-function tenantSetting(PDO $conn, ?int $tenantId, string $key, ?string $default = null): ?string
+function tenantSetting(PDO $conn, ?int $tenantId, string $key, ?string $default = null, bool $clearCache = false): ?string
 {
     static $cache = [];
+    if ($clearCache) { $cache = []; }
     $ck = ($tenantId ?? 0) . '|' . $key;
     if (array_key_exists($ck, $cache)) return $cache[$ck];
 

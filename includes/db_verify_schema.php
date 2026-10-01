@@ -1686,6 +1686,14 @@ return [
         'updated_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
     ],
 
+    'asset_tag_sequences' => [
+        'id'                => 'INT NOT NULL AUTO_INCREMENT',
+        'tenant_id'         => 'INT NOT NULL DEFAULT 0',
+        'next_number'       => 'INT UNSIGNED NOT NULL DEFAULT 1',
+        'updated_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',
+    ],
+
     'assets' => [
         'id'                => 'INT NOT NULL AUTO_INCREMENT',
         'hostname'          => 'VARCHAR(50) NULL',

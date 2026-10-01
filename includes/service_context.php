@@ -67,6 +67,18 @@ final class ActorContext
     }
 
     /** Build from an authenticated API key row (API adapters). */
+    /** Build for automated / system actions (workflows, cron, CLI tests). */
+    public static function system(string $name = 'System'): self
+    {
+        return new self(
+            actorId:      0,
+            companyScope: null,
+            source:       'system',
+            locale:       'en',
+            actorName:    $name
+        );
+    }
+
     public static function fromApiKey(array $apiKey): self
     {
         return new self(

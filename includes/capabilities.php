@@ -80,6 +80,7 @@ final class Cap
     const ASSETS_VCENTER   = 'assets.vcenter';     // credentials
     const ASSETS_INTUNE    = 'assets.intune';      // credentials
     const ASSETS_RECONCILIATION = 'assets.reconciliation';
+    const ASSETS_TAGS           = 'assets.tags';
 
     // ---- Contracts ---------------------------------------------------------
     const CONTRACTS_MANAGE             = 'contracts.manage';              // umbrella

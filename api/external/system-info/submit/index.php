@@ -211,19 +211,25 @@ try {
     } else {
         $isNew = true;
 
+        require_once __DIR__ . '/../../../../includes/services/asset_tags.php';
+        $agentAssignedTag = null;
+        if (AssetTagsService::isAutogenEnabled($conn, $keyTenant)) {
+            $agentAssignedTag = AssetTagsService::generateNextAssetTag($conn, $keyTenant);
+        }
+
         $stmt = $conn->prepare("
             INSERT INTO assets (
                 hostname, manufacturer, model, memory, service_tag,
                 operating_system, feature_release, build_number, cpu_name, speed,
                 bios_version, first_seen, last_seen,
                 domain, logged_in_user, last_boot_utc,
-                tpm_version, bitlocker_status, gpu_name, tenant_id
+                tpm_version, bitlocker_status, gpu_name, tenant_id, asset_tag
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(),
                 ?, ?, ?,
-                ?, ?, ?, ?
+                ?, ?, ?, ?, ?
             )
         ");
         $stmt->execute([
@@ -244,7 +250,8 @@ try {
             $tpmVersion,
             $bitlockerStatus ? mb_substr($bitlockerStatus, 0, 20) : null,
             $gpuName,
-            $keyTenant
+            $keyTenant,
+            $agentAssignedTag
         ]);
 
         $hostId = (int)$conn->lastInsertId();

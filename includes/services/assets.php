@@ -141,6 +141,29 @@ class AssetsService
         $columns[] = 'tenant_id';
         $values[]  = $storeTenant;
 
+        // Asset tag auto-generation or manual assignment.
+        // Left blank + enabled -> mint sequentially; explicitly provided -> validate uniqueness.
+        require_once __DIR__ . '/asset_tags.php';
+        $assignedTag = null;
+        if (array_key_exists('asset_tag', $in) && trim((string)$in['asset_tag']) !== '') {
+            $manualTag = trim((string)$in['asset_tag']);
+            if (mb_strlen($manualTag) > 64) {
+                throw new ServiceError('validation', 'invalid_field', "'asset_tag' must be at most 64 characters.");
+            }
+            require_once __DIR__ . '/../asset_labels.php';
+            if (!assetTagAvailable($conn, $storeTenant, $manualTag)) {
+                throw new ServiceError('conflict', 'conflict', "Asset tag '{$manualTag}' is already in use by another asset in this company.");
+            }
+            $assignedTag = $manualTag;
+        } elseif (AssetTagsService::isAutogenEnabled($conn, $storeTenant)) {
+            $assignedTag = AssetTagsService::generateNextAssetTag($conn, $storeTenant);
+        }
+
+        if ($assignedTag !== null) {
+            $columns[] = 'asset_tag';
+            $values[]  = $assignedTag;
+        }
+
         // 🔑 first_seen ONLY. `last_seen` means "when did an agent last report
         // this machine", and nothing has ever reported a television, a SIM card
         // or a meeting-room monitor — the very things this path exists to add.
@@ -650,13 +673,11 @@ class AssetsService
 
     private static function auditWrite(PDO $conn, int $assetId, int $analystId, string $fieldKey, ?string $old, ?string $new): void
     {
+        $realAnalystId = ($analystId > 0) ? $analystId : null;
         $conn->prepare(
-            "INSERT INTO asset_history (asset_id, analyst_id, field_name, old_value, new_value, created_datetime)
-             VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())"
-        )->execute([$assetId, $analystId, $fieldKey, $old, $new]);
+            "INSERT INTO asset_history (asset_id, analyst_id, field_name, old_value, new_value, created_datetime) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())"
+        )->execute([$assetId, $realAnalystId, $fieldKey, $old, $new]);
     }
-
-    /** Validate a DATE field (YYYY-MM-DD); 422 naming the field. Null/'' clears. */
     private static function parseDate($value, string $field): ?string
     {
         if ($value === null || $value === '') {

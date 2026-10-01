@@ -130,8 +130,13 @@ try {
         $stmt->execute([$hostId]);
     } else {
         // Host does not exist -> insert (stamped with this key's company)
-        $stmt = $conn->prepare("INSERT INTO assets (hostname, tenant_id, first_seen, last_seen) VALUES (?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
-        $stmt->execute([$hostname, $keyTenant]);
+        require_once __DIR__ . '/../../../../includes/services/asset_tags.php';
+        $softAssignedTag = null;
+        if (AssetTagsService::isAutogenEnabled($conn, $keyTenant)) {
+            $softAssignedTag = AssetTagsService::generateNextAssetTag($conn, $keyTenant);
+        }
+        $stmt = $conn->prepare("INSERT INTO assets (hostname, tenant_id, asset_tag, first_seen, last_seen) VALUES (?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
+        $stmt->execute([$hostname, $keyTenant, $softAssignedTag]);
 
         // Re-select to get id (scoped to this key's company)
         $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ?");

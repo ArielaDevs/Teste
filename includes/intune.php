@@ -325,9 +325,10 @@ function intuneLinkDevicesToAssets(PDO $conn, ?int $companyId = null): array {
 
     $stubsCreated = 0;
     if ($unlinked) {
+        require_once __DIR__ . '/services/asset_tags.php';
         $insert = $conn->prepare(
-            "INSERT INTO assets (hostname, manufacturer, model, operating_system, service_tag, tenant_id, first_seen, last_seen)
-             VALUES (:hostname, :manufacturer, :model, :operating_system, :service_tag, :tenant_id, UTC_TIMESTAMP(), :last_seen)"
+            "INSERT INTO assets (hostname, manufacturer, model, operating_system, service_tag, asset_tag, tenant_id, first_seen, last_seen)
+             VALUES (:hostname, :manufacturer, :model, :operating_system, :service_tag, :asset_tag, :tenant_id, UTC_TIMESTAMP(), :last_seen)"
         );
         $linkOne = $conn->prepare("UPDATE intune_devices SET asset_id = :asset_id WHERE id = :id");
 
@@ -353,12 +354,17 @@ function intuneLinkDevicesToAssets(PDO $conn, ?int $companyId = null): array {
                 $linkOne->execute([':asset_id' => $res['asset_id'], ':id' => $row['id']]);
             } else {
                 // Tier 4: No reliable existing asset identified — create a new stub.
+                $assignedTag = null;
+                if (AssetTagsService::isAutogenEnabled($conn, $companyId)) {
+                    $assignedTag = AssetTagsService::generateNextAssetTag($conn, $companyId);
+                }
                 $insert->execute([
                     ':hostname'         => $hostname,
                     ':manufacturer'     => $row['manufacturer'] !== null ? substr((string)$row['manufacturer'], 0, 50) : null,
                     ':model'            => $row['model'] !== null ? substr((string)$row['model'], 0, 50) : null,
                     ':operating_system' => $row['operating_system'] !== null ? substr((string)$row['operating_system'], 0, 50) : null,
                     ':service_tag'      => $serialTag,
+                    ':asset_tag'        => $assignedTag,
                     ':tenant_id'        => $companyId,
                     ':last_seen'        => $row['last_sync_datetime'],
                 ]);
