@@ -396,6 +396,8 @@ return [
     ['checklist_template_items', 'idx_item_tpl', 'key', '(`template_id`)'],
     ['ticket_checklists', 'idx_chk_ticket', 'key', '(`ticket_id`)'],
     ['ticket_checklist_items', 'idx_item_ticket_chk', 'key', '(`ticket_checklist_id`)'],
+    ['task_checklists', 'idx_task_chk_task', 'key', '(`task_id`)'],
+    ['task_checklist_items', 'idx_item_task_chk', 'key', '(`task_checklist_id`)'],
     ['domain_registrar_accounts', 'idx_dra_tenant', 'key', '(`tenant_id`)'],
     ['domain_registrar_accounts', 'idx_dra_supplier', 'key', '(`supplier_id`)'],
     ['domains', 'idx_domains_tenant', 'key', '(`tenant_id`)'],

@@ -119,6 +119,27 @@ return [
         // The mark on a row in "My Tasks" that you are helping with rather than own.
         'involved_badge'       => 'Involved',
         'involved_badge_title' => 'You are involved in this task. {owner} owns it.',
+
+        // Checklists on a task (discussion #138) - only shown while
+        // Tasks → Settings → Checklists is switched on. "Standard" and
+        // "Critical" are the same words the Checklists module uses.
+        'checklist_heading'        => 'Checklist',
+        'checklist_none'           => 'No checklist on this task.',
+        'checklist_choose'         => 'Choose a checklist…',
+        'checklist_attach'         => 'Attach',
+        'checklist_no_templates'   => 'No checklists apply to tasks yet. In the Checklists module, set one to apply to Tasks or Both.',
+        'checklist_remove'         => 'Remove',
+        'checklist_remove_confirm' => 'Remove the checklist "{name}" from this task? Its ticked steps go with it.',
+        'checklist_progress'       => '{done} of {total} done',
+        'checklist_critical'       => 'Critical: the task cannot be completed until its mandatory steps are done',
+        'checklist_mandatory'      => 'Mandatory',
+        'checklist_value_needed'   => 'Enter a value before ticking this step.',
+        'checklist_value_placeholder' => 'Value',
+        'checklist_done_by'        => '{name}, {when}',
+        // Before completing: the first refuses (Critical), the second asks (Standard).
+        'checklist_block'          => "This task cannot be completed yet. Finish these mandatory checklist steps first:\n{list}",
+        'checklist_warn'           => "These mandatory checklist steps are not done:\n{list}\n\nComplete the task anyway? It will be recorded in the task's history.",
+        'checklist_failed'         => 'Could not update the checklist',
         'start_date'     => 'Start Date',
         'work_start'     => 'Work starts',
         'work_end'       => 'Work ends',
@@ -280,6 +301,13 @@ return [
         'involved_completion_name'  => 'Let each person tick off their own part',
         'involved_completion_desc'  => 'Everyone listed on a task gets a tick of their own, so you can see who has finished and who has not.',
         'involved_note'             => 'The owner still closes the task, whether or not everybody has ticked — the ticks show progress rather than granting a veto. Closing with people outstanding gives you a warning you can dismiss. Switching this off hides the ticks; it never deletes them.',
+        // Checklists on tasks (discussion #138).
+        'tab_checklists'            => 'Checklists',
+        'checklists_heading'        => 'Checklists on tasks',
+        'checklists_desc'           => 'Let people attach a checklist from the Checklists module to a task and tick its steps as they go - the same checklists tickets use, for work that follows a procedure.',
+        'checklists_enabled_name'   => 'Allow checklists on tasks',
+        'checklists_enabled_desc'   => 'Adds a Checklist section to every task and subtask. Only checklists set to apply to Tasks or Both can be attached.',
+        'checklists_note'           => 'A Standard checklist lets the task be completed with mandatory steps outstanding, and records who did it in the task\'s history. A Critical one stops the task being completed until those steps are done. Switching this off hides the section and stops enforcing it; it never deletes a checklist.',
         'add'            => 'Add',
         'loading'        => 'Loading...',
         'no_items'       => 'No items found',
@@ -573,6 +601,12 @@ return [
         'settings_calendar_span'     => '<strong>Spanning bar</strong> &mdash; the task is drawn as one continuous bar running from its start date to its due date, wrapping onto the next row at the end of each week. Bars stack into lanes so they never overlap. Best when seeing how long things take, and what overlaps, matters more than a tidy grid.',
         'settings_calendar_everyday' => '<strong>Every day</strong> &mdash; a chip is repeated in every single day cell the task covers. The most thorough &mdash; the task is impossible to miss on any given day &mdash; but a few long tasks can crowd the grid quickly.',
         'settings_calendar_note'     => 'Whichever mode you pick, a task that has <em>only</em> a due date (no start date) always shows as a single chip on that date &mdash; the modes only change how a genuine date <em>range</em> is drawn. The calendar itself shows the current mode in its toolbar, with a <strong>Change</strong> link straight back to this tab.',
+        // Checklists on tasks (discussion #138). Contains markup - echoed raw like its neighbours.
+        'settings_checklists_heading'  => 'Checklists',
+        'settings_checklists_body'     => 'Switch on <strong>Allow checklists on tasks</strong> and every task and subtask gains a <strong>Checklist</strong> section: attach any checklist from the Checklists module that is set to apply to <em>Tasks</em> or <em>Both</em>, then tick its steps as you go. A step that asks for a value cannot be ticked without one. It is off by default.',
+        'settings_checklists_standard' => '<strong>Standard</strong> checklist &mdash; you can still complete the task with mandatory steps outstanding. You are asked first, and the task\'s history records who completed it and which steps were skipped.',
+        'settings_checklists_critical' => '<strong>Critical</strong> checklist (padlock) &mdash; the task cannot be completed until its mandatory steps are done, whether from the status box, by dragging the card into a closed column, by ticking a subtask, or through the API.',
+        'settings_checklists_note'     => 'The company setting <strong>Block all</strong> under Tickets &rarr; Settings &rarr; Checklists applies to tasks too. A repeating task gives each new occurrence a fresh, unticked copy of its checklists. Switching this off hides the section and stops enforcing it; it never deletes a checklist.',
         'settings_tags_heading' => 'Tag options',
         'settings_tags_body'    => 'The Tags tab does two jobs. The top half is the <strong>tag list</strong> &mdash; add, edit, delete and recolour the tags your team can apply (each is simply a name and a colour). The bottom half, <strong>Display options</strong>, is five toggles that decide how tagging behaves and where tags surface:',
         'settings_tags_allow'    => '<strong>Allow new tags from a task</strong> (off by default) &mdash; the managed-vs-open switch. Off, the tag list is a fixed vocabulary: analysts can only pick existing tags, and new ones are added here in Settings &mdash; best for a governed set like Security or ISO. On, the tag picker on a task also lets an analyst type and create a brand-new tag on the spot.',

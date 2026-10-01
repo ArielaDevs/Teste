@@ -391,4 +391,373 @@ class ChecklistsService
             throw new ServiceError('not_found', 'not_found', $label . ' not found.');
         }
     }
+
+    // ======================================================================
+    //  Checklists on TASKS (discussion #138, round three)
+    //
+    //  Sandy asked whether checklists should reach Tasks, and thought probably
+    //  not: subtasks already split work between people with due dates, and two
+    //  similar things side by side invite teams to use them interchangeably.
+    //  Ed's answer was to build it behind a switch - Tasks → Settings →
+    //  Checklists, OFF by default, the same shape as time recording - so a team
+    //  that would be confused by both simply never sees it.
+    //
+    //  🔑 The rules are the TICKET rules, not new ones, so the two cannot drift:
+    //   - a checklist is a COPY of the template's steps, taken when attached;
+    //   - Standard (warn) records who completed the task with steps outstanding,
+    //     Critical (block) refuses - resolved by effectiveClosureMode(), so the
+    //     company's "block all" setting reaches tasks too (a zero-tolerance
+    //     company that blocked tickets but let tasks through would have a gap);
+    //   - the gate is enforced HERE, called from every path that completes a
+    //     task (TasksService::updateTask / moveTask, reorder.php,
+    //     toggle_subtask.php), never in the browser alone.
+    //
+    //  ⚠️ What tasks deliberately do NOT get: the "no checklist attached" rule.
+    //  On tickets it is a default-off switch for procedure-led desks; on tasks it
+    //  would gate every to-do on the board, which nobody would want.
+    //
+    //  🔴 Switched OFF means OFF: nothing shown and NOTHING ENFORCED, even where
+    //  checklists were attached while it was on. A rule the admin has turned off
+    //  must not keep refusing completions from behind a section nobody can see.
+    // ======================================================================
+
+    /** Is Tasks → Settings → Checklists switched on? Off by default; safe before DB Verification. */
+    public static function tasksEnabled(PDO $conn): bool
+    {
+        try {
+            $st = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'tasks_checklists_enabled'");
+            $st->execute();
+            return (string)$st->fetchColumn() === '1';
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    /** The task's company for the gate (NULL = the Default company, read as the install default). */
+    public static function taskTenantId(PDO $conn, int $taskId): ?int
+    {
+        try {
+            $st = $conn->prepare("SELECT tenant_id FROM tasks WHERE id = ?");
+            $st->execute([$taskId]);
+            $v = $st->fetchColumn();
+            return ($v === false || $v === null) ? null : (int)$v;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * The task's checklists with their steps and progress, each carrying the
+     * gate it will ACTUALLY apply (template mode + company setting), resolved
+     * here so the padlock in the panel is the lock the server enforces.
+     */
+    public static function taskChecklists(PDO $conn, int $taskId): array
+    {
+        $tenantId = self::taskTenantId($conn, $taskId);
+        $st = $conn->prepare("SELECT id, template_id, title, closure_mode, created_datetime
+                                FROM task_checklists WHERE task_id = ? ORDER BY id ASC");
+        $st->execute([$taskId]);
+        $lists = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $items = $conn->prepare("SELECT id, title, suggested_role, is_mandatory, requires_input, input_placeholder,
+                                        response_value, is_completed, completed_by_id, completed_by_name, completed_datetime
+                                   FROM task_checklist_items WHERE task_checklist_id = ?
+                                  ORDER BY sort_order ASC, id ASC");
+        foreach ($lists as &$l) {
+            $l['closure_mode'] = $l['closure_mode'] ?: 'warn';
+            $l['effective_closure_mode'] = self::effectiveClosureMode($conn, $l['closure_mode'], $tenantId);
+            $items->execute([(int)$l['id']]);
+            $l['items'] = $items->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $done = count(array_filter($l['items'], fn($i) => !empty($i['is_completed'])));
+            $l['total_items'] = count($l['items']);
+            $l['completed_items'] = $done;
+            $l['percent'] = $l['total_items'] > 0 ? (int)round($done / $l['total_items'] * 100) : 0;
+        }
+        unset($l);
+        return $lists;
+    }
+
+    /** Templates offered for a task: scope task or both, active, with the gate each would apply. */
+    public static function templatesForTask(PDO $conn, int $taskId): array
+    {
+        $tenantId = self::taskTenantId($conn, $taskId);
+        $rows = $conn->query("SELECT id, title, category, description, closure_mode FROM checklist_templates
+                               WHERE scope IN ('task','both') AND (is_active = 1 OR is_active IS NULL)
+                               ORDER BY category ASC, title ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$r) {
+            $r['closure_mode'] = $r['closure_mode'] ?: 'warn';
+            $r['effective_closure_mode'] = self::effectiveClosureMode($conn, $r['closure_mode'], $tenantId);
+        }
+        unset($r);
+        return $rows;
+    }
+
+    /**
+     * Attach a template to a task: copy its title, gate and steps. Returns the new id.
+     *
+     * The copy is the point, exactly as on a ticket: rewriting a procedure must
+     * not change a task already half-way through it.
+     */
+    public static function attachTemplateToTask(PDO $conn, ActorContext $ctx, int $taskId, int $templateId): int
+    {
+        $tpl = $conn->prepare("SELECT title, closure_mode, scope FROM checklist_templates WHERE id = ?");
+        $tpl->execute([$templateId]);
+        $t = $tpl->fetch(PDO::FETCH_ASSOC);
+        if (!$t) {
+            throw new ServiceError('not_found', 'not_found', 'Checklist not found.');
+        }
+        if (!in_array((string)$t['scope'], ['task', 'both'], true)) {
+            throw new ServiceError('validation', 'invalid_field', 'That checklist is for tickets only.');
+        }
+        return self::copyTemplateToTask($conn, $taskId, $templateId, (string)$t['title'],
+            (string)$t['closure_mode'], $ctx->actorId > 0 ? $ctx->actorId : null);
+    }
+
+    /** The one place a task checklist is written: parent, then its steps, in one transaction. */
+    private static function copyTemplateToTask(PDO $conn, int $taskId, int $templateId, string $title,
+                                               string $closureMode, ?int $createdBy): int
+    {
+        $own = !$conn->inTransaction();
+        if ($own) $conn->beginTransaction();
+        try {
+            $conn->prepare("INSERT INTO task_checklists (task_id, template_id, title, closure_mode, created_by_id, created_datetime)
+                            VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())")
+                 ->execute([$taskId, $templateId, $title, $closureMode === 'block' ? 'block' : 'warn', $createdBy]);
+            $chkId = (int)$conn->lastInsertId();
+
+            $steps = $conn->prepare("SELECT title, suggested_role, is_mandatory, requires_input, input_placeholder, sort_order
+                                       FROM checklist_template_items WHERE template_id = ? ORDER BY sort_order ASC, id ASC");
+            $steps->execute([$templateId]);
+            $ins = $conn->prepare("INSERT INTO task_checklist_items
+                                     (task_checklist_id, title, suggested_role, is_mandatory, requires_input, input_placeholder, sort_order)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?)");
+            foreach ($steps->fetchAll(PDO::FETCH_ASSOC) as $i => $s) {
+                $ins->execute([$chkId, $s['title'], $s['suggested_role'] ?: null, !empty($s['is_mandatory']) ? 1 : 0,
+                               !empty($s['requires_input']) ? 1 : 0, $s['input_placeholder'] ?: null,
+                               $s['sort_order'] ?? ($i + 1)]);
+            }
+            if ($own) $conn->commit();
+            return $chkId;
+        } catch (Throwable $e) {
+            if ($own && $conn->inTransaction()) $conn->rollBack();
+            throw $e;
+        }
+    }
+
+    /** Which task does this step / checklist belong to? 0 if neither exists. Callers gate on the task. */
+    public static function taskIdForItem(PDO $conn, int $itemId): int
+    {
+        $st = $conn->prepare("SELECT c.task_id FROM task_checklist_items i
+                                JOIN task_checklists c ON c.id = i.task_checklist_id WHERE i.id = ?");
+        $st->execute([$itemId]);
+        return (int)($st->fetchColumn() ?: 0);
+    }
+    public static function taskIdForChecklist(PDO $conn, int $checklistId): int
+    {
+        $st = $conn->prepare("SELECT task_id FROM task_checklists WHERE id = ?");
+        $st->execute([$checklistId]);
+        return (int)($st->fetchColumn() ?: 0);
+    }
+
+    /**
+     * Tick or untick a step. A step that asks for a value cannot be ticked
+     * without one - enforced here, not only in the panel, because a tick with an
+     * empty answer is a record that says something was checked when it was not.
+     *
+     * UTC at rest (GH #126). Returns the stored row.
+     */
+    public static function toggleTaskItem(PDO $conn, ActorContext $ctx, int $itemId, bool $completed, ?string $value): array
+    {
+        $st = $conn->prepare("SELECT requires_input FROM task_checklist_items WHERE id = ?");
+        $st->execute([$itemId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            throw new ServiceError('not_found', 'not_found', 'Step not found.');
+        }
+        // A value is only kept on a step that asks for one - a stray value on a
+        // plain tick would show up as an answer to a question nobody asked.
+        $value = ((int)$row['requires_input'] === 1 && $value !== null) ? trim($value) : null;
+        if ($completed && (int)$row['requires_input'] === 1 && ($value === null || $value === '')) {
+            throw new ServiceError('validation', 'missing_field', 'This step needs a value before it can be ticked.');
+        }
+        if ($completed) {
+            $conn->prepare("UPDATE task_checklist_items
+                               SET is_completed = 1, response_value = ?, completed_by_id = ?,
+                                   completed_by_name = ?, completed_datetime = UTC_TIMESTAMP()
+                             WHERE id = ?")
+                 ->execute([$value !== '' ? $value : null, $ctx->actorId > 0 ? $ctx->actorId : null,
+                            $ctx->actorName !== '' ? $ctx->actorName : null, $itemId]);
+        } else {
+            $conn->prepare("UPDATE task_checklist_items
+                               SET is_completed = 0, response_value = NULL, completed_by_id = NULL,
+                                   completed_by_name = NULL, completed_datetime = NULL
+                             WHERE id = ?")
+                 ->execute([$itemId]);
+        }
+        $back = $conn->prepare("SELECT id, is_completed, response_value, completed_by_id, completed_by_name, completed_datetime
+                                  FROM task_checklist_items WHERE id = ?");
+        $back->execute([$itemId]);
+        return $back->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** Remove one checklist from a task: its steps first (no FK to rely on), then it. */
+    public static function removeTaskChecklist(PDO $conn, int $checklistId): void
+    {
+        $own = !$conn->inTransaction();
+        if ($own) $conn->beginTransaction();
+        try {
+            $conn->prepare("DELETE FROM task_checklist_items WHERE task_checklist_id = ?")->execute([$checklistId]);
+            $conn->prepare("DELETE FROM task_checklists WHERE id = ?")->execute([$checklistId]);
+            if ($own) $conn->commit();
+        } catch (Throwable $e) {
+            if ($own && $conn->inTransaction()) $conn->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Remove every checklist from these tasks - for TasksService::deleteTask,
+     * which deletes a whole subtask tree. Children explicitly, then parents;
+     * tolerant of the tables not existing yet.
+     *
+     * @param int[] $taskIds
+     */
+    public static function deleteForTasks(PDO $conn, array $taskIds): void
+    {
+        $taskIds = array_values(array_filter(array_map('intval', $taskIds)));
+        if (!$taskIds) return;
+        $in = implode(',', array_fill(0, count($taskIds), '?'));
+        try {
+            $conn->prepare("DELETE i FROM task_checklist_items i
+                              JOIN task_checklists c ON c.id = i.task_checklist_id
+                             WHERE c.task_id IN ($in)")->execute($taskIds);
+            $conn->prepare("DELETE FROM task_checklists WHERE task_id IN ($in)")->execute($taskIds);
+        } catch (Throwable $e) {
+            // tables not there yet on a part-upgraded install: nothing to remove
+        }
+    }
+
+    /** Mandatory steps still outstanding on a task (same shape as the ticket version). */
+    public static function taskOutstandingMandatorySteps(PDO $conn, int $taskId): array
+    {
+        if ($taskId <= 0) return [];
+        try {
+            $st = $conn->prepare(
+                "SELECT i.id AS item_id, i.title AS step, c.title AS checklist, c.closure_mode
+                   FROM task_checklist_items i
+                   JOIN task_checklists c ON c.id = i.task_checklist_id
+                  WHERE c.task_id = ? AND i.is_mandatory = 1 AND i.is_completed = 0
+                  ORDER BY c.id ASC, i.sort_order ASC, i.id ASC"
+            );
+            $st->execute([$taskId]);
+            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            return [];   // tables not created yet: completing a task must not start failing
+        }
+    }
+
+    /**
+     * What completing this task now would run into - for the panel and the
+     * board to warn BEFORE they post. Read-only; the server still decides.
+     *
+     * @return array{blocking: array<string,string[]>, warning: array<string,string[]>}
+     */
+    public static function taskCompletionCheck(PDO $conn, int $taskId): array
+    {
+        $out = ['blocking' => [], 'warning' => []];
+        if (!self::tasksEnabled($conn)) return $out;
+        $tenantId = self::taskTenantId($conn, $taskId);
+        foreach (self::taskOutstandingMandatorySteps($conn, $taskId) as $r) {
+            $name = $r['checklist'] !== '' ? $r['checklist'] : 'Checklist';
+            $mode = self::effectiveClosureMode($conn, (string)($r['closure_mode'] ?? 'warn'), $tenantId);
+            $out[$mode === 'block' ? 'blocking' : 'warning'][$name][] = $r['step'];
+        }
+        return $out;
+    }
+
+    /**
+     * Refuse completing the task where a Critical checklist has steps outstanding.
+     *
+     * 🔴 MUST be called BEFORE the status is written - see assertClosureAllowed().
+     * Called from every path that completes a task; a new one must call it too.
+     */
+    public static function assertTaskCompletionAllowed(PDO $conn, int $taskId): void
+    {
+        $check = self::taskCompletionCheck($conn, $taskId);
+        if (!$check['blocking']) return;
+        $parts = [];
+        foreach ($check['blocking'] as $checklist => $steps) {
+            $parts[] = $checklist . ' (' . implode(', ', $steps) . ')';
+        }
+        throw new ServiceError('validation', 'mandatory_steps_outstanding',
+            'This task cannot be completed until its mandatory checklist steps are done: ' . implode('; ', $parts));
+    }
+
+    /**
+     * Called AFTER a task has moved to a closed status: record any Standard
+     * checklist steps it was completed without, on the task's own audit trail.
+     *
+     * task_audit, not a comment: its analyst_id is nullable, so a workflow or
+     * an API key with no analyst behind it is recorded honestly as nobody,
+     * instead of being stamped with a colleague's name (the round-two lesson,
+     * see writeClosureNote()).
+     */
+    public static function recordTaskCompletionOverride(PDO $conn, ActorContext $ctx, int $taskId): void
+    {
+        if (!self::tasksEnabled($conn)) return;
+        $outstanding = self::taskOutstandingMandatorySteps($conn, $taskId);
+        if (!$outstanding) return;
+        $list = implode('; ', array_map(fn($r) => $r['checklist'] . ' - ' . $r['step'], $outstanding));
+        $note = count($outstanding) . ' mandatory checklist step(s) outstanding: ' . $list . '. ' . self::closedBy($ctx);
+        try {
+            $conn->prepare("INSERT INTO task_audit (task_id, analyst_id, field_name, old_value, new_value, source, created_datetime)
+                            VALUES (?, ?, 'Completed with checklist steps outstanding', NULL, ?, ?, UTC_TIMESTAMP())")
+                 ->execute([$taskId, $ctx->actorId > 0 ? $ctx->actorId : null, mb_substr($note, 0, 500),
+                            // 'app' for the web interface, as the rest of task_audit writes it.
+                            $ctx->source === 'ui' ? 'app' : substr($ctx->source, 0, 20)]);
+        } catch (Throwable $e) {
+            error_log('[checklists] could not record task completion override for task ' . $taskId . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Give a new occurrence of a recurring task fresh, unticked copies of the
+     * checklists the finished one had (TaskRecurrence::createOccurrence).
+     *
+     * Re-copied from the TEMPLATE where it still exists, so a monthly check
+     * picks up this month's version of the procedure; a checklist whose template
+     * has since been deleted is copied from the finished task's own steps
+     * instead, rather than silently vanishing from the series.
+     */
+    public static function copyTaskChecklists(PDO $conn, int $fromTaskId, int $toTaskId): void
+    {
+        if (!self::tasksEnabled($conn)) return;
+        try {
+            $src = $conn->prepare("SELECT c.id, c.template_id, c.title, c.closure_mode, c.created_by_id,
+                                          t.id AS tpl_exists, t.title AS tpl_title, t.closure_mode AS tpl_mode
+                                     FROM task_checklists c
+                                     LEFT JOIN checklist_templates t ON t.id = c.template_id
+                                    WHERE c.task_id = ? ORDER BY c.id ASC");
+            $src->execute([$fromTaskId]);
+            foreach ($src->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                if ($c['tpl_exists']) {
+                    self::copyTemplateToTask($conn, $toTaskId, (int)$c['template_id'], (string)$c['tpl_title'],
+                        (string)$c['tpl_mode'], $c['created_by_id'] !== null ? (int)$c['created_by_id'] : null);
+                    continue;
+                }
+                $conn->prepare("INSERT INTO task_checklists (task_id, template_id, title, closure_mode, created_by_id, created_datetime)
+                                VALUES (?, NULL, ?, ?, ?, UTC_TIMESTAMP())")
+                     ->execute([$toTaskId, $c['title'], $c['closure_mode'] ?: 'warn', $c['created_by_id']]);
+                $newId = (int)$conn->lastInsertId();
+                $conn->prepare("INSERT INTO task_checklist_items
+                                  (task_checklist_id, title, suggested_role, is_mandatory, requires_input, input_placeholder, sort_order)
+                                SELECT ?, title, suggested_role, is_mandatory, requires_input, input_placeholder, sort_order
+                                  FROM task_checklist_items WHERE task_checklist_id = ?")
+                     ->execute([$newId, (int)$c['id']]);
+            }
+        } catch (Throwable $e) {
+            // A recurrence must still be created if this fails.
+            error_log('[checklists] could not copy checklists to recurring task ' . $toTaskId . ': ' . $e->getMessage());
+        }
+    }
 }

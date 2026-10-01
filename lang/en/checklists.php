@@ -33,6 +33,8 @@ return [
         'applies_both'      => 'Tickets and tasks',
         'applies_ticket'    => 'Tickets only',
         'applies_task'      => 'Tasks only',
+        // Shown under "Applies to" while Tasks → Settings → Checklists is off (discussion #138).
+        'tasks_off_hint'    => 'Checklists on tasks are switched off. Until an administrator turns them on in Tasks → Settings → Checklists, this only reaches tickets.',
         'closure_mode'      => 'Closure gate',
         'closure_mode_desc' => 'How outstanding mandatory steps behave when a ticket moves to a closed status.',
         'closure_warn'      => 'Standard (Warn & record override)',
@@ -180,6 +182,8 @@ return [
         'building_step1'   => '<strong>Title</strong> - what the checklist is, as somebody searching would say it. <em>New starter onboarding</em>, not <em>Process 4b</em>.',
         'building_step2'   => '<strong>Category</strong> - groups templates on the list and colours their pill. Categories are yours to define, in <strong>Settings &rarr; Categories</strong>.',
         'building_step3'   => '<strong>Applies to</strong> - whether the checklist is offered on tickets, on tasks, or on both.',
+        // A separate key so the translated step above keeps its meaning (discussion #138).
+        'building_step3_tasks' => 'Tasks only offer checklists once an administrator switches them on in <strong>Tasks &rarr; Settings &rarr; Checklists</strong>; there, Standard and Critical work exactly as they do on tickets.',
         'building_step4'   => '<strong>Description</strong> - when and why to use this one. This is what somebody reads when deciding between two similar checklists, so it earns its place.',
         'building_step5'   => '<strong>Keywords</strong> - comma separated, and the reason a checklist finds its own ticket. A VPN checklist tagged <code>vpn, remote access, token</code> is offered on a ticket about any of them.',
         'building_step6'   => '<strong>Closure gate</strong> - choose how mandatory steps behave when a ticket is closed: <em>Standard</em> (warns the analyst and records an audit note if overridden) or <em>Critical</em> (strictly blocks ticket closure until completed).',

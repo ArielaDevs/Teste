@@ -7074,6 +7074,48 @@ CREATE TABLE IF NOT EXISTS `ticket_checklist_items` (
     CONSTRAINT `fk_ticket_chk_items_chk` FOREIGN KEY (`ticket_checklist_id`) REFERENCES `ticket_checklists` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Checklists on TASKS (discussion #138, round three). The same two shapes as
+-- ticket_checklists / ticket_checklist_items, keyed on a task: attaching a
+-- checklist copies the template's steps, exactly as it does on a ticket, so
+-- editing a template later never changes work already in progress. Only used
+-- while Tasks → Settings → Checklists is switched on (tasks_checklists_enabled).
+-- ⚠️ The code deletes children itself (ChecklistsService) - a table grown by
+-- Database Verification has no foreign keys, so the CASCADEs below cannot be
+-- relied on everywhere.
+CREATE TABLE IF NOT EXISTS `task_checklists` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `task_id` INT NOT NULL,
+    `template_id` INT NULL,
+    `title` VARCHAR(255) NOT NULL,
+    `closure_mode` ENUM('warn','block') NOT NULL DEFAULT 'warn',
+    `created_by_id` INT NULL,
+    `created_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `is_demo` tinyint(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_task_chk_task` (`task_id`),
+    CONSTRAINT `fk_task_checklists_task` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `task_checklist_items` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `task_checklist_id` INT NOT NULL,
+    `title` VARCHAR(255) NOT NULL,
+    `suggested_role` VARCHAR(100) NULL,
+    `is_mandatory` TINYINT(1) NOT NULL DEFAULT 1,
+    `is_completed` TINYINT(1) NOT NULL DEFAULT 0,
+    `completed_by_id` INT NULL,
+    `completed_by_name` VARCHAR(150) NULL,
+    `completed_datetime` DATETIME NULL,
+    `requires_input` TINYINT(1) NOT NULL DEFAULT 0,
+    `input_placeholder` VARCHAR(255) NULL,
+    `response_value` TEXT NULL,
+    `sort_order` INT NOT NULL DEFAULT 1,
+    `is_demo` tinyint(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_item_task_chk` (`task_checklist_id`),
+    CONSTRAINT `fk_task_chk_items_chk` FOREIGN KEY (`task_checklist_id`) REFERENCES `task_checklists` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ----------------------------------------------------------
 -- Domains module (GitHub #154)
 -- ----------------------------------------------------------

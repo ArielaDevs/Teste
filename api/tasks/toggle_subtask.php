@@ -7,6 +7,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/tenancy.php';
+require_once '../../includes/services/checklists.php';   // completion gate (discussion #138)
 
 header('Content-Type: application/json');
 
@@ -94,6 +95,18 @@ try {
     // column with UTC_TIMESTAMP(), so the value depended on which route closed it.
     $completedSql = $newStatusRow['is_closed'] ? 'UTC_TIMESTAMP()' : 'NULL';
 
+    // 🔴 Checklist gate (discussion #138), before the write: ticking a subtask
+    // done is completing it, and a subtask can carry its own checklist.
+    $completing = !empty($newStatusRow['is_closed']) && empty($task['status_is_closed']);
+    if ($completing) {
+        try {
+            ChecklistsService::assertTaskCompletionAllowed($conn, $id);
+        } catch (ServiceError $se) {
+            echo json_encode(['success' => false, 'error' => $se->getMessage(), 'code' => $se->errorCode]);
+            exit;
+        }
+    }
+
     $stmt = $conn->prepare(
         "UPDATE tasks SET status_id = ?, completed_datetime = {$completedSql},
                           updated_datetime = UTC_TIMESTAMP()
@@ -101,6 +114,9 @@ try {
     );
     $stmt->execute([$newStatusId, $id]);
     $newStatus = $newStatusRow['name'];
+    if ($completing) {
+        ChecklistsService::recordTaskCompletionOverride($conn, ActorContext::fromSession($conn), $id);
+    }
 
     // Update parent's updated_datetime
     if ($task['parent_task_id']) {

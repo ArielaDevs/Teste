@@ -20,8 +20,39 @@ if (!isset($_SESSION["analyst_id"])) {
     exit;
 }
 
+require_once __DIR__ . "/../../includes/tenancy.php";
+requireModuleAccessJson('tickets');
+
 $analystId = (int)$_SESSION["analyst_id"];
 $analystName = $_SESSION["analyst_name"] ?? ($_SESSION["username"] ?? "Analyst");
+
+/**
+ * 🔒 Refuse unless this analyst can reach the ticket. Found while building the
+ * task twin of this endpoint (discussion #138): NOTHING here checked company -
+ * or even Tickets module access - so any signed-in analyst could read, attach
+ * to, tick and remove checklists on another company's ticket by number. The
+ * step and checklist actions are addressed by a CHILD id, so they resolve it to
+ * its ticket first and gate on that; a child id with no gate of its own is the
+ * classic way scoped data leaks. "Not found", never "not yours".
+ */
+function checklistTicketGate(PDO $conn, int $ticketId): void
+{
+    if ($ticketId <= 0 || !analystCanAccessTicket($conn, (int) $_SESSION["analyst_id"], $ticketId)) {
+        throw new Exception("Ticket not found");
+    }
+}
+function checklistTicketForItem(PDO $conn, int $itemId): int
+{
+    $st = $conn->prepare("SELECT c.ticket_id FROM ticket_checklist_items i JOIN ticket_checklists c ON c.id = i.ticket_checklist_id WHERE i.id = ?");
+    $st->execute([$itemId]);
+    return (int) ($st->fetchColumn() ?: 0);
+}
+function checklistTicketForChecklist(PDO $conn, int $checklistId): int
+{
+    $st = $conn->prepare("SELECT ticket_id FROM ticket_checklists WHERE id = ?");
+    $st->execute([$checklistId]);
+    return (int) ($st->fetchColumn() ?: 0);
+}
 $action = $_GET["action"] ?? ($_POST["action"] ?? "");
 
 if (!$action) {
@@ -40,6 +71,7 @@ try {
         case "get_ticket_checklists":
             $ticketId = (int)($_GET["ticket_id"] ?? 0);
             if ($ticketId <= 0) throw new Exception("ticket_id is required");
+            checklistTicketGate($conn, $ticketId);
 
             // 🔴 These used to read COALESCE(created_datetime, created_at). `created_at`
             // is not created by the module bootstrap, by database/freeitsm.sql, or by
@@ -101,6 +133,7 @@ try {
         case "suggest_template":
             $ticketId = (int)($_GET["ticket_id"] ?? 0);
             if ($ticketId <= 0) throw new Exception("ticket_id required");
+            checklistTicketGate($conn, $ticketId);
 
             $tStmt = $conn->prepare("SELECT id, subject FROM tickets WHERE id = ? LIMIT 1");
             $tStmt->execute([$ticketId]);
@@ -175,6 +208,7 @@ try {
             $ticketId = (int)($_GET["ticket_id"] ?? $_POST["ticket_id"] ?? 0);
             // Same company as the gate itself will use, so the padlock in the
             // attach dialogue promises what the close will actually do.
+            if ($ticketId > 0) checklistTicketGate($conn, $ticketId);
             $ticketTenantId = $ticketId > 0 ? ticketTenantId($conn, $ticketId) : null;
 
             $stmt = $conn->query("SELECT id, title, category, description, keywords, closure_mode FROM checklist_templates WHERE scope IN ('ticket', 'both') AND (is_active = 1 OR is_active IS NULL) ORDER BY category ASC, title ASC");
@@ -194,6 +228,7 @@ try {
             $ticketId = (int)($_POST["ticket_id"] ?? 0);
             $templateId = (int)($_POST["template_id"] ?? 0);
             if ($ticketId <= 0 || $templateId <= 0) throw new Exception("ticket_id and template_id required");
+            checklistTicketGate($conn, $ticketId);
 
             $tplStmt = $conn->prepare("SELECT title, closure_mode FROM checklist_templates WHERE id = ?");
             $tplStmt->execute([$templateId]);
@@ -231,6 +266,7 @@ try {
             $responseValue = isset($_POST["response_value"]) ? trim((string)$_POST["response_value"]) : null;
 
             if ($itemId <= 0) throw new Exception("item_id is required");
+            checklistTicketGate($conn, checklistTicketForItem($conn, $itemId));
 
             // 🔴 UTC at rest (GH #126). date() renders the SERVER's wall clock, so a
             // step ticked at 09:00 in London was stored as 09:00 and then displayed
@@ -275,6 +311,7 @@ try {
         case "remove_checklist":
             $chkId = (int)($_POST["checklist_id"] ?? 0);
             if ($chkId <= 0) throw new Exception("checklist_id is required");
+            checklistTicketGate($conn, checklistTicketForChecklist($conn, $chkId));
 
             // 🔴 Remove the children EXPLICITLY. There is no foreign key on
             // ticket_checklist_items.ticket_checklist_id - none of the three schema

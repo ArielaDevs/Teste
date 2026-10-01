@@ -41,6 +41,7 @@
 
 require_once __DIR__ . '/../service_context.php';
 require_once __DIR__ . '/../tenancy.php';                       // isMultiTenant / getDefaultTenantId for ticket scope
+require_once __DIR__ . '/checklists.php';                        // the checklist completion gate (discussion #138)
 require_once dirname(__DIR__, 2) . '/workflow/includes/engine.php';
 
 class TasksService
@@ -185,6 +186,12 @@ class TasksService
             $args[]    = $status[0];
             $statusChanged = true;
             if ($status[2]) {
+                // 🔴 Checklist gate BEFORE the write (discussion #138): a Critical
+                // checklist with steps outstanding refuses; a Standard one is
+                // recorded after the write, below.
+                if (!$wasClosed) {
+                    ChecklistsService::assertTaskCompletionAllowed($conn, $taskId);
+                }
                 $updates[] = 'completed_datetime = COALESCE(completed_datetime, UTC_TIMESTAMP())';
                 $firesCompleted = !$wasClosed;
             } else {
@@ -308,6 +315,7 @@ class TasksService
         }
 
         if ($firesCompleted) {
+            ChecklistsService::recordTaskCompletionOverride($conn, $ctx, $taskId);
             self::completedDispatch($conn, $taskId);
             self::recurrenceOnClosed($conn, $taskId);
         }
@@ -348,6 +356,12 @@ class TasksService
             ? max(0, (int)$in['position'])
             : null; // null = end of column
 
+        // Checklist gate (discussion #138) - before the write, like updateTask.
+        $completing = $targetIsClosed && !(bool)$current['status_is_closed'];
+        if ($completing) {
+            ChecklistsService::assertTaskCompletionAllowed($conn, $taskId);
+        }
+
         $conn->beginTransaction();
         try {
             $conn->prepare(
@@ -384,7 +398,8 @@ class TasksService
         // would give a task that repeats when you tick it and silently does not
         // when you drag it. Outside the transaction: the move is committed and
         // must stand whatever the recurrence does.
-        if ($targetIsClosed && !(bool)$current['status_is_closed']) {
+        if ($completing) {
+            ChecklistsService::recordTaskCompletionOverride($conn, $ctx, $taskId);
             self::recurrenceOnClosed($conn, $taskId);
         }
         // Completing by DRAGGING must take the calendar entry away too, exactly
@@ -461,6 +476,9 @@ class TasksService
         $ph = implode(',', array_fill(0, count($ids), '?'));
         $conn->prepare("DELETE FROM task_comments WHERE task_id IN ($ph)")->execute($ids);
         $conn->prepare("DELETE FROM task_tag_map WHERE task_id IN ($ph)")->execute($ids);
+        // Their checklists too (discussion #138) - whether or not the feature is
+        // switched on now, or the rows are stranded pointing at deleted tasks.
+        ChecklistsService::deleteForTasks($conn, $ids);
         foreach (array_reverse($ids) as $id) {
             $conn->prepare("DELETE FROM tasks WHERE id = ?")->execute([$id]);
         }

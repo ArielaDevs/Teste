@@ -45,6 +45,12 @@ try {
     if (!isset($settings['collaborator_completion'])) {
         $settings['collaborator_completion'] = '0';
     }
+    // Checklists on tasks (discussion #138). OFF by default, for the same reason
+    // as the per-person tick: it adds procedure to a module some teams use as a
+    // simple to-do board.
+    if (!isset($settings['checklists_enabled'])) {
+        $settings['checklists_enabled'] = '0';
+    }
 
     // card_fields — which extras show on board cards. Stored as JSON;
     // always returned as a complete object so callers needn't merge defaults.

@@ -497,7 +497,7 @@ async function logStepNote(ticketId, checklistTitle, stepTitle, completed, respo
     }
 
     try {
-        await fetch("/api/tickets/save_note.php", {
+        await fetch((window.API_BASE || "../api/tickets/") + "save_note.php", {   // was root-absolute: broke on a subfolder install
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -765,7 +765,7 @@ window.dismissedSuggestions = window.dismissedSuggestions || {};
 async function checkAndShowSopSuggestion(ticketId) {
     if (window.dismissedSuggestions[ticketId]) return;
     try {
-        const res = await fetch(`/api/tickets/ticket_checklists.php?action=suggest_template&ticket_id=${ticketId}`);
+        const res = await fetch(CHK_API + `?action=suggest_template&ticket_id=${ticketId}`);   // was root-absolute: broke on a subfolder install
         const data = await res.json();
         const hostDiv = document.getElementById(`sopEmptyStateHost_${ticketId}`);
         if (!hostDiv) return;

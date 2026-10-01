@@ -722,6 +722,17 @@ class TaskRecurrence
             }
         }
 
+        // Fresh, unticked checklists for the new occurrence (discussion #138).
+        // Always, not behind a copy_* option: a repeating task that HAS a
+        // checklist is usually a repeating procedure, and the checklist is the
+        // procedure. Does nothing while checklists on tasks are switched off.
+        try {
+            require_once __DIR__ . '/checklists.php';
+            ChecklistsService::copyTaskChecklists($conn, $sourceTaskId, $newId);
+        } catch (Throwable $e) {
+            error_log('Recurrence: checklist copy failed for task ' . $newId . ': ' . $e->getMessage());
+        }
+
         $conn->prepare(
             "UPDATE task_recurrences
                 SET occurrences_created = occurrences_created + 1, updated_datetime = UTC_TIMESTAMP()

@@ -37,6 +37,9 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2064 | Tickets           | Feature     | Attach in the chat reply box sends a picture or document over Telegram, WhatsApp via Meta, and WhatsApp via Twilio (a signed one-hour link) - validated like any attachment, with the real file name, and rolled back if the provider refuses (PR #159). |
 | 2065 | Tickets           | Improvement | The chat reply box (Suggest, Summarise, Send, templates, toasts) is fully translated, with the new strings in 13 languages (PR #159). |
 | 2066 | Tickets           | Fix         | The channel self-test works for Telegram (a chat-id-shaped test sender, no real outbound call) and says plainly when a free ngrok tunnel's warning page answered instead of FreeITSM (PR #159). |
+| 2067 | Tasks             | Feature     | Checklists on tasks (discussion #138 - Sandy asked; built behind a switch): Tasks → Settings → Checklists, off by default, adds a Checklist section to tasks and subtasks; Standard warns and records in task_audit, Critical blocks - enforced in TasksService (update, move), reorder.php and toggle_subtask.php; company "block all" applies; recurrences get fresh copies; deleting a task removes them. |
+| 2068 | Checklists        | Fix         | Security: api/tickets/ticket_checklists.php checked neither company nor Tickets access, so any signed-in analyst could read, attach, tick and remove checklists on another company's ticket by id (proven: a step ticked across companies); every action, including the step/checklist-addressed ones, is now gated on the ticket. |
+| 2069 | Checklists        | Fix         | Two root-absolute addresses left in checklists/ticket_view.js (saving a note from the checklist and the "suggest a checklist" call) broke on an install in a subfolder; both now use the page's API base like the rest of the file. |
 
 
 

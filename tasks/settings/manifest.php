@@ -81,6 +81,17 @@ return [
             'setting_keys' => ['tasks_collaborator_completion'],
         ],
         [
+            // Checklists on tasks (discussion #138, round three). Off by default:
+            // the author of the module thought subtasks and checklists side by side
+            // would confuse some teams, so it is offered rather than imposed - the
+            // same shape as time recording.
+            'id'           => 'checklists',
+            'cap'          => Cap::TASKS_CHECKLISTS,
+            'label_key'    => 'tasks.settings.tab_checklists',
+            'grant'        => 'Switch checklists on tasks on or off',
+            'setting_keys' => ['tasks_checklists_enabled'],
+        ],
+        [
             // Deleting tags and configuring them. Creating one inline from the board is
             // everyday work and deliberately stays on plain module access.
             'id'           => 'tags',

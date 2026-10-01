@@ -39,7 +39,7 @@ $translationNamespaces = ['common', 'tasks'];
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('tasks.title') . ' ' . t('tasks.nav.settings')); ?></title>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../../assets/css/inbox.css?v=73">
-    <link rel="stylesheet" href="../../assets/css/tasks.css?v=32">
+    <link rel="stylesheet" href="../../assets/css/tasks.css?v=33">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
     <script src="../../assets/js/tz.js?v=5"></script>
@@ -262,6 +262,26 @@ $translationNamespaces = ['common', 'tasks'];
             <!-- Said plainly, because "does this stop me closing the task?" is the
                  first thing anybody switching it on will want to know. -->
             <p style="color: var(--text-muted, #666); margin-top: 16px;"><?php echo htmlspecialchars(t('tasks.settings.involved_note')); ?></p>
+        </div>
+        <?php endif; ?>
+
+        <!-- Checklists Tab — checklists on tasks (discussion #138) -->
+        <?php if (settingsTabVisible($visibleTabs, 'checklists')): ?>
+        <div class="tab-content<?php echo $activeTabId === 'checklists' ? ' active' : ''; ?>" id="checklists-tab" data-capability="<?php echo Cap::TASKS_CHECKLISTS; ?>">
+            <div class="section-header">
+                <h2><?php echo htmlspecialchars(t('tasks.settings.checklists_heading')); ?></h2>
+            </div>
+            <p style="color: var(--text-muted, #666); margin-bottom: 16px;"><?php echo htmlspecialchars(t('tasks.settings.checklists_desc')); ?></p>
+            <label class="card-field-row">
+                <input type="checkbox" id="taskChecklistsEnabled" onchange="saveTaskChecklistsEnabled(this.checked)">
+                <div>
+                    <div class="card-field-name"><?php echo htmlspecialchars(t('tasks.settings.checklists_enabled_name')); ?></div>
+                    <div class="card-field-desc"><?php echo htmlspecialchars(t('tasks.settings.checklists_enabled_desc')); ?></div>
+                </div>
+            </label>
+            <!-- Said plainly, because "does this stop me completing a task?" and
+                 "what happens if I switch it off again?" are the two questions. -->
+            <p style="color: var(--text-muted, #666); margin-top: 16px;"><?php echo htmlspecialchars(t('tasks.settings.checklists_note')); ?></p>
         </div>
         <?php endif; ?>
 
@@ -559,10 +579,11 @@ $translationNamespaces = ['common', 'tasks'];
             loadSpanMode();
             loadTimeScope();
             loadCollaboratorCompletion();
+            loadTaskChecklistsEnabled();
             loadCardFields();
             loadTagSettings();
             const tabFromHash = location.hash.replace('#', '');
-            if (['calendar', 'time', 'involved', 'card', 'tags'].includes(tabFromHash)) switchTab(tabFromHash);
+            if (['calendar', 'time', 'involved', 'checklists', 'card', 'tags'].includes(tabFromHash)) switchTab(tabFromHash);
         });
 
         // ── Tag display settings ──
@@ -666,6 +687,32 @@ $translationNamespaces = ['common', 'tasks'];
                 box.checked  = String(data.settings.collaborator_completion || '0') === '1';
                 box.disabled = false;
             } catch (e) { console.error(e); }
+        }
+
+        // Checklists on tasks (discussion #138). Same disabled-until-loaded rule
+        // as the per-person tick above, for the same reason.
+        async function loadTaskChecklistsEnabled() {
+            const box = document.getElementById('taskChecklistsEnabled');
+            if (!box) return;
+            box.disabled = true;
+            try {
+                const data = await fetch(API_BASE + 'get_settings.php').then(r => r.json());
+                if (!data.success) return;
+                box.checked  = String(data.settings.checklists_enabled || '0') === '1';
+                box.disabled = false;
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveTaskChecklistsEnabled(on) {
+            try {
+                const res = await fetch(API_BASE + 'save_settings.php', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ settings: { checklists_enabled: on ? '1' : '0' } })
+                });
+                const data = await res.json();
+                if (data.success) showToast(t('tasks.toast.saved'), 'success');
+                else showToast(data.error || t('tasks.toast.save_failed'), 'error');
+            } catch (e) { showToast(t('tasks.toast.save_failed'), 'error'); }
         }
 
         async function saveCollaboratorCompletion(on) {

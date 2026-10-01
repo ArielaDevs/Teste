@@ -4672,6 +4672,36 @@ return [
         'is_demo'          => 'TINYINT(1) NOT NULL DEFAULT 0',   // set by the demo data importer
     ],
 
+    // Checklists on TASKS (discussion #138, round three) - the same shape as the
+    // two ticket tables above, keyed on a task instead. Only used while
+    // Tasks → Settings → Checklists is switched on.
+    'task_checklists' => [
+        'id'                => 'INT NOT NULL AUTO_INCREMENT',
+        'task_id'           => 'INT NOT NULL',
+        'template_id'       => 'INT DEFAULT NULL',
+        'title'             => 'VARCHAR(255) NOT NULL',
+        'closure_mode'      => "ENUM('warn','block') NOT NULL DEFAULT 'warn'",
+        'created_by_id'     => 'INT DEFAULT NULL',
+        'created_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',
+    ],
+    'task_checklist_items' => [
+        'id'                  => 'INT NOT NULL AUTO_INCREMENT',
+        'task_checklist_id'   => 'INT NOT NULL',
+        'title'               => 'VARCHAR(255) NOT NULL',
+        'suggested_role'      => 'VARCHAR(100) DEFAULT NULL',
+        'is_mandatory'        => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'is_completed'        => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'completed_by_id'     => 'INT DEFAULT NULL',
+        'completed_by_name'   => 'VARCHAR(150) DEFAULT NULL',
+        'completed_datetime'  => 'DATETIME DEFAULT NULL',
+        'requires_input'      => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'input_placeholder'   => 'VARCHAR(255) DEFAULT NULL',
+        'response_value'      => 'TEXT DEFAULT NULL',
+        'sort_order'          => 'INT NOT NULL DEFAULT 1',
+        'is_demo'             => 'TINYINT(1) NOT NULL DEFAULT 0',
+    ],
+
     // Domains module (GitHub #154) — see the matching block in freeitsm.sql for
     // what each table is for. FKs live in api/system/db_verify.php.
     'domain_statuses' => [

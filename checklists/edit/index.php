@@ -173,6 +173,15 @@ $categories   = $conn->query("SELECT name FROM checklist_categories ORDER BY nam
                         <option value="ticket"><?php echo htmlspecialchars(t('checklists.editor.applies_ticket')); ?></option>
                         <option value="task"><?php echo htmlspecialchars(t('checklists.editor.applies_task')); ?></option>
                     </select>
+                    <?php
+                    // Checklists on tasks are behind Tasks → Settings → Checklists
+                    // (discussion #138). Until that is on, a checklist "for Tasks"
+                    // can never be attached to one - so say so here, where the
+                    // choice is made, rather than let it look like it worked.
+                    require_once '../../includes/services/checklists.php';
+                    if (!ChecklistsService::tasksEnabled($conn)): ?>
+                    <div class="ed-hint" style="margin-top:4px;font-size:12px;color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('checklists.editor.tasks_off_hint')); ?></div>
+                    <?php endif; ?>
                 </div>
                 <div class="ed-field">
                     <label for="edClosureMode"><?php echo htmlspecialchars(t('checklists.editor.closure_mode')); ?></label>

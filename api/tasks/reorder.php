@@ -7,6 +7,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/tenancy.php';
+require_once '../../includes/services/checklists.php';   // completion gate (discussion #138)
 
 header('Content-Type: application/json');
 
@@ -37,17 +38,33 @@ try {
         exit;
     }
 
-    $conn->beginTransaction();
-
     // Resolve new status name -> id and decide whether to stamp completed_datetime
     $stsStmt = $conn->prepare("SELECT id, is_closed FROM task_statuses WHERE name = ? LIMIT 1");
     $stsStmt->execute([$newStatus]);
     $sts = $stsStmt->fetch(PDO::FETCH_ASSOC);
     if (!$sts) {
-        $conn->rollBack();
         echo json_encode(['success' => false, 'error' => "Unknown status: $newStatus"]);
         exit;
     }
+
+    // 🔴 Checklist gate (discussion #138), BEFORE the write. This endpoint stays
+    // off TasksService (see the comment above), so it must call the gate itself -
+    // dragging a card into Done is the commonest way a task is completed, and
+    // leaving it out would make a Critical checklist block the tick box and not
+    // the drag.
+    $wasClosedStmt = $conn->prepare("SELECT ts.is_closed FROM tasks t LEFT JOIN task_statuses ts ON ts.id = t.status_id WHERE t.id = ?");
+    $wasClosedStmt->execute([$taskId]);
+    $completing = !empty($sts['is_closed']) && empty($wasClosedStmt->fetchColumn());
+    if ($completing) {
+        try {
+            ChecklistsService::assertTaskCompletionAllowed($conn, $taskId);
+        } catch (ServiceError $se) {
+            echo json_encode(['success' => false, 'error' => $se->getMessage(), 'code' => $se->errorCode]);
+            exit;
+        }
+    }
+
+    $conn->beginTransaction();
     $newStatusId = (int)$sts['id'];
     $completedSql = $sts['is_closed']
         ? ", completed_datetime = COALESCE(completed_datetime, UTC_TIMESTAMP())"
@@ -73,9 +90,16 @@ try {
     }
 
     $conn->commit();
+    if ($completing) {
+        ChecklistsService::recordTaskCompletionOverride($conn, ActorContext::fromSession($conn), $taskId);
+    }
     echo json_encode(['success' => true, 'message' => 'Task reordered']);
 
 } catch (Exception $e) {
-    $conn->rollBack();
+    // The status lookup and the checklist gate now run BEFORE the transaction
+    // starts, so there may be nothing to roll back.
+    if (isset($conn) && $conn->inTransaction()) {
+        $conn->rollBack();
+    }
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

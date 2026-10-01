@@ -799,6 +799,15 @@ async function endDrag(e) {
     const movedTaskId = dragState.taskId;
     dragState = null;
 
+    // Dropping into a closed column is completing the task - the commonest way
+    // it happens - so it gets the same checklist question as the status box
+    // (discussion #138). Declined: the card goes back where it was.
+    const movedFrom = (tasks.find(t => t.id == movedTaskId) || {}).status;
+    if (!(await confirmChecklistCompletion(movedTaskId, newStatus, movedFrom))) {
+        loadTasks();
+        return;
+    }
+
     // Same reasoning as postTaskChange above: a refused reorder used to leave the
     // card springing back to where it started with nothing said, which reads as
     // the drag not having worked rather than as the server declining it.
@@ -812,7 +821,10 @@ async function endDrag(e) {
         if (!data || !data.success) {
             showToast(data && data.error === 'Not authenticated'
                 ? window.t('tasks.toast.session_expired')
-                : window.t('tasks.toast.order_failed'), 'error');
+                // A checklist refusal says WHICH steps - "could not reorder"
+                // would read as the drag having broken.
+                : (data && data.code === 'mandatory_steps_outstanding' ? data.error
+                : window.t('tasks.toast.order_failed')), 'error');
         }
     } catch (e) {
         console.error(e);
@@ -1168,7 +1180,9 @@ async function openDetailPanel(taskId) {
         // second panel to keep in step.
         panel.classList.toggle('as-modal', taskViewIsModal());
         paintViewToggle();
+        detailTaskStatus = data.task.status || null;
         renderDetailPanel(data.task);
+        loadTaskChecklists(taskId);
         // Who else is on it (GH #89). Fetched separately from the task itself
         // because the same call returns the CANDIDATE list, which is a different
         // question — "who could be added" depends on who is already on it.
@@ -1326,6 +1340,10 @@ function renderDetailPanel(task) {
         <div class="detail-field" id="taskTimeSection"></div>
         ` : ''}
 
+        <!-- Checklists (discussion #138). Filled by loadTaskChecklists(); stays
+             hidden unless Tasks → Settings → Checklists is switched on. -->
+        <div class="detail-field" id="taskChecklistSection" style="display:none"></div>
+
         <div class="detail-field">
             <label>${esc(window.t('tasks.detail.tags'))}</label>
             <div id="detailTagSection"></div>
@@ -1396,7 +1414,7 @@ function renderDetailPanel(task) {
                     <div class="subtask-item" onclick="openDetailPanel(${s.id})"${priorityAccent}>
                         <input type="checkbox" ${s.status_is_closed ? 'checked' : ''}
                                onclick="event.stopPropagation()"
-                               onchange="toggleSubtask(${s.id})">
+                               onchange="toggleSubtask(${s.id}, this.checked)">
                         ${priorityHtml}
                         <span class="subtask-title ${s.status_is_closed ? 'completed' : ''}">${esc(s.title)}</span>
                         <span class="subtask-meta">
@@ -1519,6 +1537,8 @@ function renderDetailPanel(task) {
 // translation pipeline would have produced exactly that word in all nine.
 
 let involvedState = { taskId: null, rows: [], candidates: [], completion: false, ownerId: null };
+// The open task's status as the panel drew it - what a status change is changing FROM.
+let detailTaskStatus = null;
 
 /** Fetch and draw the Involved section for the open task. */
 async function loadInvolved(taskId) {
@@ -1711,7 +1731,179 @@ async function moveToCompanyFromPanel(sel) {
 async function saveField(field, value) {
     if (!selectedTaskId) return;
     if (field === 'status' && !(await confirmCloseWithInvolved(value))) return;
+    if (field === 'status') {
+        const current = detailTaskStatus;   // the status the open task had when the panel drew it
+        if (!(await confirmChecklistCompletion(selectedTaskId, value, current))) {
+            openDetailPanel(selectedTaskId);   // put the status box back
+            return;
+        }
+    }
     await postTaskChange({ id: selectedTaskId, [field]: value }, 'tasks.toast.save_failed');
+}
+
+// ── Checklists on a task (discussion #138) ─────────────────────────
+//
+// Only while Tasks → Settings → Checklists is on; the endpoint says so and the
+// section stays empty otherwise. Every rule - who may see it, whether a step
+// needs a value, whether completing is allowed - is the server's
+// (ChecklistsService). This code shows the state and asks the questions.
+
+let checklistState = { taskId: null, enabled: false, checklists: [], templates: [] };
+
+const ICON_LOCK = '<svg class="chk-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
+
+async function loadTaskChecklists(taskId) {
+    const host = document.getElementById('taskChecklistSection');
+    if (!host) return;
+    try {
+        const data = await fetch(API_BASE + 'checklists.php?task_id=' + taskId).then(r => r.json());
+        if (!data.success || !data.enabled) { host.innerHTML = ''; host.style.display = 'none'; return; }
+        checklistState = { taskId, enabled: true, checklists: data.checklists || [], templates: data.templates || [] };
+        renderTaskChecklists();
+    } catch (e) { console.error(e); host.innerHTML = ''; host.style.display = 'none'; }
+}
+
+function renderTaskChecklists() {
+    const host = document.getElementById('taskChecklistSection');
+    if (!host || checklistState.taskId !== selectedTaskId) return;
+    host.style.display = '';
+    const T = (k, p) => window.t('tasks.detail.' + k, p);
+
+    const lists = checklistState.checklists.map(c => {
+        const critical = c.effective_closure_mode === 'block';
+        const steps = (c.items || []).map(i => {
+            const done = Number(i.is_completed) === 1;
+            const needsValue = Number(i.requires_input) === 1;
+            const by = done && i.completed_by_name
+                ? `<div class="chk-step-by">${esc(T('checklist_done_by', { name: i.completed_by_name, when: formatDateTime(i.completed_datetime) }))}</div>` : '';
+            const value = needsValue
+                ? `<input type="text" class="chk-step-value" id="chkValue${i.id}" value="${esc(i.response_value || '')}"
+                          placeholder="${esc(i.input_placeholder || T('checklist_value_placeholder'))}" ${done ? 'disabled' : ''}>` : '';
+            return `
+                <div class="chk-step${done ? ' done' : ''}">
+                    <input type="checkbox" ${done ? 'checked' : ''} onchange="toggleTaskChecklistItem(${i.id}, this)">
+                    <div class="chk-step-body">
+                        <div class="chk-step-title">${esc(i.title)}
+                            ${Number(i.is_mandatory) === 1 ? `<span class="chk-mandatory">${esc(T('checklist_mandatory'))}</span>` : ''}
+                            ${i.suggested_role ? `<span class="chk-role">${esc(i.suggested_role)}</span>` : ''}
+                        </div>
+                        ${value}${by}
+                    </div>
+                </div>`;
+        }).join('');
+        return `
+            <div class="chk-card">
+                <div class="chk-card-head">
+                    <span class="chk-card-title">${critical ? `<span title="${esc(T('checklist_critical'))}">${ICON_LOCK}</span>` : ''}${esc(c.title)}</span>
+                    <span class="chk-card-progress">${esc(T('checklist_progress', { done: c.completed_items, total: c.total_items }))}</span>
+                    <button type="button" class="btn-link-small" onclick="removeTaskChecklist(${c.id})">${esc(T('checklist_remove'))}</button>
+                </div>
+                <div class="chk-bar"><div class="chk-bar-fill" style="width:${Number(c.percent) || 0}%"></div></div>
+                ${steps}
+            </div>`;
+    }).join('');
+
+    const options = checklistState.templates.map(t =>
+        `<option value="${t.id}">${t.effective_closure_mode === 'block' ? '🔒 ' : ''}${esc(t.title)}${t.category ? ' (' + esc(t.category) + ')' : ''}</option>`
+    ).join('');
+    const attach = checklistState.templates.length
+        ? `<div class="chk-attach">
+               <select id="chkTemplatePick" class="detail-select"><option value="">${esc(T('checklist_choose'))}</option>${options}</select>
+               <button type="button" class="btn btn-secondary btn-sm" onclick="attachTaskChecklist()">${esc(T('checklist_attach'))}</button>
+           </div>`
+        : `<div class="chk-empty">${esc(T('checklist_no_templates'))}</div>`;
+
+    host.innerHTML = `
+        <label>${esc(T('checklist_heading'))}</label>
+        ${lists || `<div class="chk-empty">${esc(T('checklist_none'))}</div>`}
+        ${attach}`;
+}
+
+async function postTaskChecklist(payload) {
+    try {
+        const data = await fetch(API_BASE + 'checklists.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        }).then(r => r.json());
+        if (!data.success) {
+            showToast(data.error || window.t('tasks.detail.checklist_failed'), 'error');
+            renderTaskChecklists();      // put any box the server refused back
+            return false;
+        }
+        checklistState.checklists = data.checklists || [];
+        checklistState.templates  = data.templates || [];
+        renderTaskChecklists();
+        return true;
+    } catch (e) {
+        showToast(window.t('tasks.detail.checklist_failed'), 'error');
+        renderTaskChecklists();
+        return false;
+    }
+}
+
+function attachTaskChecklist() {
+    const pick = document.getElementById('chkTemplatePick');
+    if (!pick || !pick.value) return;
+    postTaskChecklist({ action: 'attach', task_id: selectedTaskId, template_id: Number(pick.value) });
+}
+
+function toggleTaskChecklistItem(itemId, box) {
+    const valueBox = document.getElementById('chkValue' + itemId);
+    const value = valueBox ? valueBox.value.trim() : null;
+    // The server refuses this too; asking here saves a round trip and keeps the
+    // tick from flickering on and off.
+    if (box.checked && valueBox && value === '') {
+        box.checked = false;
+        showToast(window.t('tasks.detail.checklist_value_needed'), 'error');
+        valueBox.focus();
+        return;
+    }
+    postTaskChecklist({ action: 'toggle', item_id: itemId, completed: box.checked ? 1 : 0, response_value: value });
+}
+
+async function removeTaskChecklist(checklistId) {
+    const c = checklistState.checklists.find(x => x.id == checklistId);
+    if (!(await showConfirm({
+        title: window.t('tasks.detail.checklist_remove'),
+        message: window.t('tasks.detail.checklist_remove_confirm', { name: c ? c.title : '' }),
+        okLabel: window.t('tasks.detail.checklist_remove'),
+        okClass: 'danger'
+    }))) return;
+    postTaskChecklist({ action: 'remove', checklist_id: checklistId });
+}
+
+/**
+ * Before completing a task from ANY route in this page (the status box, a drag
+ * into a closed column, a subtask tick): ask the server what completing it now
+ * would run into. A Critical checklist with steps outstanding is refused here
+ * with the list; a Standard one asks first. The server enforces the Critical
+ * case regardless - this exists so nobody meets a bare refusal, and so a
+ * Standard override is a decision rather than an accident.
+ *
+ * Returns true to go ahead. Anything that is not a completion goes ahead.
+ */
+async function confirmChecklistCompletion(taskId, newStatusName, currentStatusName) {
+    const isClosed = name => !!((statusList || []).find(s => s.name === name) || {}).is_closed;
+    if (!isClosed(newStatusName) || (currentStatusName && isClosed(currentStatusName))) return true;
+    return confirmChecklistCompletionById(taskId);
+}
+
+async function confirmChecklistCompletionById(taskId) {
+    let data;
+    try {
+        data = await fetch(API_BASE + 'checklists.php?check=complete&task_id=' + taskId).then(r => r.json());
+    } catch (e) { return true; }            // the server still enforces Critical
+    if (!data || !data.success || !data.enabled) return true;
+
+    const fmt = groups => Object.entries(groups || {})
+        .map(([name, steps]) => '• ' + name + ': ' + steps.join(', ')).join('\n');
+    if (data.blocking && Object.keys(data.blocking).length) {
+        window.alert(window.t('tasks.detail.checklist_block', { list: fmt(data.blocking) }));
+        return false;
+    }
+    if (data.warning && Object.keys(data.warning).length) {
+        return window.confirm(window.t('tasks.detail.checklist_warn', { list: fmt(data.warning) }));
+    }
+    return true;
 }
 
 /**
@@ -2054,7 +2246,13 @@ function saveDetailTags() {
 
 // ── Subtasks ───────────────────────────────────────────────────────
 
-async function toggleSubtask(id) {
+async function toggleSubtask(id, completing) {
+    // Ticking a subtask done is completing it, and a subtask can carry its own
+    // checklist (discussion #138). Unticking is never gated.
+    if (completing && !(await confirmChecklistCompletionById(id))) {
+        if (selectedTaskId) openDetailPanel(selectedTaskId);   // un-tick the box
+        return;
+    }
     try {
         // The response used to be thrown away — not parsed, not checked. The
         // server could refuse outright and the only visible result was the panel
@@ -2482,7 +2680,7 @@ function appendSubtaskRow(sub) {
         : '<input type="date" class="subtask-due-set" onclick="event.stopPropagation()"'
           + ' onchange="event.stopPropagation(); setSubtaskDue(' + sub.id + ', this.value)">';
     row.innerHTML =
-        '<input type="checkbox" onclick="event.stopPropagation()" onchange="toggleSubtask(' + sub.id + ')">'
+        '<input type="checkbox" onclick="event.stopPropagation()" onchange="toggleSubtask(' + sub.id + ', this.checked)">'
       + '<span class="subtask-title">' + esc(sub.title) + '</span>'
       + '<span class="subtask-meta">' + due + '</span>';
     list.appendChild(row);

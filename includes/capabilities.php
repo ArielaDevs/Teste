@@ -107,6 +107,7 @@ final class Cap
     const TASKS_TAGS       = 'tasks.tags';
     const TASKS_TIME       = 'tasks.time';
     const TASKS_INVOLVED   = 'tasks.involved';    // who else is on a task (GH #89)
+    const TASKS_CHECKLISTS = 'tasks.checklists';  // checklists on tasks on/off (discussion #138)
 
     // ---- Knowledge ---------------------------------------------------------
     const KNOWLEDGE_MANAGE      = 'knowledge.manage';       // umbrella

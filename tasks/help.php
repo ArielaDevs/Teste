@@ -439,6 +439,15 @@ $translationNamespaces = ['common', 'tasks'];
                     </div>
                     <p style="margin-top:14px;"><?php echo t('tasks.help.settings_calendar_note'); ?></p>
 
+                    <!-- Checklists on tasks (discussion #138) -->
+                    <h4><?php echo htmlspecialchars(t('tasks.help.settings_checklists_heading')); ?></h4>
+                    <p><?php echo t('tasks.help.settings_checklists_body'); ?></p>
+                    <div class="help-list">
+                        <div><?php echo t('tasks.help.settings_checklists_standard'); ?></div>
+                        <div><?php echo t('tasks.help.settings_checklists_critical'); ?></div>
+                    </div>
+                    <p style="margin-top:14px;"><?php echo t('tasks.help.settings_checklists_note'); ?></p>
+
                     <h4><?php echo htmlspecialchars(t('tasks.help.settings_tags_heading')); ?></h4>
                     <p><?php echo t('tasks.help.settings_tags_body'); ?></p>
                     <div class="help-list">

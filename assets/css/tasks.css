@@ -2224,3 +2224,47 @@ body {
     padding: 9px 11px;
     border-radius: 6px;
 }
+
+/* ── Checklists on a task (discussion #138) ───────────────────────
+   Every colour is a theme variable that exists in theme.css, so the section
+   follows dark mode - the Telegram settings box shipped with two that did not
+   exist and showed a light panel in dark mode. */
+#taskChecklistSection .chk-card {
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: var(--surface, #fff);
+}
+#taskChecklistSection .chk-card-head { display: flex; align-items: center; gap: 8px; }
+#taskChecklistSection .chk-card-title { font-weight: 600; color: var(--text, #333); flex: 1; display: flex; align-items: center; gap: 6px; }
+#taskChecklistSection .chk-lock { color: var(--danger-text, #b91c1c); flex-shrink: 0; }
+#taskChecklistSection .chk-card-progress { font-size: 12px; color: var(--text-muted, #666); white-space: nowrap; }
+#taskChecklistSection .btn-link-small {
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font-size: 12px; color: var(--text-muted, #666); text-decoration: underline;
+}
+#taskChecklistSection .btn-link-small:hover { color: var(--danger-text, #b91c1c); }
+#taskChecklistSection .chk-bar { height: 4px; border-radius: 2px; background: var(--border-soft, #eef0f3); margin: 8px 0 6px; overflow: hidden; }
+#taskChecklistSection .chk-bar-fill { height: 100%; background: var(--success-text, #16a34a); }
+#taskChecklistSection .chk-step { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border-soft, #eef0f3); }
+#taskChecklistSection .chk-step:first-of-type { border-top: 0; }
+#taskChecklistSection .chk-step input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+#taskChecklistSection .chk-step-body { flex: 1; min-width: 0; }
+#taskChecklistSection .chk-step-title { font-size: 13px; color: var(--text, #333); }
+#taskChecklistSection .chk-step.done .chk-step-title { color: var(--text-muted, #666); text-decoration: line-through; }
+#taskChecklistSection .chk-mandatory {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .03em; margin-left: 6px;
+    padding: 1px 5px; border-radius: 3px;
+    background: var(--warning-bg, #fef3c7); color: var(--warning-text, #92400e);
+}
+#taskChecklistSection .chk-role { font-size: 11px; color: var(--text-muted, #666); margin-left: 6px; }
+#taskChecklistSection .chk-step-value {
+    margin-top: 4px; width: 100%; box-sizing: border-box; font-size: 12px; padding: 4px 6px;
+    border: 1px solid var(--border, #e5e7eb); border-radius: 4px;
+    background: var(--surface, #fff); color: var(--text, #333);
+}
+#taskChecklistSection .chk-step-by { font-size: 11px; color: var(--text-muted, #666); margin-top: 2px; }
+#taskChecklistSection .chk-attach { display: flex; gap: 8px; align-items: center; }
+#taskChecklistSection .chk-attach .detail-select { flex: 1; min-width: 0; }
+#taskChecklistSection .chk-empty { font-size: 13px; color: var(--text-muted, #666); margin-bottom: 8px; }
