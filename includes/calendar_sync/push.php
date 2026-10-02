@@ -23,6 +23,7 @@
 
 require_once __DIR__ . '/calendar_sync.php';
 require_once __DIR__ . '/../session_security.php'; // requestScheme() — proxy-aware (GH #152)
+require_once __DIR__ . '/../ticket_sensitivity.php';  // a confidential ticket's subject stays home (#62)
 
 /**
  * Make the calendar match the ticket.
@@ -46,7 +47,8 @@ function calendarSyncReconcileTicket(PDO $conn, int $ticketId, bool $gone = fals
                         t.work_start_datetime, t.work_end_datetime, t.work_all_day,
                         t.deleted_datetime, ts.name AS status_name, tp.name AS priority_name,
                         COALESCE(ts.is_closed, 0) AS is_closed,
-                        u.display_name AS requester_name
+                        u.display_name AS requester_name,
+                        " . ticketSensitivitySelectSql($conn) . " AS sensitivity
                    FROM tickets t
                    LEFT JOIN ticket_statuses   ts ON ts.id = t.status_id
                    LEFT JOIN ticket_priorities tp ON tp.id = t.priority_id
@@ -424,13 +426,21 @@ function calendarSyncEventFromTicket(array $t): array
     $end = $t['work_end_datetime'];
     if (!$end || strtotime($end) <= strtotime($t['work_start_datetime'])) {
         // The same default the calendar screen and the feed resolve, so all three
-        // agree about what an unspecified duration means.
-        $end = date('Y-m-d H:i:s',
-            strtotime($t['work_start_datetime']) + TicketsService::SCHEDULE_DEFAULT_MINUTES * 60);
+        // agree about what an unspecified duration means. Guarded like the task
+        // path below: a confidential-flag change can reconcile from a page that
+        // never loaded the tickets service.
+        $minutes = class_exists('TicketsService') ? TicketsService::SCHEDULE_DEFAULT_MINUTES : 60;
+        $end = date('Y-m-d H:i:s', strtotime($t['work_start_datetime']) + $minutes * 60);
     }
 
+    // 🔴 A confidential ticket's subject and requester do not go into a calendar
+    // (discussion #62): it is Microsoft's or a CalDAV server's copy, shown on
+    // phones and shared diaries. The number, the time, status and priority do -
+    // the same allow-list a webhook gets - so the day still reads as booked.
+    $confidential = ticketSensitivityNormalise($t['sensitivity'] ?? '') === 'confidential';
+
     $bits = [];
-    if (!empty($t['requester_name'])) $bits[] = 'Requester: ' . $t['requester_name'];
+    if (!$confidential && !empty($t['requester_name'])) $bits[] = 'Requester: ' . $t['requester_name'];
     if (!empty($t['status_name']))    $bits[] = 'Status: '    . $t['status_name'];
     if (!empty($t['priority_name']))  $bits[] = 'Priority: '  . $t['priority_name'];
 
@@ -444,7 +454,7 @@ function calendarSyncEventFromTicket(array $t): array
         : '';
 
     return [
-        'subject'  => trim(($t['ticket_number'] ?? '') . ' — ' . ($t['subject'] ?? '')),
+        'subject'  => trim(($t['ticket_number'] ?? '') . ' — ' . ($confidential ? TICKET_CONFIDENTIAL_SUBJECT : ($t['subject'] ?? ''))),
         'body'     => implode("\n", $bits),
         'start'    => $t['work_start_datetime'],
         'end'      => $end,

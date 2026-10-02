@@ -1177,7 +1177,7 @@ class WorkflowEngine
             ],
             'send_email' => [
                 'label'       => 'Send an email',
-                'description' => 'Send an email. With a ticket it goes from that ticket\'s mailbox and a reply threads back onto it; without one, choose the mailbox to send from — which is how a form acknowledges a submission before any ticket exists. The body is plain-text-with-newlines or HTML; both work.',
+                'description' => 'Send an email. With a ticket it goes from that ticket\'s mailbox and a reply threads back onto it; without one, choose the mailbox to send from — which is how a form acknowledges a submission before any ticket exists. The body is plain-text-with-newlines or HTML; both work. A confidential ticket is only emailed to its requester or to analysts; any other address is skipped, and the run says so.',
                 'args'        => [
                     'ticket_id'  => $ticketIdArg,
                     'mailbox_id' => ['type' => 'lookup', 'label' => 'Send from (needed when there is no ticket)', 'lookup' => 'mailbox'],
@@ -2162,6 +2162,18 @@ class WorkflowEngine
             throw new Exception($ticketId
                 ? 'No recipient (and ticket has no requester email)'
                 : 'No recipient — set one, e.g. {{submission.email}}');
+        }
+
+        // 🔴 A confidential ticket is emailed only to its requester or to analysts
+        // (discussion #62) - never a manager, a list or an outside address, which
+        // is who the flag keeps it from. Skipped like the tracker actions, so the
+        // run log says why. The ticket can come from the payload as well as the
+        // arg: a "send from this mailbox" email can still quote {{ticket.subject}}.
+        require_once dirname(__DIR__, 2) . '/includes/ticket_sensitivity.php';
+        $sensTicket = $ticketId ?: (int)($payload['ticket']['id'] ?? ($payload['ticket_id'] ?? 0));
+        if ($sensTicket > 0 && !ticketEmailRecipientsAllowed($conn, $sensTicket, $recipient)) {
+            return ['skipped' => true, 'reason' => TICKET_EMAIL_CONFIDENTIAL_SKIP, 'confidential' => true,
+                    'ticket_id' => $sensTicket];
         }
 
         // An explicitly chosen mailbox wins over the ticket's own. On a ticket
