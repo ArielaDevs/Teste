@@ -47,6 +47,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2115 | Domains           | Improvement | Certificate renewals now feed the Calendar as well as Watchtower, with their own setting (Where certificate renewals are shown) and their own "Certificate renewals" category, remembered by id so renaming it never makes a second (the warranty/lease rule); switching one kind off leaves the other's entries alone, a manual Check now re-syncs it, and the Watchtower card shows each figure only under its own setting and counts certificates over the configured warning window instead of a fixed 21 days. |
 | 2116 | Domains           | Feature     | Right-click a domain in the register: Open, Open in a new tab, Edit (opens the domain with its Edit dialog), Refresh lookup, Check now, Status ›, Owner ›, Assign to me, Connections, Visit website, Copy name and Delete - each through the same endpoint as the domain's own page. |
 | 2117 | CMDB              | Fix         | A CI's ticket list showed every ticket as #id with an unknown status: the page read reference / status_name / priority_name, which the API never sends (it sends ticket_number / status / priority). |
+| 2118 | Reporting         | Fix         | The Reporting landing page was laid out for three 280px cards in a 700px box; Report Packs made it four, so each card was squeezed by a different amount and the descriptions wrapped a word or two to a line. On desktop widths the cards are now an even grid (two-by-two on a narrower window); the phone layout is unchanged. |
 
 
 

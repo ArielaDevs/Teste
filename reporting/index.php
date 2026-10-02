@@ -47,6 +47,32 @@ $translationNamespaces = ['common', 'reporting'];
             max-width: 700px;
         }
 
+        /* 🔴 Four cards, not three. The row was sized for three 280px cards in a
+           700px box; Report Packs made it four (~1,190px), so the browser shrank
+           each card by a different amount depending on its text - uneven widths
+           and descriptions wrapping a word or two to a line. An even grid in a
+           box wide enough for four, two-by-two on a narrower window rather than
+           squeezed. Desktop widths only: the phone layer (mobile.css LAYER 35)
+           stacks these with flex-direction, which a grid would ignore (§27). */
+        @media (min-width: 769px) {
+            .landing-content {
+                width: 100%;
+                max-width: 1160px;
+                padding: 24px 32px;
+                box-sizing: border-box;
+            }
+            .report-cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+                gap: 24px;
+            }
+            .report-card {
+                width: auto;
+                min-width: 0;
+                padding: 36px 28px;
+            }
+        }
+
         .landing-content h2 {
             font-size: 24px;
             color: var(--text, #333);
