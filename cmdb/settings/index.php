@@ -526,7 +526,7 @@ $translationNamespaces = ['common', 'cmdb'];
                             <option value="to_from"></option>
                             <option value="from_to"></option>
                         </select>
-                        <p class="field-hint"><?php echo htmlspecialchars(t('cmdb.settings.rel_type_impact_hint')); ?></p>
+                        <small><?php echo htmlspecialchars(t('cmdb.settings.rel_type_impact_hint')); ?></small>
                     </div>
                     <div class="form-group">
                         <label for="relTypeDisplayOrder"><?php echo htmlspecialchars(t('cmdb.settings.rel_type_display_order')); ?></label>
