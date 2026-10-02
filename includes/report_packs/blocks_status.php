@@ -62,6 +62,7 @@ function rpStatusUptime(PDO $conn, int $analystId, array $o, array $range, $tena
         $out[] = $row;
     }
     return ['kind' => 'uptime', 'services' => $out, 'days' => $range['days'],
+            'uptimeLabel' => t('reporting.packs.uptime_label'), 'downtimeLabel' => t('reporting.packs.down_label'),
             'from' => rpFmtDate($range['from_date']), 'to' => rpFmtDate($range['to_date']),
             'empty' => t('reporting.packs.empty.services')];
 }

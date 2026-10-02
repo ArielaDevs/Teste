@@ -214,8 +214,8 @@ function rpTicketsList(PDO $conn, int $analystId, array $o, array $range, $tenan
     if ($more) array_pop($rows);
 
     $cols = [
-        ['key' => 'number',  'label' => t('reporting.packs.col.ticket'),  'w' => 14],
-        ['key' => 'subject', 'label' => t('reporting.packs.col.subject'), 'w' => 40],
+        ['key' => 'number',  'label' => t('reporting.packs.col.ticket'),  'w' => 18],
+        ['key' => 'subject', 'label' => t('reporting.packs.col.subject'), 'w' => 38],
     ];
     if ($o['status'])   $cols[] = ['key' => 'status',   'label' => t('reporting.packs.col.status'),   'w' => 14];
     if ($o['priority']) $cols[] = ['key' => 'priority', 'label' => t('reporting.packs.col.priority'), 'w' => 12];

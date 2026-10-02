@@ -329,6 +329,8 @@ return [
         'other'      => 'Other',
         'unassigned' => 'Unassigned',
         'ongoing'    => '(ongoing)',
+        'uptime_label' => 'uptime',
+        'down_label'   => 'down',
         'truncated'  => 'Showing the first {n} rows.',
 
         'starter' => [
