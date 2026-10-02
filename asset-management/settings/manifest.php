@@ -114,11 +114,28 @@ return [
             'setting_keys' => ['vcenter_server', 'vcenter_user', 'vcenter_password'],
         ],
         [
+            'id'           => 'asset-tags',
+            'cap'          => Cap::ASSETS_TAGS,
+            'label_key'    => 'asset-management.settings.tab_asset_tags',
+            'grant'        => 'Configure asset tag auto-generation and numbering sequence',
+            'setting_keys' => ['asset_tag_autogen_enabled', 'asset_tag_prefix',
+                               'asset_tag_suffix', 'asset_tag_padding', 'asset_tag_initial_number'],
+        ],
+        [
             'id'           => 'reconciliation',
             'cap'          => Cap::ASSETS_RECONCILIATION,
             'label_key'    => 'asset-management.settings.tab_reconciliation',
             'grant'        => 'Configure asset discovery, identity reconciliation and ignored serials',
             'setting_keys' => ['asset_reconciliation_ignored_serials'],
+        ],
+        [
+            'id'           => 'asset-labels',
+            'cap'          => Cap::ASSETS_TAGS,
+            'label_key'    => 'asset-management.settings.tab_asset_labels',
+            'grant'        => 'Configure physical asset labels, layout and QR code branding',
+            'setting_keys' => ['asset_label_title', 'asset_label_fields', 'asset_label_subtitle_field',
+                               'asset_label_footer', 'asset_label_logo_enabled',
+                               'asset_label_logo_path', 'asset_label_show_field_labels'],
         ],
         [
             'id'           => 'intune',

@@ -29,10 +29,22 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/public_url.php';
+require_once __DIR__ . '/tenant_settings.php';
+require_once __DIR__ . '/branding.php';
 
 /** Token length in bytes (hex-encoded to 20 chars). Short enough to keep the QR
  *  coarse, long enough that guessing is pointless. */
 const ASSET_TOKEN_BYTES = 10;
+
+/** Setting keys for physical label & QR configuration */
+const KEY_LABEL_TITLE           = 'asset_label_title';
+const KEY_LABEL_FIELDS          = 'asset_label_fields';
+const KEY_LABEL_SUBTITLE_FIELD   = 'asset_label_subtitle_field'; // Legacy fallback
+const KEY_LABEL_FOOTER          = 'asset_label_footer';
+const KEY_LABEL_LOGO_ENABLED    = 'asset_label_logo_enabled';
+const KEY_LABEL_LOGO_PATH       = 'asset_label_logo_path';
+const KEY_LABEL_SHOW_FIELD_LABELS = 'asset_label_show_field_labels';
 
 /** Does this database have the label columns yet? Cached per request. */
 function assetLabelsSchemaReady(PDO $conn): bool {
@@ -49,35 +61,26 @@ function assetLabelsSchemaReady(PDO $conn): bool {
 
 /**
  * The token for an asset, minting one if it has never been labelled.
- *
- * Minting on demand rather than at creation keeps the column empty for the
- * thousands of auto-discovered assets nobody will ever print a label for, and
- * means an asset's token comes into existence at the moment it acquires meaning.
  */
 function assetEnsureToken(PDO $conn, int $assetId): ?string {
     if (!assetLabelsSchemaReady($conn) || $assetId <= 0) return null;
-
     $stmt = $conn->prepare("SELECT qr_token FROM assets WHERE id = ?");
     $stmt->execute([$assetId]);
     $existing = $stmt->fetchColumn();
-    if ($existing === false) return null;              // no such asset
+    if ($existing === false) return null;
     if (!empty($existing)) return (string)$existing;
 
-    // Retry on the (astronomically unlikely) collision rather than trusting luck;
-    // the unique index is the real guard and this just avoids a hard failure.
     for ($attempt = 0; $attempt < 5; $attempt++) {
         $token = bin2hex(random_bytes(ASSET_TOKEN_BYTES));
         try {
             $upd = $conn->prepare("UPDATE assets SET qr_token = ? WHERE id = ? AND (qr_token IS NULL OR qr_token = '')");
             $upd->execute([$token, $assetId]);
             if ($upd->rowCount() > 0) return $token;
-            // Somebody else minted one first — use theirs.
+
             $stmt->execute([$assetId]);
             $now = $stmt->fetchColumn();
             if (!empty($now)) return (string)$now;
-        } catch (Exception $e) {
-            // Unique violation: go round again with a new token.
-        }
+        } catch (Exception $e) { /* Unique violation: retry */ }
     }
     return null;
 }
@@ -86,8 +89,6 @@ function assetEnsureToken(PDO $conn, int $assetId): ?string {
 function assetIdForToken(PDO $conn, string $token): ?int {
     if (!assetLabelsSchemaReady($conn)) return null;
     $token = trim($token);
-    // Cheap shape check first: the column is indexed, but there is no reason to
-    // send junk from a mis-scan to the database.
     if ($token === '' || !preg_match('/^[a-f0-9]{8,64}$/i', $token)) return null;
     $stmt = $conn->prepare("SELECT id FROM assets WHERE qr_token = ? LIMIT 1");
     $stmt->execute([$token]);
@@ -97,18 +98,11 @@ function assetIdForToken(PDO $conn, string $token): ?int {
 
 /**
  * Is this asset tag free within its company?
- *
- * Application-level because a UNIQUE (tenant_id, asset_tag) index would NOT
- * hold for the Default company: MySQL treats NULLs as distinct in a unique
- * index, so two NULL-tenant assets could both be LT0001 while the index looked
- * like it was guarding them. Same reason hostname is checked here rather than
- * by the schema. `<=>` is the null-safe equality operator, so the comparison
- * behaves for the Default company as well as a named one.
  */
 function assetTagAvailable(PDO $conn, ?int $tenantId, string $tag, ?int $exceptAssetId = null): bool {
     if (!assetLabelsSchemaReady($conn)) return true;
     $tag = trim($tag);
-    if ($tag === '') return true;                       // blank is always allowed
+    if ($tag === '') return true;
     $sql = "SELECT COUNT(*) FROM assets WHERE tenant_id <=> ? AND asset_tag = ?";
     $args = [$tenantId, $tag];
     if ($exceptAssetId !== null) { $sql .= " AND id <> ?"; $args[] = $exceptAssetId; }
@@ -119,59 +113,161 @@ function assetTagAvailable(PDO $conn, ?int $tenantId, string $tag, ?int $exceptA
 
 /**
  * The URL a label's QR encodes.
- *
- * Absolute, because the code is scanned by a phone that has no idea what the
- * app's base path is. Derived from the install's configured public base URL so
- * that labels printed today still resolve when the app moves.
  */
-function assetLabelUrl(string $token): string {
-    return rtrim(assetPublicBaseUrl(), '/') . '/a/' . $token;
+function assetLabelUrl(string $token, ?PDO $conn = null): string {
+    if ($conn === null) {
+        $conn = connectToDatabase();
+    }
+    return publicAbsoluteUrl($conn, 'a/' . $token);
 }
 
 /**
- * The install's public base, including any sub-folder.
- *
- * REUSES `messagingPublicBaseUrl()` and its `messaging_public_base_url`
- * setting rather than adding a second one. That setting answers the question
- * "how does the outside world reach this install?", which is exactly what a
- * printed label needs to know — and an install that already told us for
- * WhatsApp webhooks should not have to tell us again for asset labels.
- *
- * ⚠️ Divergence worth flagging rather than hiding: the setting is *named* for
- * messaging, and it is now doing install-wide work. It wants renaming to a
- * generic key (with a read-both-fall-back) the next time settings are touched.
- *
- * Why the configured value wins over the current request: a label is printed
- * once and lives on a laptop for years, so deriving it from whichever hostname
- * the printing analyst happened to be using would bake that in permanently.
+ * The install's public base URL.
  */
-function assetPublicBaseUrl(): string {
-    static $base = null;
-    if ($base !== null) return $base;
+function assetPublicBaseUrl(?PDO $conn = null): string {
+    if ($conn === null) {
+        $conn = connectToDatabase();
+    }
+    return publicBaseUrl($conn);
+}
 
-    require_once __DIR__ . '/messaging/messaging.php';
-    $host = '';
+/**
+ * Catalogue of built-in standard fields printable on asset labels.
+ */
+function assetLabelStandardFields(): array {
+    return [
+        'asset_tag'   => 'Asset Tag',
+        'hostname'    => 'Hostname',
+        'service_tag' => 'Serial / Service Tag',
+        'manufacturer'=> 'Manufacturer',
+        'model'       => 'Model',
+        'company'     => 'Company / Client',
+        'location'    => 'Location',
+        'asset_type'  => 'Asset Type',
+    ];
+}
+
+/**
+ * Complete catalogue of printable fields (Standard + Custom Fields) for a context.
+ *
+ * Custom fields are dynamically discovered from `asset_fields` table (is_deleted = 0)
+ * and assigned keys prefixed with `cf_` (e.g. `cf_far_id`).
+ */
+function assetLabelAvailableFields(PDO $conn, ?int $tenantId = null): array {
+    $fields = assetLabelStandardFields();
     try {
-        $host = messagingPublicBaseUrl(connectToDatabase());
-    } catch (Exception $e) {
-        $scheme = requestScheme();
-        $host = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $sql = "SELECT field_key, label FROM asset_fields WHERE is_deleted = 0";
+        $args = [];
+        if ($tenantId !== null && $tenantId > 0 && isMultiTenant($conn)) {
+            $sql .= " AND (tenant_id IS NULL OR tenant_id = ?)";
+            $args[] = $tenantId;
+        }
+        $sql .= " ORDER BY label ASC";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($args);
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $key = 'cf_' . $r['field_key'];
+            $fields[$key] = $r['label'] . ' (Custom Field)';
+        }
+    } catch (Exception $e) { /* table absent fallback */ }
+    return $fields;
+}
+
+/**
+ * Retrieve physical label and QR customisation settings for a company/tenant context.
+ *
+ * @param PDO $conn
+ * @param ?int $tenantId
+ * @return array{
+ *   title: string,
+ *   fields: array<string>,
+ *   subtitle_field: string,
+ *   footer: string,
+ *   logo_enabled: bool,
+ *   logo_path: string,
+ *   show_field_labels: bool
+ * }
+ */
+
+/**
+ * Concise display labels for physical printed labels.
+ */
+function assetLabelPrintFields(PDO $conn, ?int $tenantId = null): array {
+    $standard = [
+        'asset_tag'    => 'Asset Tag',
+        'hostname'     => 'Hostname',
+        'service_tag'  => 'Serial',
+        'manufacturer' => 'Manufacturer',
+        'model'        => 'Model',
+        'company'      => 'Company',
+        'location'     => 'Location',
+        'asset_type'   => 'Type',
+    ];
+
+    $available = assetLabelAvailableFields($conn, $tenantId);
+    $printFields = [];
+
+    foreach ($available as $key => $rawLabel) {
+        if (isset($standard[$key])) {
+            $printFields[$key] = $standard[$key];
+        } else {
+            $clean = preg_replace('/\s*\([^)]*Custom Field[^)]*\)/i', '', $rawLabel);
+            $printFields[$key] = trim($clean);
+        }
     }
 
-    // The app root — the same derivation messagingWebhookUrl() uses, so a
-    // sub-folder install ("/freeitsm-app/") is handled identically.
-    $root = defined('BASE_URL') ? rtrim(BASE_URL, '/') : '';
-    $host = rtrim($host, '/');
+    return $printFields;
+}
 
-    // ⚠️ The setting is documented as scheme://host, but people paste the URL
-    // they actually use — which on a sub-folder install carries the folder, and
-    // on a tunnel (ngrok et al) is copied wholesale from the address bar. Adding
-    // the root again would encode …/freeitsm-app/freeitsm-app/a/<token> into a
-    // code that then gets printed onto physical labels. Accept both forms.
-    if ($root !== '' && substr($host, -strlen($root)) === $root) {
-        $root = '';
+function assetLabelSettings(PDO $conn, ?int $tenantId = null): array {
+    $title        = (string)tenantSetting($conn, $tenantId, KEY_LABEL_TITLE, '');
+    $rawFields    = (string)tenantSetting($conn, $tenantId, KEY_LABEL_FIELDS, '');
+    $legacySub    = (string)tenantSetting($conn, $tenantId, KEY_LABEL_SUBTITLE_FIELD, '');
+    $footer       = (string)tenantSetting($conn, $tenantId, KEY_LABEL_FOOTER, '');
+    $logoEnabled      = (string)tenantSetting($conn, $tenantId, KEY_LABEL_LOGO_ENABLED, '0') === '1';
+    $customLogoPath   = (string)tenantSetting($conn, $tenantId, KEY_LABEL_LOGO_PATH, '');
+    $logoPath         = ($logoEnabled && $customLogoPath !== '' && brandingPathIsSafe($customLogoPath) && file_exists(__DIR__ . '/../' . $customLogoPath)) ? $customLogoPath : '';
+    $showFieldLabels = (string)tenantSetting($conn, $tenantId, KEY_LABEL_SHOW_FIELD_LABELS, '0') === '1';
+
+    $available = assetLabelAvailableFields($conn, $tenantId);
+
+    // Parse configured ordered fields list
+    $fields = [];
+    if ($rawFields !== '') {
+        $decoded = json_decode($rawFields, true);
+        if (is_array($decoded)) {
+            $fields = $decoded;
+        } else {
+            $fields = array_map('trim', explode(',', $rawFields));
+        }
+    } elseif ($legacySub !== '' && $legacySub !== 'none') {
+        $fields = ['asset_tag', $legacySub];
+    } else {
+        $fields = ['asset_tag', 'hostname']; // Backward-compatibility default
     }
 
-    $base = $host . $root;
-    return $base;
+    // Filter to valid known fields
+    $validFields = [];
+    foreach ($fields as $f) {
+        $f = trim((string)$f);
+        if ($f !== '' && isset($available[$f]) && !in_array($f, $validFields, true)) {
+            $validFields[] = $f;
+        }
+    }
+
+    // Mandatory Rule: Asset Tag MUST be present in selected fields
+    if (!in_array('asset_tag', $validFields, true)) {
+        array_unshift($validFields, 'asset_tag');
+    }
+
+    return [
+        'title'              => $title,
+        'fields'             => $validFields,
+        'subtitle_field'     => $validFields[1] ?? 'hostname',
+        'footer'             => $footer,
+        'logo_enabled'       => $logoEnabled,
+        'logo_path'          => $logoPath,
+        'custom_logo_path'   => $customLogoPath,
+                'show_field_labels'  => $showFieldLabels,
+    ];
 }

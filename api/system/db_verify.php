@@ -3779,6 +3779,9 @@ try {
         }
     }
 
+
+    }
+
     // Tag each result with its module for the card grid's colour + filter. This
     // is presentation only (a label on a table name); it reads no schema truth
     // and cannot affect verification. Derived from table-name prefixes — see

@@ -107,9 +107,10 @@ function publicUrlWithAppPath(string $root): string
  *   3. BASE_URL alone — a path, which is no worse than what a caller would have
  *      done unaided, so an install that has configured nothing is not made worse.
  */
-function publicBaseUrl(PDO $conn): string
+function publicBaseUrl(PDO $conn, bool $resetCache = false): string
 {
     static $root = null;
+    if ($resetCache) { $root = null; }
     if ($root !== null) {
         return $root;
     }
@@ -135,12 +136,12 @@ function publicBaseUrl(PDO $conn): string
         // reflect an unchecked header.
         $host = preg_replace('/[^A-Za-z0-9\.\-:]/', '', (string)$_SERVER['HTTP_HOST']);
         if ($host !== '') {
-            $root = ($https ? 'https://' : 'http://') . $host . rtrim(BASE_URL, '/');
+            $root = ($https ? 'https://' : 'http://') . $host . rtrim(defined('BASE_URL') ? BASE_URL : '/', '/');
             return $root;
         }
     }
 
-    $root = rtrim(BASE_URL, '/');
+    $root = rtrim(defined('BASE_URL') ? BASE_URL : '/', '/');
     return $root;
 }
 

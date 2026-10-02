@@ -530,6 +530,7 @@ $translationNamespaces = ['common', 'asset-management'];
     <?php /* Mobile-friendly opt-in (#937). AFTER this page's own <style> so its
              @media rules win on ties. Every rule inside is gated at 768px. */ ?>
     <link rel="stylesheet" href="../../assets/css/mobile.css?v=154">
+    <script src="../../assets/js/qrcode.min.js"></script>
 </head>
 <?php /* The marker mobile.css LAYER 15e keys on. `.container` is far too common
          a class to restyle globally, so a settings page opts in by name. */ ?>
@@ -1072,6 +1073,265 @@ $translationNamespaces = ['common', 'asset-management'];
 
         <?php endif; ?>
 
+        <?php if (settingsTabVisible($visibleTabs, 'asset-tags')): ?>
+        <!-- Asset Tags Tab -->
+        <div class="tab-content<?php echo $activeTabId === 'asset-tags' ? ' active' : ''; ?>" id="asset-tags-tab" data-capability="<?php echo Cap::ASSETS_TAGS; ?>">
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                    <h2><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_heading')); ?></h2>
+                </div>
+                <div class="settings-section-body">
+                    <p class="settings-description">
+                        <?php echo htmlspecialchars(t('asset-management.settings.asset_tags_intro')); ?>
+                    </p>
+
+                    <form id="assetTagsForm" onsubmit="saveAssetTagsSettings(event); return false;">
+                        <div class="form-group">
+                            <label class="form-label" style="display:flex; align-items:center; gap:10px;">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="tagAutogenEnabled" onchange="updateTagPreview()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_enable_label')); ?></span>
+                            </label>
+                            <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_enable_hint')); ?></div>
+                        </div>
+
+                        <div class="form-row" style="display:flex; gap:16px; flex-wrap:wrap;">
+                            <div class="form-group" style="flex:1; min-width:180px;">
+                                <label class="form-label" for="tagPrefix"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_prefix_label')); ?></label>
+                                <input type="text" class="form-input" id="tagPrefix" maxlength="20" placeholder="AST-" value="AST-" oninput="updateTagPreview()">
+                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_prefix_hint')); ?></div>
+                            </div>
+
+                            <div class="form-group" style="flex:1; min-width:180px;">
+                                <label class="form-label" for="tagSuffix"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_suffix_label')); ?></label>
+                                <input type="text" class="form-input" id="tagSuffix" maxlength="20" placeholder="" oninput="updateTagPreview()">
+                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_suffix_hint')); ?></div>
+                            </div>
+
+                            <div class="form-group" style="flex:1; min-width:140px;">
+                                <label class="form-label" for="tagPadding"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_padding_label')); ?></label>
+                                <input type="number" class="form-input" id="tagPadding" min="1" max="12" value="5" oninput="updateTagPreview()">
+                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_padding_hint')); ?></div>
+                            </div>
+
+                            <div class="form-group" style="flex:1; min-width:180px;">
+                                <label class="form-label" for="tagNextNumber"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_initial_number_label')); ?></label>
+                                <input type="number" class="form-input" id="tagNextNumber" min="1" value="1" oninput="updateTagPreview()">
+                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_initial_number_hint')); ?></div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="background:var(--surface-2, #f3f6fa); border:1px solid var(--border, #e2e6ea); border-radius:8px; padding:14px 16px; margin:16px 0;">
+                            <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #667); margin-bottom:4px;">
+                                <?php echo htmlspecialchars(t('asset-management.settings.asset_tags_preview_label')); ?>
+                            </div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                                <span style="font-size:18px; font-family:monospace; font-weight:700; color:var(--accent, #0056b3);" id="tagFormatPreview">AST-00001</span>
+                                <span style="font-size:12px; color:var(--text-muted, #778);" id="tagStatusNotice"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_preview_text')); ?></span>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="tagSaveBtn"><?php echo htmlspecialchars(t('asset-management.common.save')); ?></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php if (settingsTabVisible($visibleTabs, 'asset-labels')): ?>
+        <!-- Asset Labels & QR Tab -->
+        <div class="tab-content<?php echo $activeTabId === 'asset-labels' ? ' active' : ''; ?>" id="asset-labels-tab" data-capability="<?php echo Cap::ASSETS_TAGS; ?>">
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <rect x="7" y="7" width="3" height="3"></rect>
+                        <rect x="14" y="7" width="3" height="3"></rect>
+                        <rect x="7" y="14" width="3" height="3"></rect>
+                        <path d="M14 14h3v3h-3z"></path>
+                    </svg>
+                    <h2><?php echo htmlspecialchars(t('asset-management.settings.asset_labels_heading')); ?></h2>
+                </div>
+                <div class="settings-section-body">
+                    <p class="settings-description">
+                        <?php echo htmlspecialchars(t('asset-management.settings.asset_labels_intro')); ?>
+                    </p>
+                    <form id="assetLabelsForm" onsubmit="saveAssetLabelSettings(event); return false;" enctype="multipart/form-data">
+                        <div class="asset-labels-layout" style="display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px;">
+                            <!-- Left Column -->
+                            <div class="left-col" style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label" for="lblTitle"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_title_label')); ?></label>
+                                    <input type="text" class="form-input" id="lblTitle" maxlength="100" placeholder="<?php echo htmlspecialchars(t('asset-management.settings.asset_label_title_ph')); ?>" oninput="updateLabelLivePreview()">
+                                    <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_title_hint')); ?></div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="lblFooter"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_footer_label')); ?></label>
+                                    <input type="text" class="form-input" id="lblFooter" maxlength="100" placeholder="<?php echo htmlspecialchars(t('asset-management.settings.asset_label_footer_ph')); ?>" oninput="updateLabelLivePreview()">
+                                    <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_footer_hint')); ?></div>
+                                </div>
+                                
+                                <!-- QR Logo Section directly in Left Column -->
+                                <div style="border-top: 1px solid var(--border, #e2e6ea); padding-top: 16px;">
+                                    <h3 style="font-size:14px; font-weight:600; margin:0 0 10px 0;"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_logo_heading')); ?></h3>
+                                    <div class="form-group">
+                                        <label class="form-label" style="display:flex; align-items:center; gap:10px;">
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="lblLogoEnabled" onchange="updateLabelLivePreview()">
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                            <span><?php echo htmlspecialchars(t('asset-management.settings.asset_label_logo_enabled_label')); ?></span>
+                                        </label>
+                                        <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_logo_enabled_hint')); ?></div>
+                                    </div>
+                                    <div class="form-group" id="logoUploadRow" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:10px;">
+                                        <div>
+                                            <input type="file" id="lblLogoFile" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="display:none;" onchange="handleLabelLogoSelect(event)">
+                                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('lblLogoFile').click()">
+                                                <?php echo htmlspecialchars(t('asset-management.settings.asset_label_logo_upload_btn')); ?>
+                                            </button>
+                                            <button type="button" class="btn btn-secondary delete" id="lblRemoveLogoBtn" style="display:none; margin-left:8px;" onclick="removeLabelLogo()">
+                                                <?php echo htmlspecialchars(t('asset-management.settings.asset_label_logo_remove_btn')); ?>
+                                            </button>
+                                        </div>
+                                        <div id="lblLogoStatusText" style="font-size:12px; color:var(--text-muted, #778);"></div>
+                                        <div class="form-hint" style="width:100%; margin-top:6px;"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_logo_restrictions_hint', 'Logo format: PNG or JPG only, max 2 MB. Square, bold, or high-contrast logos work best. Scaled to 22% in the center of the QR code with Error Correction Level H (30% redundancy) to ensure reliable scanning.')); ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Right Column -->
+                            <div class="right-col" style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label" style="font-weight:600;"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_fields_label')); ?></label>
+                                    <div class="form-hint" style="margin-bottom:8px;"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_fields_hint')); ?></div>
+                                    
+                                    <div style="margin: 8px 0 12px 0;">
+                                        <label class="form-label" style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer;">
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="lblShowFieldLabels" onchange="updateLabelLivePreview()">
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                            <span style="font-size:13px;"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_show_labels_label', 'Include field labels on printed tag')); ?></span>
+                                        </label>
+                                        <div class="form-hint" style="margin-left: 48px;"><?php echo htmlspecialchars(t('asset-management.settings.asset_label_show_labels_hint', 'When enabled, prints field names before values (e.g. "Hostname: LON-01"). When disabled, prints only values for maximum space efficiency.')); ?></div>
+                                    </div>
+                                    
+                                    <div id="lblSelectedFieldsContainer" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <select class="form-select" id="lblAvailableFieldsSelect" style="flex:1;"></select>
+                                        <button type="button" class="btn btn-secondary" id="lblAddFieldBtn" onclick="addSelectedLabelField()">+ <?php echo htmlspecialchars(t('asset-management.settings.asset_label_add_field')); ?></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Live Physical Label Preview Card -->
+                        <div class="card" style="background:var(--surface-2, #f3f6fa); border:1px solid var(--border, #e2e6ea); border-radius:8px; padding:16px; margin:20px 0;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                                <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #667);">
+                                    <?php echo htmlspecialchars(t('asset-management.settings.asset_label_preview_heading', 'Live physical label previews (100% physical scale — all 4 sheet sizes)')); ?>
+                                </div>
+                                <div style="font-size:11px; color:var(--text-muted, #778); font-style:italic;">
+                                    Shown at actual 1:1 physical print dimensions (mm). Verify that your selected fields fit comfortably without excessive truncation.
+                                </div>
+                            </div>
+                            
+                            <div style="display:flex; gap:20px; align-items:flex-start; overflow-x:auto; padding:12px 6px 18px 6px;">
+                                <!-- 65 per sheet: 38.1 x 21.2 mm -->
+                                <div style="flex:0 0 auto;">
+                                    <div style="font-size:11px; font-weight:600; color:#556; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                        <span>65 per sheet</span>
+                                        <span style="font-size:10px; color:#889; font-weight:normal;">(38.1 × 21.2 mm)</span>
+                                    </div>
+                                    <div class="label-preview-item" data-sheet="65" style="width:38.1mm; height:21.2mm; padding:1.2mm 1.5mm; background:#fff; border:1px dashed #bbb; border-radius:2px; box-shadow:0 2px 5px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; box-sizing:border-box;">
+                                        <div class="prevHeader" style="text-align:right; font-size:5pt; font-weight:600; color:#444; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.3mm; display:none;"></div>
+                                        <div class="label-body" style="display:flex; align-items:center; gap:1.5mm; flex:1; min-height:0;">
+                                            <div class="prevQrBox" style="position:relative; flex:0 0 auto; width:16mm; height:16mm; background:#fff;"></div>
+                                            <div class="prevTextContainer" style="min-width:0; flex:1; display:flex; flex-direction:column; justify-content:center; overflow:hidden;">
+                                                <div class="prevTag" style="font-weight:700; font-size:6.4pt; color:#000; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">AST-00042</div>
+                                                <div class="prevSubs" style="font-size:4.8pt; color:#333; line-height:1.15; overflow:hidden;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="prevFooter" style="text-align:right; font-size:4.5pt; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0.3mm; display:none;"></div>
+                                    </div>
+                                </div>
+
+                                <!-- 40 per sheet: 45.7 x 25.4 mm (Standard) -->
+                                <div style="flex:0 0 auto;">
+                                    <div style="font-size:11px; font-weight:600; color:#556; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                        <span>40 per sheet</span>
+                                        <span style="font-size:10px; color:#889; font-weight:normal;">(45.7 × 25.4 mm)</span>
+                                        <span style="font-size:9px; background:#e8f5e9; color:#2e7d32; padding:1px 4px; border-radius:3px;">Standard</span>
+                                    </div>
+                                    <div class="label-preview-item" data-sheet="40" style="width:45.7mm; height:25.4mm; padding:1.2mm 1.5mm; background:#fff; border:1px dashed #bbb; border-radius:2px; box-shadow:0 2px 5px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; box-sizing:border-box;">
+                                        <div class="prevHeader" style="text-align:right; font-size:6.0pt; font-weight:600; color:#444; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.4mm; display:none;"></div>
+                                        <div class="label-body" style="display:flex; align-items:center; gap:1.5mm; flex:1; min-height:0;">
+                                            <div class="prevQrBox" style="position:relative; flex:0 0 auto; width:19mm; height:19mm; background:#fff;"></div>
+                                            <div class="prevTextContainer" style="min-width:0; flex:1; display:flex; flex-direction:column; justify-content:center; overflow:hidden;">
+                                                <div class="prevTag" style="font-weight:700; font-size:7.6pt; color:#000; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">AST-00042</div>
+                                                <div class="prevSubs" style="font-size:5.2pt; color:#333; line-height:1.15; overflow:hidden;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="prevFooter" style="text-align:right; font-size:5.3pt; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0.4mm; display:none;"></div>
+                                    </div>
+                                </div>
+
+                                <!-- 24 per sheet: 63.5 x 33.9 mm -->
+                                <div style="flex:0 0 auto;">
+                                    <div style="font-size:11px; font-weight:600; color:#556; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                        <span>24 per sheet</span>
+                                        <span style="font-size:10px; color:#889; font-weight:normal;">(63.5 × 33.9 mm)</span>
+                                    </div>
+                                    <div class="label-preview-item" data-sheet="24" style="width:63.5mm; height:33.9mm; padding:1.2mm 1.5mm; background:#fff; border:1px dashed #bbb; border-radius:2px; box-shadow:0 2px 5px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; box-sizing:border-box;">
+                                        <div class="prevHeader" style="text-align:right; font-size:7.5pt; font-weight:600; color:#444; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.5mm; display:none;"></div>
+                                        <div class="label-body" style="display:flex; align-items:center; gap:1.5mm; flex:1; min-height:0;">
+                                            <div class="prevQrBox" style="position:relative; flex:0 0 auto; width:25mm; height:25mm; background:#fff;"></div>
+                                            <div class="prevTextContainer" style="min-width:0; flex:1; display:flex; flex-direction:column; justify-content:center; overflow:hidden;">
+                                                <div class="prevTag" style="font-weight:700; font-size:10.0pt; color:#000; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">AST-00042</div>
+                                                <div class="prevSubs" style="font-size:6.5pt; color:#333; line-height:1.15; overflow:hidden;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="prevFooter" style="text-align:right; font-size:7.0pt; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0.5mm; display:none;"></div>
+                                    </div>
+                                </div>
+
+                                <!-- 12 per sheet: 63.5 x 72.0 mm -->
+                                <div style="flex:0 0 auto;">
+                                    <div style="font-size:11px; font-weight:600; color:#556; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                        <span>12 per sheet</span>
+                                        <span style="font-size:10px; color:#889; font-weight:normal;">(63.5 × 72.0 mm)</span>
+                                    </div>
+                                    <div class="label-preview-item" data-sheet="12" style="width:63.5mm; height:72.0mm; padding:1.2mm 1.5mm; background:#fff; border:1px dashed #bbb; border-radius:2px; box-shadow:0 2px 5px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; box-sizing:border-box;">
+                                        <div class="prevHeader" style="text-align:right; font-size:7.5pt; font-weight:600; color:#444; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:0.5mm; display:none;"></div>
+                                        <div class="label-body is-portrait" style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:1.2mm; flex:1; min-height:0;">
+                                            <div class="prevQrBox" style="position:relative; flex:0 0 auto; width:38mm; height:38mm; background:#fff; margin:0 auto;"></div>
+                                            <div class="prevTextContainer" style="width:100%; min-width:0; flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; overflow:hidden;">
+                                                <div class="prevTag" style="font-weight:700; font-size:13.0pt; color:#000; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">AST-00042</div>
+                                                <div class="prevSubs" style="font-size:8.5pt; color:#333; line-height:1.15; overflow:hidden;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="prevFooter" style="text-align:right; font-size:7.0pt; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0.5mm; display:none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="labelSaveBtn"><?php echo htmlspecialchars(t('asset-management.common.save')); ?></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         <?php if (settingsTabVisible($visibleTabs, 'reconciliation')): ?>
         <!-- Discovery & Reconciliation Tab -->
         <div class="tab-content<?php echo $activeTabId === 'reconciliation' ? ' active' : ''; ?>" id="reconciliation-tab" data-capability="<?php echo Cap::ASSETS_RECONCILIATION; ?>">
@@ -1088,7 +1348,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     <p class="settings-description">
                         <?php echo htmlspecialchars(t('asset-management.settings.reconciliation_intro')); ?>
                     </p>
-                    <form id="reconciliationForm" onsubmit="saveReconciliationSettings(event)">
+                    <form id="reconciliationForm" onsubmit="saveReconciliationSettings(event); return false;">
                         <div class="form-group">
                             <label class="form-label" for="reconIgnoredSerials"><?php echo htmlspecialchars(t('asset-management.settings.ignored_serials_label')); ?></label>
                             <textarea class="form-input" id="reconIgnoredSerials" rows="6" placeholder="<?php echo htmlspecialchars(t('asset-management.settings.ignored_serials_placeholder')); ?>" style="font-family: monospace; font-size: 12px;"></textarea>
@@ -1486,7 +1746,419 @@ $translationNamespaces = ['common', 'asset-management'];
             loadLocations();
             loadSuppliers();
             loadIntegrationSettings();
+            loadAssetTagSettings();
+            loadAssetLabelSettings();
+
+            // Hash / Query parameter tab deep-linking
+            const wantHash = decodeURIComponent((location.hash || '').slice(1));
+            const urlParams = new URLSearchParams(window.location.search);
+            const wantTab = wantHash || urlParams.get('tab');
+            if (wantTab && document.getElementById(wantTab + '-tab')) {
+                switchTab(wantTab);
+            }
         });
+
+        // =========================================================================
+        // Asset Labels & Physical Preview Configuration
+        // =========================================================================
+        let currentLabelLogoPath = '';
+        let pendingLabelLogoFile = null;
+        let removeLabelLogoFlag = false;
+        let selectedLabelFields = ['asset_tag', 'hostname'];
+        let availableLabelFieldsMap = { asset_tag: 'Asset Tag', hostname: 'Hostname', service_tag: 'Serial / Service Tag', model: 'Model' };
+
+        async function loadAssetLabelSettings() {
+            const titleEl = document.getElementById('lblTitle');
+            if (!titleEl) return;
+            try {
+                const res = await fetch(API_BASE + 'get_asset_label_settings.php');
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseErr) {
+                    console.error('get_asset_label_settings returned non-JSON:', text);
+                    return;
+                }
+                if (data.success) {
+                    if (data.available_fields) {
+                        availableLabelFieldsMap = data.available_fields;
+                    }
+                    if (data.print_fields) {
+                        window.printLabelFieldsMap = data.print_fields;
+                    }
+                    if (data.settings) {
+                        const s = data.settings;
+                        titleEl.value = s.title || '';
+                        document.getElementById('lblFooter').value = s.footer || '';
+                        document.getElementById('lblLogoEnabled').checked = !!s.logo_enabled;
+                        if (document.getElementById('lblShowFieldLabels')) {
+                            document.getElementById('lblShowFieldLabels').checked = !!s.show_field_labels;
+                        }
+                        selectedLabelFields = Array.isArray(s.fields) && s.fields.length > 0 ? s.fields : ['asset_tag', 'hostname'];
+                        if (!selectedLabelFields.includes('asset_tag')) {
+                            selectedLabelFields.unshift('asset_tag');
+                        }
+                        currentLabelLogoPath = s.logo_path || '';
+                        removeLabelLogoFlag = false;
+                        pendingLabelLogoFile = null;
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load asset label settings', err);
+            } finally {
+                renderSelectedLabelFieldsList();
+                updateLogoStatusDisplay();
+                updateLabelLivePreview();
+            }
+        }
+
+        function renderSelectedLabelFieldsList() {
+            const container = document.getElementById('lblSelectedFieldsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            selectedLabelFields.forEach((fk, idx) => {
+                const labelName = availableLabelFieldsMap[fk] || fk;
+                const row = document.createElement('div');
+                row.className = 'lbl-field-item';
+                row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; background:var(--surface,#fff); border:1px solid var(--border,#d5dbe1); border-radius:4px; padding:6px 10px; font-size:13px;';
+
+                const left = document.createElement('div');
+                left.style.cssText = 'display:flex; align-items:center; gap:8px;';
+                const dragIcon = '<span style="color:var(--text-muted,#889); font-size:12px;">☰</span>';
+                left.innerHTML = dragIcon + '<strong>' + escapeHtml(labelName) + '</strong>' + (fk === 'asset_tag' ? ' <span style="font-size:11px; color:#2e7d32; background:#e8f5e9; padding:1px 5px; border-radius:3px; font-weight:normal;">Required</span>' : '');
+
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display:flex; align-items:center; gap:4px;';
+
+                const upBtn = document.createElement('button');
+                upBtn.type = 'button';
+                upBtn.className = 'btn btn-secondary';
+                upBtn.style.cssText = 'padding:2px 6px; font-size:11px;';
+                upBtn.textContent = '↑';
+                upBtn.disabled = (idx === 0);
+                upBtn.onclick = () => moveSelectedLabelField(idx, -1);
+
+                const dnBtn = document.createElement('button');
+                dnBtn.type = 'button';
+                dnBtn.className = 'btn btn-secondary';
+                dnBtn.style.cssText = 'padding:2px 6px; font-size:11px;';
+                dnBtn.textContent = '↓';
+                dnBtn.disabled = (idx === selectedLabelFields.length - 1);
+                dnBtn.onclick = () => moveSelectedLabelField(idx, 1);
+
+                actions.appendChild(upBtn);
+                actions.appendChild(dnBtn);
+
+                if (fk !== 'asset_tag') {
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = 'btn btn-secondary delete';
+                    delBtn.style.cssText = 'padding:2px 6px; font-size:11px; margin-left:4px;';
+                    delBtn.textContent = '✕';
+                    delBtn.onclick = () => removeSelectedLabelField(idx);
+                    actions.appendChild(delBtn);
+                }
+
+                row.appendChild(left);
+                row.appendChild(actions);
+                container.appendChild(row);
+            });
+
+            // Populate Available Fields Dropdown
+            const selectEl = document.getElementById('lblAvailableFieldsSelect');
+            if (selectEl) {
+                selectEl.innerHTML = '';
+                let addedCount = 0;
+                Object.keys(availableLabelFieldsMap).forEach(key => {
+                    if (!selectedLabelFields.includes(key)) {
+                        const opt = document.createElement('option');
+                        opt.value = key;
+                        opt.textContent = availableLabelFieldsMap[key];
+                        selectEl.appendChild(opt);
+                        addedCount++;
+                    }
+                });
+
+                if (addedCount === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = window.t('asset-management.settings.no_more_fields', 'No more fields available');
+                    opt.disabled = true;
+                    opt.selected = true;
+                    selectEl.appendChild(opt);
+                }
+
+                const btnAdd = document.getElementById('lblAddFieldBtn');
+                if (btnAdd) {
+                    btnAdd.disabled = (addedCount === 0);
+                }
+            }
+        }
+
+        function addSelectedLabelField() {
+            const selectEl = document.getElementById('lblAvailableFieldsSelect');
+            if (!selectEl || !selectEl.value) return;
+            const key = selectEl.value;
+            if (!selectedLabelFields.includes(key)) {
+                selectedLabelFields.push(key);
+                renderSelectedLabelFieldsList();
+                updateLabelLivePreview();
+            }
+        }
+
+        function moveSelectedLabelField(index, dir) {
+            const targetIdx = index + dir;
+            if (targetIdx < 0 || targetIdx >= selectedLabelFields.length) return;
+            const temp = selectedLabelFields[index];
+            selectedLabelFields[index] = selectedLabelFields[targetIdx];
+            selectedLabelFields[targetIdx] = temp;
+            renderSelectedLabelFieldsList();
+            updateLabelLivePreview();
+        }
+
+        function removeSelectedLabelField(index) {
+            const key = selectedLabelFields[index];
+            if (key === 'asset_tag') return;
+            selectedLabelFields.splice(index, 1);
+            renderSelectedLabelFieldsList();
+            updateLabelLivePreview();
+        }
+
+        function updateLogoStatusDisplay() {
+            const statusEl = document.getElementById('lblLogoStatusText');
+            const removeBtn = document.getElementById('lblRemoveLogoBtn');
+            if (!statusEl) return;
+            if (pendingLabelLogoFile) {
+                statusEl.innerHTML = '<span style="color:#0277bd; font-weight:500;">Selected: ' + escapeHtml(pendingLabelLogoFile.name) + '</span>';
+                if (removeBtn) removeBtn.style.display = 'inline-block';
+            } else if (currentLabelLogoPath && !removeLabelLogoFlag) {
+                const name = currentLabelLogoPath.split('/').pop();
+                statusEl.innerHTML = '<span style="color:#2e7d32; font-weight:500;">✓ Logo configured</span> <span style="color:#888;">(' + escapeHtml(name) + ')</span>';
+                if (removeBtn) removeBtn.style.display = 'inline-block';
+            } else {
+                statusEl.textContent = 'No logo uploaded';
+                if (removeBtn) removeBtn.style.display = 'none';
+            }
+        }
+
+        function handleLabelLogoSelect(e) {
+            const file = e.target.files?.[0];
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) {
+                    showToast(window.t('system.branding.logo_too_large', 'File is too large (maximum 2 MB).'), 'error');
+                    e.target.value = '';
+                    return;
+                }
+                pendingLabelLogoFile = file;
+                removeLabelLogoFlag = false;
+                document.getElementById('lblLogoEnabled').checked = true;
+                updateLogoStatusDisplay();
+                updateLabelLivePreview();
+            }
+        }
+
+        function removeLabelLogo() {
+            pendingLabelLogoFile = null;
+            removeLabelLogoFlag = true;
+            document.getElementById('lblLogoFile').value = '';
+            updateLogoStatusDisplay();
+            updateLabelLivePreview();
+        }
+
+        function updateLabelLivePreview() {
+            const title = (document.getElementById('lblTitle')?.value || '').trim();
+            const footer = (document.getElementById('lblFooter')?.value || '').trim();
+            const logoEnabled = document.getElementById('lblLogoEnabled')?.checked;
+            const showLabels = document.getElementById('lblShowFieldLabels')?.checked;
+
+            const sheetDefs = {
+                '65': { w: 38.1, h: 21.2, qr: 16, tagPt: 6.4, subDivisor: 3.2 },
+                '40': { w: 45.7, h: 25.4, qr: 19, tagPt: 7.6, subDivisor: 3.2 },
+                '24': { w: 63.5, h: 33.9, qr: 25, tagPt: 10.0, subDivisor: 3.2 },
+                '12': { w: 63.5, h: 72.0, qr: 38, tagPt: 13.0, subDivisor: 3.2 }
+            };
+
+            const printCatalogueMap = {
+                'asset_tag': 'Asset Tag',
+                'hostname': 'Hostname',
+                'service_tag': 'Serial',
+                'manufacturer': 'Manufacturer',
+                'model': 'Model',
+                'company': 'Company',
+                'location': 'Location',
+                'asset_type': 'Type'
+            };
+
+            const sampleCatalogue = {
+                'asset_tag': 'AST-00042',
+                'hostname': 'LON-LT-042',
+                'service_tag': 'CN-0XYZ987',
+                'model': 'Dell Latitude 5540',
+                'manufacturer': 'Dell',
+                'company': 'ACME Corp',
+                'location': 'HQ - Floor 3',
+                'asset_type': 'Laptop'
+            };
+
+            document.querySelectorAll('.label-preview-item').forEach(card => {
+                const sheetKey = card.getAttribute('data-sheet') || '40';
+                const def = sheetDefs[sheetKey] || sheetDefs['40'];
+                const isPortrait = def.h > def.w;
+                const indent = isPortrait ? '0' : ('calc(' + def.qr + 'mm + 1.5mm)');
+
+                // Update Header at physical TOP of label
+                const headerEl = card.querySelector('.prevHeader');
+                if (headerEl) {
+                    headerEl.textContent = title;
+                    headerEl.style.display = title ? 'block' : 'none';
+                    headerEl.style.marginLeft = indent;
+                    headerEl.style.textAlign = isPortrait ? 'center' : 'left';
+                }
+
+                // Update Footer at physical BOTTOM of label
+                const footerEl = card.querySelector('.prevFooter');
+                if (footerEl) {
+                    footerEl.textContent = footer;
+                    footerEl.style.display = footer ? 'block' : 'none';
+                    footerEl.style.marginLeft = indent;
+                    footerEl.style.textAlign = isPortrait ? 'center' : 'left';
+                }
+
+                // Update Fields in strict chosen catalogue order mirroring labels.php
+                const txtContainer = card.querySelector('.prevTextContainer');
+                if (txtContainer) {
+                    txtContainer.innerHTML = '';
+                    const countFields = selectedLabelFields.length;
+                    const subPt = Math.max(4.8, Math.min(8.5, def.qr / (def.subDivisor + (countFields * 0.35))));
+
+                    selectedLabelFields.forEach(fk => {
+                        if (fk === 'asset_tag') {
+                            const tagDiv = document.createElement('div');
+                            tagDiv.className = 'tag prevTag';
+                            tagDiv.style.cssText = 'font-weight:700; font-size:' + def.tagPt + 'pt; color:#000; letter-spacing:0.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' + (isPortrait ? ' width:100%; text-align:center;' : '');
+                            tagDiv.textContent = 'AST-00042';
+                            txtContainer.appendChild(tagDiv);
+                        } else {
+                            let fieldTitle = (window.printLabelFieldsMap && window.printLabelFieldsMap[fk]) ? window.printLabelFieldsMap[fk] : printCatalogueMap[fk];
+                            if (!fieldTitle) {
+                                let rawTitle = availableLabelFieldsMap[fk] || fk;
+                                fieldTitle = rawTitle.replace(/\s*\([^)]*Custom Field[^)]*\)/gi, '').trim();
+                            }
+
+                            let sampleVal = sampleCatalogue[fk];
+                            if (!sampleVal) {
+                                sampleVal = fk.indexOf('cf_') === 0 ? 'FAR-88092' : ('Sample ' + fieldTitle);
+                            }
+
+                            const displayText = showLabels ? (fieldTitle + ': ' + sampleVal) : sampleVal;
+                            const subDiv = document.createElement('div');
+                            subDiv.className = 'sub';
+                            subDiv.style.cssText = 'font-size:' + subPt.toFixed(1) + 'pt; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.15; margin-top:0.3mm;' + (isPortrait ? ' width:100%; text-align:center;' : '');
+                            subDiv.textContent = displayText;
+                            txtContainer.appendChild(subDiv);
+                        }
+                    });
+                }
+
+                // Update QR with center logo if enabled
+                const qrBox = card.querySelector('.prevQrBox');
+                if (qrBox && typeof qrcode === 'function') {
+                    qrBox.innerHTML = '';
+                    const hasLogo = logoEnabled && ((currentLabelLogoPath && !removeLabelLogoFlag) || pendingLabelLogoFile);
+                    const ec = hasLogo ? 'H' : 'M';
+                    const qr = qrcode(0, ec);
+                    qr.addData('https://example.com/a/preview');
+                    qr.make();
+                    qrBox.innerHTML = qr.createImgTag(2, 0);
+                    const img = qrBox.querySelector('img');
+                    if (img) {
+                        img.style.width = '100%';
+                        img.style.height = '100%';
+                        img.style.display = 'block';
+                    }
+
+                    if (hasLogo) {
+                        const overlay = document.createElement('div');
+                        overlay.style.position = 'absolute';
+                        overlay.style.top = '50%';
+                        overlay.style.left = '50%';
+                        overlay.style.transform = 'translate(-50%, -50%)';
+                        overlay.style.width = '22%';
+                        overlay.style.height = '22%';
+                        overlay.style.background = '#ffffff';
+                        overlay.style.padding = '1px';
+                        overlay.style.boxSizing = 'border-box';
+                        overlay.style.display = 'flex';
+                        overlay.style.alignItems = 'center';
+                        overlay.style.justifyContent = 'center';
+                        overlay.style.borderRadius = '2px';
+
+                        const logoImg = document.createElement('img');
+                        if (pendingLabelLogoFile) {
+                            logoImg.src = URL.createObjectURL(pendingLabelLogoFile);
+                        } else if (currentLabelLogoPath) {
+                            logoImg.src = '../../' + currentLabelLogoPath;
+                        }
+                        logoImg.style.maxWidth = '100%';
+                        logoImg.style.maxHeight = '100%';
+                        logoImg.style.objectFit = 'contain';
+                        overlay.appendChild(logoImg);
+                        qrBox.appendChild(overlay);
+                    }
+                }
+            });
+        }
+
+        async function saveAssetLabelSettings(e) {
+            if (e) e.preventDefault();
+            const btn = document.getElementById('labelSaveBtn');
+            if (btn) { btn.disabled = true; btn.textContent = window.t('asset-management.settings.saving'); }
+            try {
+                const formData = new FormData();
+                formData.append('title', (document.getElementById('lblTitle')?.value || '').trim());
+                formData.append('fields', JSON.stringify(selectedLabelFields));
+                formData.append('footer', (document.getElementById('lblFooter')?.value || '').trim());
+                formData.append('logo_enabled', document.getElementById('lblLogoEnabled')?.checked ? '1' : '0');
+                formData.append('show_field_labels', document.getElementById('lblShowFieldLabels')?.checked ? '1' : '0');
+                if (removeLabelLogoFlag) {
+                    formData.append('remove_logo', '1');
+                }
+                if (pendingLabelLogoFile) {
+                    formData.append('logo', pendingLabelLogoFile);
+                }
+
+                const res = await fetch(API_BASE + 'save_asset_label_settings.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseErr) {
+                    showToast(window.t('asset-management.settings.save_settings_failed', 'Save failed') + ': ' + text.substring(0, 100), 'error');
+                    return;
+                }
+                if (data.success) {
+                    showToast(window.t('asset-management.settings.asset_label_saved'), 'success');
+                    if (data.settings) {
+                        currentLabelLogoPath = data.settings.logo_path || '';
+                        pendingLabelLogoFile = null;
+                        removeLabelLogoFlag = false;
+                        updateLogoStatusDisplay();
+                        updateLabelLivePreview();
+                    }
+                } else {
+                    showToast(data.error || window.t('asset-management.settings.save_settings_failed'), 'error');
+                }
+            } catch (err) {
+                showToast(window.t('asset-management.settings.save_settings_failed'), 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = window.t('asset-management.common.save'); }
+            }
+        }
 
         function switchTab(tab) {
             currentTab = tab;
@@ -1494,8 +2166,15 @@ $translationNamespaces = ['common', 'asset-management'];
             const btn = document.querySelector('.tab[data-tab="' + tab + '"]');
             if (btn) btn.classList.add('active');
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(tab + '-tab').classList.add('active');
+            const targetPanel = document.getElementById(tab + '-tab');
+            if (targetPanel) targetPanel.classList.add('active');
             if (tab === 'left-panel') loadSidebarMode();
+            if (tab === 'asset-tags') updateLabelLivePreview();
+            try {
+                if (history.replaceState) {
+                    history.replaceState(null, '', '?tab=' + encodeURIComponent(tab));
+                }
+            } catch (e) {}
         }
 
         // --- Left panel preference ------------------------------------
@@ -1764,6 +2443,72 @@ $translationNamespaces = ['common', 'asset-management'];
         // the placeholder tells the user one is already saved. The save endpoint
         // treats blank/asterisk values as "keep existing", so leaving them
         // alone preserves the stored secret.
+        async function loadAssetTagSettings() {
+            const prefixEl = document.getElementById('tagPrefix');
+            if (!prefixEl) return;
+            try {
+                const res = await fetch(API_BASE + 'get_asset_tag_settings.php');
+                const data = await res.json();
+                if (data.success && data.settings) {
+                    const s = data.settings;
+                    document.getElementById('tagAutogenEnabled').checked = !!s.enabled;
+                    document.getElementById('tagPrefix').value = s.prefix || 'AST-';
+                    document.getElementById('tagSuffix').value = s.suffix || '';
+                    document.getElementById('tagPadding').value = s.padding || 5;
+                    document.getElementById('tagNextNumber').value = s.next_number || 1;
+                    updateTagPreview();
+                }
+            } catch (err) {
+                console.error('Failed to load asset tag settings', err);
+            }
+        }
+
+        function updateTagPreview() {
+            const prefix = (document.getElementById('tagPrefix')?.value || '');
+            const suffix = (document.getElementById('tagSuffix')?.value || '');
+            const padding = Math.max(1, Math.min(12, parseInt(document.getElementById('tagPadding')?.value, 10) || 5));
+            const num = Math.max(1, parseInt(document.getElementById('tagNextNumber')?.value, 10) || 1);
+            const previewEl = document.getElementById('tagFormatPreview');
+            if (!previewEl) return;
+
+            const padded = String(num).padStart(padding, '0');
+            previewEl.textContent = prefix + padded + suffix;
+        }
+
+        async function saveAssetTagsSettings(e) {
+            e.preventDefault();
+            const btn = document.getElementById('tagSaveBtn');
+            if (btn) { btn.disabled = true; btn.textContent = window.t('asset-management.settings.saving'); }
+            try {
+                const res = await fetch(API_BASE + 'save_asset_tag_settings.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        enabled: document.getElementById('tagAutogenEnabled').checked,
+                        prefix: document.getElementById('tagPrefix').value.trim(),
+                        suffix: document.getElementById('tagSuffix').value.trim(),
+                        padding: parseInt(document.getElementById('tagPadding').value, 10) || 5,
+                        initial_number: parseInt(document.getElementById('tagNextNumber').value, 10) || 1,
+                        next_number: parseInt(document.getElementById('tagNextNumber').value, 10) || 1
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(window.t('asset-management.settings.asset_tags_saved'), 'success');
+                    if (data.settings) {
+                        document.getElementById('tagNextNumber').value = data.settings.next_number;
+                        updateTagPreview();
+                    }
+                } else {
+                    showToast(data.error || window.t('asset-management.settings.save_settings_failed'), 'error');
+                }
+            } catch (err) {
+                showToast(window.t('asset-management.settings.save_settings_failed'), 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = window.t('asset-management.common.save'); }
+            }
+        }
+
         async function loadIntegrationSettings() {
             try {
                 const response = await fetch(API_SETTINGS + 'get_system_settings.php');
@@ -1909,7 +2654,7 @@ $translationNamespaces = ['common', 'asset-management'];
             const btn = document.getElementById('reconSaveBtn');
             if (btn) btn.disabled = true;
             try {
-                const response = await fetch(`${API_BASE}/system/save_system_settings.php`, {
+                const response = await fetch(API_SETTINGS + 'save_system_settings.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

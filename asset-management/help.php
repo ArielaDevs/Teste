@@ -81,30 +81,38 @@ $translationNamespaces = ['common', 'asset-management'];
                 <span class="help-nav-num">7</span>
                 <?php echo htmlspecialchars(t('asset-management.help.reconciliation.nav')); ?>
             </a>
-            <a href="#servers" class="help-nav-link" data-section="servers">
+            <a href="#asset-tags" class="help-nav-link" data-section="asset-tags">
                 <span class="help-nav-num">8</span>
+                <?php echo htmlspecialchars(t('asset-management.help.asset_tags.nav')); ?>
+            </a>
+            <a href="#asset-labels" class="help-nav-link" data-section="asset-labels">
+                <span class="help-nav-num">9</span>
+                <?php echo htmlspecialchars(t('asset-management.help.asset_labels.nav')); ?>
+            </a>
+            <a href="#servers" class="help-nav-link" data-section="servers">
+                <span class="help-nav-num">10</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_servers')); ?>
             </a>
             <a href="#dashboard" class="help-nav-link" data-section="dashboard">
-                <span class="help-nav-num">9</span>
+                <span class="help-nav-num">11</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_dashboard')); ?>
             </a>
             <a href="#who-holds-what" class="help-nav-link" data-section="who-holds-what">
-                <span class="help-nav-num">10</span>
+                <span class="help-nav-num">12</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_users')); ?>
             </a>
             <a href="#linked-tickets" class="help-nav-link" data-section="linked-tickets">
-                <span class="help-nav-num">11</span>
+                <span class="help-nav-num">13</span>
                 Tickets on an asset
             </a>
             <a href="#linked-contracts" class="help-nav-link" data-section="linked-contracts">
-                <span class="help-nav-num">12</span> Contracts covering an asset
+                <span class="help-nav-num">14</span> Contracts covering an asset
             </a>
             <a href="#right-click" class="help-nav-link" data-section="right-click">
-                <span class="help-nav-num">13</span> Right-click an asset
+                <span class="help-nav-num">15</span> Right-click an asset
             </a>
             <a href="#companies" class="help-nav-link" data-section="companies">
-                <span class="help-nav-num">14</span>
+                <span class="help-nav-num">16</span>
                 <?php echo htmlspecialchars(t('asset-management.help.companies.nav')); ?>
             </a>
             <a href="#tips" class="help-nav-link" data-section="tips">
@@ -446,7 +454,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 <!-- Section 8: Servers & vCenter -->
                 <div class="help-section" id="servers">
                     <div class="help-section-header">
-                        <span class="help-section-num">8</span>
+                        <span class="help-section-num">10</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_servers')); ?></h3>
                     </div>
                     <p>If you run VMware vCenter, FreeITSM can sync your entire virtual machine estate with a single click.</p>
@@ -475,7 +483,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 <!-- Section 7: Dashboard -->
                 <div class="help-section" id="dashboard">
                     <div class="help-section-header">
-                        <span class="help-section-num">9</span>
+                        <span class="help-section-num">11</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_dashboard')); ?></h3>
                     </div>
                     <p>The dashboard lets you visualise your asset estate with customisable Chart.js widgets. Each analyst has their own dashboard &mdash; choose the charts that matter to you.</p>
@@ -506,7 +514,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 <!-- Section 9: Who holds what + the handover document (discussion #56) -->
                 <div class="help-section" id="who-holds-what">
                     <div class="help-section-header">
-                        <span class="help-section-num">10</span>
+                        <span class="help-section-num">12</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.users_heading')); ?></h3>
                     </div>
                     <p><?php echo htmlspecialchars(t('asset-management.help.users_intro')); ?></p>
@@ -550,7 +558,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
                 <div class="help-section" id="linked-tickets">
                     <div class="help-section-header">
-                        <span class="help-section-num">11</span>
+                        <span class="help-section-num">13</span>
                         <h3>Tickets raised against an asset</h3>
                     </div>
                     <p>Every asset has a <strong>Tickets</strong> tab listing what has been reported against it &mdash; open tickets first, then everything that came before. Click any row to open the ticket.</p>
@@ -566,7 +574,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
                 <div class="help-section" id="linked-contracts">
                     <div class="help-section-header">
-                        <span class="help-section-num">12</span>
+                        <span class="help-section-num">14</span>
                         <h3>Contracts covering an asset</h3>
                     </div>
                     <p>Every asset has a <strong>Contracts</strong> tab listing the agreements that cover it &mdash; the mobile service agreement behind a handset, the internet agreement behind a router, the maintenance contract behind a server. Each row shows the supplier, when the contract ends, and when notice has to be given. Click one to open the contract.</p>
@@ -586,7 +594,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
 <div class="help-section" id="right-click">
                     <div class="help-section-header">
-                        <span class="help-section-num">13</span>
+                        <span class="help-section-num">15</span>
                         <h3>Right-click an asset</h3>
                     </div>
                     <p>Right-clicking any asset in the list opens a menu of the things you most often want to do to one piece of equipment, without opening it and without hunting through the detail panel.</p>
@@ -609,7 +617,7 @@ $translationNamespaces = ['common', 'asset-management'];
          language while the translation score still reads 100%. */ ?>
                 <div class="help-section" id="companies">
                     <div class="help-section-header">
-                        <span class="help-section-num">14</span>
+                        <span class="help-section-num">16</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.companies.heading')); ?></h3>
                     </div>
                     <p><?php echo t('asset-management.help.companies.intro'); ?></p>
