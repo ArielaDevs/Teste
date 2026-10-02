@@ -59,6 +59,7 @@ docker compose up -d
 Then open [http://localhost:8080/setup/](http://localhost:8080/setup/) to verify the installation and create your admin account. The first sign-in uses **admin** / **freeitsm** and FreeITSM will make you choose a new password before it lets you do anything else.
 
 - **Manual install** (WAMP / XAMPP / LAMP): follow the **[Installation guide](https://github.com/edmozley/freeitsm/wiki/Installation)** — prerequisites, database setup, encryption key, and configuration files.
+- **Upgraded, or moved servers?** **System → Debug Tools → D017** checks your `config.php` against what this version expects and gives you the exact line to add for anything missing. It shows setting names only, never values.
 - **Running in Docker?** FreeITSM checks whether the folders holding your uploaded files are on Docker volumes, and warns you on the System screen if an update would discard them. **System → Debug Tools → D013** shows the detail and what to do about it. Native installs are unaffected and see nothing.
 - **HTTPS in Docker**: **System → Docker** makes a certificate for the name your people type (such as `freeitsm.internal`) and walks you through the rest: the DNS record, installing its authority certificate on your PCs, and restarting the container. HTTPS is then served on port 8443. The authority can only vouch for that one name, so trusting it on your PCs does not let it impersonate any other site.
 - **First login**: `admin` / `freeitsm` — change it immediately via the account menu.

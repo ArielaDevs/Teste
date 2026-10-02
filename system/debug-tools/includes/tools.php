@@ -406,6 +406,26 @@ function getDebugTools() {
             'duration' => 'Slower than the other tools — it reads every card in the book. Seconds for a few hundred contacts.',
             'persists' => 'Nothing, in either direction. It does not write to the address book and does not change anybody here, and it deliberately offers no "fix it" button: which side is right is a judgement a person has to make, and a one-click reconcile across hundreds of contacts is how a careful integration becomes a data-loss incident. ⚠️ Contact names and details DO appear in the output, so treat the report as personal data.',
         ],
+        [
+            'id'       => 'D017',
+            'slug'     => 'd017',
+            'file'     => 'D017_config_completeness.php',
+            'title'    => 'Config completeness — is anything missing from config.php?',
+            'category' => 'Installation',
+            'icon'     => 'shield',
+            'desc'     => 'Check your config.php against what this version expects, setting by setting, and get the exact line to add for anything missing.',
+            'keywords' => 'config config.php db_config settings constants missing upgrade template base_url ssl_verify_peer ssl_ca_bundle encryption_key_path trust_proxy_https cannot redeclare undefined constant 129 d017',
+            'when'     => 'Run this after an upgrade, after moving an install to a new server, or whenever a page fails with "undefined constant" or "Cannot redeclare". config.php is your own file - it is edited once and kept, so an upgrade never adds a line to it, and a copy made from an older version can lack a setting a newer version knows about. Most settings now have a safe built-in default, so a missing line usually changes nothing; this tool tells you which ones, and which ones you would want to set yourself.',
+            'checks'   => [
+                'Every setting this version knows about - whether it is needed, has a built-in default, or is optional - and whether your config.php sets it',
+                'The database settings that have no default, which normally live in db_config.php outside the web root',
+                'Constants in your config.php that this version does not know about (usually harmless leftovers)',
+                'Functions declared inside config.php - the shape that caused GH #129, where an old copy of a function in config.php clashed with the app\'s own',
+                'A plain-English verdict, with the exact line to add for anything you want to set',
+            ],
+            'duration' => 'Instant',
+            'persists' => 'Nothing. Read-only - it reads config.php\'s text for the NAMES it defines and checks which settings exist. 🔒 It never prints a value: no password, no path, no address - names and yes/no only, so the report is safe to send on.',
+        ],
     ];
 }
 

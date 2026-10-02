@@ -62,20 +62,10 @@ ini_set('display_errors', 0);
 
 /**
  * BASE_URL — absolute URL path prefix for the app's deployment root.
- * Auto-detected from the filesystem location of this config.php relative to
- * the web server's DOCUMENT_ROOT. In the standard Docker image the app is at
- * /var/www/html and Apache's doc root is /var/www/html, so this resolves to '/'.
+ * Auto-detected by includes/base_url.php (shipped with the app) from where the
+ * app sits under the web server's DOCUMENT_ROOT. In the standard Docker image
+ * the app is at /var/www/html and Apache's doc root is /var/www/html, so this
+ * resolves to '/'.
  */
-if (!defined('BASE_URL')) {
-    $__appRoot = str_replace('\\', '/', realpath(__DIR__));
-    $__docRoot = str_replace('\\', '/', realpath($_SERVER['DOCUMENT_ROOT'] ?? ''));
-    $__rel = '';
-    if ($__docRoot && strpos($__appRoot, $__docRoot) === 0) {
-        $__rel = substr($__appRoot, strlen($__docRoot));
-    }
-    $__rel = '/' . trim($__rel, '/') . '/';
-    if ($__rel === '//') $__rel = '/';
-    define('BASE_URL', $__rel);
-    unset($__appRoot, $__docRoot, $__rel);
-}
+require_once(__DIR__ . '/includes/base_url.php');
 ?>

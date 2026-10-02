@@ -21,6 +21,7 @@ if (!isset($course, $courseId, $conn)) {
     exit;
 }
 
+require_once __DIR__ . '/../includes/base_url.php';   // BASE_URL if config.php lacks it (GH #129)
 $current_page = 'lms';
 $path_prefix  = '../';
 $translationNamespaces = ['common', 'lms'];

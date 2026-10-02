@@ -285,6 +285,138 @@ ok("the operator's own SSL_CA_BUNDLE is not overridden", strpos($out4, 'THEIRS')
 
 @unlink($noBundle); @unlink($ownBundle);
 
+echo "\n7. BASE_URL: every entry point that USES it reaches includes/base_url.php itself\n";
+
+// 🔴 The last thing config.php supplied with no fallback: 300+ uses, and on PHP 8
+// an undefined constant is a thrown Error - every page at once. includes/base_url.php
+// now defines it when config.php has not; this asks section 5's question of it,
+// with config.php's edges cut, because the operator's file is the thing that may
+// be missing the line.
+
+/** A real use of the BASE_URL constant (not the string 'BASE_URL' in defined()). */
+$usesBaseUrl = static function (string $src): bool {
+    $tokens = @token_get_all($src);
+    if (!is_array($tokens)) return false;
+    $prev = null;
+    foreach ($tokens as $t) {
+        if (is_array($t) && $t[0] === T_STRING && $t[1] === 'BASE_URL') {
+            $isMember = is_array($prev) && in_array($prev[0], [T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_CONST], true);
+            if (!$isMember) return true;
+        }
+        if (!is_array($t) || $t[0] !== T_WHITESPACE) $prev = $t;
+    }
+    return false;
+};
+
+$buHome = "$rootFwd/includes/base_url.php";
+$buChecked = 0;
+$buBroken = [];
+foreach ($allPhp as $file) {
+    $rel = ltrim(str_replace($rootFwd, '', $file), '/');
+    if ($rel === 'includes/base_url.php') continue;
+    if (preg_match('#(^|/)config\.php$#', $rel)) continue;          // the operator's file
+    if (preg_match('#(^|/)includes/#', $rel)) continue;              // libraries run through a caller
+    if (preg_match('#(^|/)_[^/]+\.php$#', $rel)) continue;           // _partials, likewise
+    if (!$usesBaseUrl((string)file_get_contents($file))) continue;
+    $buChecked++;
+    if (!$reaches($file, $buHome, $rootFwd)) $buBroken[] = $rel;
+}
+ok('every directly-requestable user of BASE_URL loads base_url.php', $buBroken === [],
+   $buBroken ? "\n       " . implode("\n       ", $buBroken) : "$buChecked entry points checked, config.php cut");
+ok('the BASE_URL audit actually examined some files', $buChecked > 50, "$buChecked found");
+
+// Positive control: the fallback itself, with a config.php that never defines it.
+$noBase = sys_get_temp_dir() . '/freeitsm_nobase_' . getmypid() . '.php';
+file_put_contents($noBase, '<?php
+$_SERVER["DOCUMENT_ROOT"] = ' . var_export(dirname($rootFwd), true) . ';
+require_once ' . var_export("$rootFwd/includes/base_url.php", true) . ';
+echo defined("BASE_URL") ? "DEFINED:" . BASE_URL : "UNDEFINED";
+');
+$out5 = trim((string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($noBase) . ' 2>&1'));
+$want = '/' . basename($rootFwd) . '/';
+ok("a config.php without BASE_URL still gets '$want'", $out5 === "DEFINED:$want", $out5);
+
+// And the operator's own value wins.
+$ownBase = sys_get_temp_dir() . '/freeitsm_ownbase_' . getmypid() . '.php';
+file_put_contents($ownBase, '<?php
+define("BASE_URL", "/helpdesk/");
+require_once ' . var_export("$rootFwd/includes/base_url.php", true) . ';
+echo BASE_URL;
+');
+$out6 = trim((string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($ownBase) . ' 2>&1'));
+ok("the operator's own BASE_URL is not overridden", $out6 === '/helpdesk/', $out6);
+@unlink($noBase); @unlink($ownBase);
+
+// --------------------------------------------------------------------------
+echo "\n8. The config requirements list (D017) matches both templates and leaks nothing\n";
+// One list - includes/config_requirements.php - says what config.php should
+// define. If a template gains a constant the list does not know, or the list
+// claims a default that shipped code does not provide, the diagnostic lies.
+require_once "$root/includes/config_requirements.php";
+$reqs = configRequirements();
+foreach (['config.php', 'docker/config.php'] as $rel) {
+    $shape = configFileShape("$root/$rel");
+    $unlisted = array_diff($shape['defines'], array_keys($reqs));
+    ok("every constant $rel defines is on the list", $shape['readable'] && $unlisted === [],
+       $unlisted ? implode(', ', $unlisted) : count($shape['defines']) . ' defines');
+}
+$docker = configFileShape("$root/docker/config.php");
+$missingReq = [];
+$noDefault  = [];
+foreach ($reqs as $name => $r) {
+    if ($r['kind'] === 'required') {
+        if (!in_array($name, $docker['defines'], true)) $missingReq[] = $name;
+    } else {
+        $src = @file_get_contents("$root/" . ($r['fallback'] ?? '-'));
+        if ($src === false || !preg_match("/defined\(\s*['\"]" . $name . "['\"]\s*\)/", $src)) $noDefault[] = $name;
+    }
+}
+ok('docker/config.php defines every "required" setting', $missingReq === [], implode(', ', $missingReq));
+ok('every "default" setting is really handled by its shipped file', $noDefault === [], implode(', ', $noDefault));
+
+// Positive controls: the scan can come back negative.
+$fake = sys_get_temp_dir() . '/freeitsm_fakecfg_' . getmypid() . '.php';
+file_put_contents($fake, "<?php\n// define('COMMENTED_OUT', 1);\ndefine('DB_PASSWORD', 'PLANTED-pw-7f3a');\n"
+    . "define('BASE_URL', '/planted-path-9c1e/');\ndefine('SOMETHING_NEW', 'PLANTED-new-2b4d');\n"
+    . "function legacyHelper() { return 'PLANTED-fn-5e6f'; }\n");
+$fr = configRequirementsReport($fake);
+ok('positive control: an unlisted constant is reported', $fr['unknown'] === ['SOMETHING_NEW'], implode(',', $fr['unknown']));
+ok('positive control: a function in config.php is reported', $fr['functions'] === ['legacyHelper']);
+$baseRow = array_values(array_filter($fr['rows'], fn($r) => $r['name'] === 'BASE_URL'))[0];
+ok('a define() in the file counts; a commented-out one does not',
+   $baseRow['inConfig'] === true && !in_array('COMMENTED_OUT', $fr['unknown'], true));
+ok('the report carries no planted value', strpos(json_encode($fr), 'PLANTED') === false
+   && strpos(json_encode($fr), 'planted') === false);
+@unlink($fake);
+
+// The real tool, over HTTP, as an administrator: it runs, and the real
+// database password is nowhere in what it prints. Then without a session.
+require_once "$root/config.php";
+$base = rtrim(getenv('FREEITSM_URL') ?: 'http://localhost/' . basename($root) . '/', '/') . '/';
+$sdir = rtrim(ini_get('session.save_path') ?: 'c:/wamp64/tmp', '/\\');
+$sid  = 'cfgtest' . bin2hex(random_bytes(4));
+file_put_contents("$sdir/sess_$sid", 'analyst_id|i:1;analyst_name|s:13:"Administrator";is_admin|i:1;');
+$get = function (?string $cookie) use ($base) {
+    $ch = curl_init($base . 'api/system/debug-tools/D017_config_completeness.php');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20]);
+    if ($cookie) curl_setopt($ch, CURLOPT_COOKIE, 'PHPSESSID=' . $cookie);
+    $body = (string)curl_exec($ch);
+    return [(int)curl_getinfo($ch, CURLINFO_HTTP_CODE), $body];
+};
+[$code, $body] = $get($sid);
+@unlink("$sdir/sess_$sid");
+if ($code === 0) {
+    ok('D017 reachable over HTTP (set FREEITSM_URL if not on localhost)', false, 'no web server answered');
+} else {
+    ok('D017 runs for an administrator', $code === 200 && strpos($body, '=== VERDICT ===') !== false, "HTTP $code");
+    ok('D017 lists every setting by name', count(array_filter(array_keys($reqs), fn($n) => strpos($body, $n) !== false)) === count($reqs));
+    $secret = defined('DB_PASSWORD') ? (string)DB_PASSWORD : '';
+    ok('D017 never prints the database password', strlen($secret) < 4 || strpos($body, $secret) === false,
+       strlen($secret) < 4 ? 'password too short to test' : '');
+    [$code2] = $get(null);
+    ok('D017 refuses without a session', $code2 === 403, "HTTP $code2");
+}
+
 echo "\n" . str_repeat('-', 78) . "\n";
 printf("  %d passed, %d failed\n\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

@@ -74,19 +74,13 @@ ini_set('display_errors', 1);
  *   App served at https://itsm.company.com/      → BASE_URL = '/'
  *
  * Used everywhere we build internal links so we don't have to fiddle with
- * $path_prefix or '../' on every page. Auto-detected from the filesystem
- * location of this config.php relative to the web server's DOCUMENT_ROOT.
+ * $path_prefix or '../' on every page. Auto-detected from where the app sits
+ * under the web server's DOCUMENT_ROOT - by includes/base_url.php, which ships
+ * with the app, so nothing breaks if a copy of this file lacks the line below.
+ *
+ * To set it yourself (for example behind a proxy that serves the app under a
+ * different path), uncomment and edit:
  */
-if (!defined('BASE_URL')) {
-    $__appRoot = str_replace('\\', '/', realpath(__DIR__));
-    $__docRoot = str_replace('\\', '/', realpath($_SERVER['DOCUMENT_ROOT'] ?? ''));
-    $__rel = '';
-    if ($__docRoot && strpos($__appRoot, $__docRoot) === 0) {
-        $__rel = substr($__appRoot, strlen($__docRoot));
-    }
-    $__rel = '/' . trim($__rel, '/') . '/';
-    if ($__rel === '//') $__rel = '/'; // app deployed at document root
-    define('BASE_URL', $__rel);
-    unset($__appRoot, $__docRoot, $__rel);
-}
+// define('BASE_URL', '/helpdesk/');
+require_once(__DIR__ . '/includes/base_url.php');
 ?>
