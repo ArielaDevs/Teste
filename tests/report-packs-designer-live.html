@@ -55,12 +55,23 @@ function firstDiff(a, b, path) {
   for (const k of new Set(Object.keys(a).concat(Object.keys(b)))) { const r = firstDiff(a[k], b[k], path + '.' + k); if (r) return r; }
   return path;
 }
+// This harness is not a FreeITSM page, so it has no CSRF token of its own (S4).
+// It borrows the session's token from a real page, exactly as one would carry it.
+let CSRF = '';
+async function borrowToken() {
+  const f = document.getElementById('f');
+  f.src = ROOT + 'index.php';
+  await new Promise(r => { f.onload = r; });
+  const m = f.contentDocument.querySelector('meta[name="csrf-token"]');
+  CSRF = m ? m.getAttribute('content') : '';
+}
 async function api(path, body) {
-  const r = await fetch(ROOT + 'api/reporting/packs/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch(ROOT + 'api/reporting/packs/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF }, body: JSON.stringify(body) });
   return r.json();
 }
 
 (async function () {
+await borrowToken();
 const P = (t, r, extra) => Object.assign({ t: 'p', a: 'center', r }, extra || {});
     const design = {
       v: 1,

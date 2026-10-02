@@ -78,7 +78,7 @@ try {
     // Changing a password is often somebody's response to thinking they have been
     // compromised. Without rotating the id here, the session an attacker already
     // holds survives the very action taken to shut them out.
-    sessionPromoteToAuthenticated();
+    sessionPromoteToAuthenticated(false);   // same person: keep the CSRF token
 
     echo json_encode(['success' => true, 'message' => 'Password changed successfully']);
 } catch (Exception $e) {

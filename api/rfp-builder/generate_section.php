@@ -26,6 +26,10 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+// A GET that writes (an EventSource stream that regenerates and saves): it must
+// carry the session's CSRF token, which assets/js/csrf.js adds to EventSource URLs.
+// Without this a plain link could start AI generation and overwrite the section. (S4)
+csrfRequireToken();
 require_once '../../includes/rfp_ai.php';
 
 @ini_set('zlib.output_compression', '0');

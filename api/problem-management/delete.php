@@ -15,7 +15,8 @@ requireModuleAccessJson('problems');
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
-    $id = (int) ($data['id'] ?? $_GET['id'] ?? 0);
+    // From the POST body only: a delete must never be reachable from a link (S4).
+    $id = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? (int) ($data['id'] ?? 0) : 0;
     if ($id <= 0) throw new Exception('Problem ID is required');
     $conn = connectToDatabase();
     ProblemsService::deleteProblem($conn, ActorContext::fromSession($conn), $id);

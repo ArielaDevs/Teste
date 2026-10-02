@@ -71,7 +71,7 @@ try {
 
     // Rotate the session id: a stolen session must not outlive the password change
     // made to end it. See includes/session_security.php.
-    sessionPromoteToAuthenticated();
+    sessionPromoteToAuthenticated(false);   // same person: keep the CSRF token
 
     echo json_encode(['success' => true, 'message' => 'Password changed successfully']);
 } catch (Exception $e) {
