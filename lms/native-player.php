@@ -10,6 +10,17 @@
  * answer key. Rendering the lessons server-side would mean writing a second
  * query, and a second chance to leak it.
  */
+
+// A piece of player.php, never a page of its own. Opened directly it has no
+// course, no access check and no I18n - it used to die with a PHP fatal that
+// printed file paths. Send a direct visit through the real player, which does
+// the sign-in, module and course-access checks; keep the course id if given.
+if (!isset($course, $courseId, $conn)) {
+    $id = (int)($_GET['course_id'] ?? 0);
+    header('Location: ' . ($id > 0 ? 'player.php?course_id=' . $id : './'));
+    exit;
+}
+
 $current_page = 'lms';
 $path_prefix  = '../';
 $translationNamespaces = ['common', 'lms'];
