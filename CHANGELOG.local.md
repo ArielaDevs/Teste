@@ -14,6 +14,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
+| 2125 | System            | Fix         | The schema-drift check had failed on every push since #2113-#2117: a hand-written comment in includes/db_verify_indexes.php, which is generated from database/freeitsm.sql; regenerated with scripts/gen_db_verify_indexes.php (the 422 indexes were already right, so 3.0.0 is unaffected). |
 
 
 

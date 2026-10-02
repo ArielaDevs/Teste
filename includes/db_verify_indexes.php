@@ -421,7 +421,6 @@ return [
     ['domain_alerts_sent', 'uq_domain_alert', 'unique', '(`domain_id`,`alert_kind`,`fingerprint`)'],
     ['domain_lookalikes', 'uq_domain_lookalike', 'unique', '(`domain_id`,`lookalike`)'],
     ['domain_certificates', 'uq_domain_certificate', 'unique', '(`domain_id`,`crtsh_id`)'],
-    // Domains joined to the rest of FreeITSM (3.0.0)
     ['domain_cmdb_objects', 'uq_domain_cmdb_obj', 'unique', '(`domain_id`,`cmdb_object_id`)'],
     ['domain_cmdb_objects', 'ix_dco_cmdb_object', 'key', '(`cmdb_object_id`)'],
     ['domain_status_services', 'uq_domain_status_service', 'unique', '(`domain_id`,`service_id`)'],
