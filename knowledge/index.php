@@ -47,7 +47,7 @@ $sidebarHoverClass = $sidebarMode === 'hover' ? ' sidebar-hover' : '';
     <title><?php echo htmlspecialchars(t('knowledge.browser_title.main')); ?></title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/knowledge.css?v=26">
+    <link rel="stylesheet" href="../assets/css/knowledge.css?v=27">
     <!-- Prism.js for code syntax highlighting -->
     <link rel="stylesheet" href="../assets/css/vendor/prism-tomorrow.min.css">
     <link rel="stylesheet" href="../assets/css/vendor/prism-toolbar.min.css">
@@ -313,6 +313,8 @@ $sidebarHoverClass = $sidebarMode === 'hover' ? ' sidebar-hover' : '';
                     <button class="btn btn-secondary" onclick="cancelEdit()"><?php echo htmlspecialchars(t('knowledge.editor.cancel')); ?></button>
                     <button class="btn btn-primary" onclick="saveArticle()"><?php echo htmlspecialchars(t('knowledge.editor.save')); ?></button>
                     <button class="btn btn-primary" id="btnSaveAsVersion" onclick="saveAsNewVersion()" style="display:none;"><?php echo htmlspecialchars(t('knowledge.editor.version')); ?></button>
+                    <!-- Just the editor, nothing else (desktop only - hidden on a phone in knowledge.css). -->
+                    <button class="btn btn-secondary kb-fullscreen-btn" onclick="kbEditorFullScreen()" title="<?php echo htmlspecialchars(t('knowledge.editor.fullscreen_title')); ?>"><?php echo htmlspecialchars(t('knowledge.editor.fullscreen')); ?></button>
                 </div>
             </div>
         </div>
@@ -547,7 +549,7 @@ $sidebarHoverClass = $sidebarMode === 'hover' ? ' sidebar-hover' : '';
     <!-- jsPDF for searchable PDF generation -->
     <script src="../assets/js/vendor/jspdf.umd.min.js"></script>
     <script>window.API_BASE = '../api/knowledge/';</script>
-    <script src="../assets/js/knowledge.js?v=56"></script>
+    <script src="../assets/js/knowledge.js?v=57"></script>
     <!-- Prism.js for code syntax highlighting when viewing articles -->
     <script src="../assets/js/vendor/prism.min.js"></script>
     <script src="../assets/js/vendor/prism-powershell.min.js"></script>

@@ -142,6 +142,8 @@ return [
         'cancel'           => 'Cancel',
         'save'             => 'Save',
         'version'          => 'Version',
+        'fullscreen'       => 'Full screen',
+        'fullscreen_title' => 'Just the editor, filling the screen. Press Esc to come back.',
         'create_tag'       => 'Create "{name}"',
     ],
 
@@ -697,6 +699,7 @@ return [
         'writing_step7'   => "<strong>Save</strong> &mdash; your article is saved as a draft. You can come back and edit it anytime. When you're happy with it, submit it for review or publish it directly depending on your team's workflow.",
         'writing_visibility_callout' => '<strong>Why your chat widget might not be answering:</strong> every article starts as <em>Analysts only</em>, including ones written before this setting existed. The website chat can only use articles where <em>Also allow anyone on the internet</em> is ticked, so tick it on a few of your customer-facing ones and it will start using them. That default is deliberate &mdash; nothing you wrote for internal use gets shown to the public unless you say so.',
         'writing_tip'     => 'Every time you save significant changes, use the "Save as new version" option. This creates a versioned snapshot so you can always look back at what the article said previously. Version numbers display on the article view so readers know how current it is.',
+        'writing_fullscreen' => 'Want more room to write? <strong>Full screen</strong>, beside Save, shows just the editor filling the whole window. Press <strong>Esc</strong> to come back. (Desktop only.)',
 
         'review_heading' => 'Review workflow — getting articles approved',
         'review_intro'   => 'For teams that need quality control over published content, the review workflow ensures every article is checked by a second pair of eyes before it goes live. This is especially valuable for customer-facing documentation, compliance procedures, and technical runbooks where accuracy matters.',

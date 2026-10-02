@@ -230,7 +230,7 @@ function initTinyMCE() {
         toolbar: 'undo redo | blocks | ' +
             'bold italic forecolor backcolor | alignleft aligncenter ' +
             'alignright alignjustify | bullist numlist outdent indent | ' +
-            'link image table | codesample code | removeformat | help',
+            'link image table | codesample code | removeformat | help | fullscreen',
         codesample_languages: [
             { text: 'PowerShell', value: 'powershell' },
             { text: 'Bash/Shell', value: 'bash' },
@@ -256,9 +256,41 @@ function initTinyMCE() {
                        ' @media (pointer: coarse) { body { font-size: 16px; } }',
         setup: function(editor) {
             articleEditor = editor;
+            // Full screen (the button by Save): lift the editor above the app's
+            // own fixed layers while it is on - see knowledge.css.
+            editor.on('FullscreenStateChanged', function(e) {
+                document.body.classList.toggle('kb-editor-fullscreen', !!e.state);
+            });
+            // Esc comes back out. TinyMCE has no key for that itself; the
+            // toolbar button and View -> Fullscreen do the same.
+            editor.on('keydown', function(e) {
+                if (e.key === 'Escape' && kbEditorIsFullScreen()) {
+                    e.preventDefault();
+                    editor.execCommand('mceFullScreen');
+                }
+            });
         }
     });
 }
+
+/** Just the editor, filling the screen - TinyMCE's own fullscreen plugin. */
+function kbEditorFullScreen() {
+    if (!articleEditor) return;
+    if (!kbEditorIsFullScreen()) articleEditor.execCommand('mceFullScreen');
+    articleEditor.focus();
+}
+
+function kbEditorIsFullScreen() {
+    return !!(articleEditor && articleEditor.plugins.fullscreen && articleEditor.plugins.fullscreen.isFullscreen());
+}
+
+// Esc with the focus on the toolbar or a menu rather than in the text. Not
+// while one of TinyMCE's own dialogs is open: Esc belongs to that first.
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && kbEditorIsFullScreen() && !document.querySelector('.tox-dialog, .tox-menu')) {
+        articleEditor.execCommand('mceFullScreen');
+    }
+});
 
 // Initialize tag input functionality
 function initTagInput() {
@@ -2609,6 +2641,8 @@ function syncArticleUrl(view) {
 
 // Show/hide views
 function showView(view) {
+    // Never leave the page behind a full-screen editor that is no longer shown.
+    if (view !== 'editor' && kbEditorIsFullScreen()) articleEditor.execCommand('mceFullScreen');
     document.getElementById('articleListView').style.display = view === 'list' ? 'block' : 'none';
     document.getElementById('articleDetailView').style.display = view === 'detail' ? 'block' : 'none';
     // 'flex' (not 'block') so the column layout that holds the sticky-footer

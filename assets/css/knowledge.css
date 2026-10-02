@@ -1876,3 +1876,14 @@ div.code-toolbar > .toolbar > .toolbar-item > span {
     border-left: 3px solid var(--warning-border);
 }
 .kb-audit-override .kb-audit-action { color: var(--warning-text); }
+
+/* Full screen (Ed): just the TinyMCE editor, nothing else. TinyMCE's own
+   fullscreen plugin does the work, but it sits at z-index 1200 and parts of
+   the app (header, floating buttons, toasts) are higher, so while it is on
+   the editor and its menus are lifted above everything. */
+body.kb-editor-fullscreen .tox.tox-tinymce.tox-fullscreen { z-index: 100000; }
+body.kb-editor-fullscreen .tox.tox-tinymce-aux { z-index: 100001; }
+/* Desktop only - a phone already gives the editor the whole screen. */
+@media (max-width: 768px) {
+    .kb-fullscreen-btn { display: none; }
+}
