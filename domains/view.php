@@ -50,14 +50,14 @@ $translationNamespaces = ['common', 'domains'];
     <link rel="stylesheet" href="../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../assets/css/domains.css?v=3">
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=159">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=161">
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-view">
     <?php include 'includes/header.php'; ?>
 
     <div class="dom-shell">
     <div class="dom-shell-pad">
-        <div style="margin-bottom:10px"><a href="./" class="dom-sub" style="text-decoration:none">← <?php echo htmlspecialchars(t('domains.page.back')); ?></a></div>
+        <div class="dom-back-row" style="margin-bottom:10px"><a href="./" id="domBack" class="dom-sub" style="text-decoration:none">← <?php echo htmlspecialchars(t('domains.page.back')); ?></a></div>
 
         <?php if (!$exists): ?>
             <div class="dom-card"><div class="dom-empty"><h3><?php echo htmlspecialchars(t('domains.page.not_found')); ?></h3></div></div>
@@ -185,6 +185,6 @@ $translationNamespaces = ['common', 'domains'];
     <script src="../assets/js/domains.js?v=1"></script>
     <script src="../assets/js/domains-view.js?v=3"></script>
     <?php endif; ?>
-    <script src="../assets/js/mobile.js?v=67"></script>
+    <script src="../assets/js/mobile.js?v=69"></script>
 </body>
 </html>

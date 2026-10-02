@@ -49,6 +49,6 @@ $path_prefix = '../';
         <?php endforeach; ?>
         </div>
     </main>
-    <script src="<?php echo BASE_URL; ?>assets/js/mobile.js?v=67"></script>
+    <script src="<?php echo BASE_URL; ?>assets/js/mobile.js?v=69"></script>
 </body>
 </html>

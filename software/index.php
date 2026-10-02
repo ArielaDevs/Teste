@@ -462,7 +462,7 @@ $translationNamespaces = ['common', 'software'];
             font-size: 14px;
         }
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=159">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=161">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
@@ -934,6 +934,6 @@ $translationNamespaces = ['common', 'software'];
             return div.innerHTML;
         }
     </script>
-    <script src="../assets/js/mobile.js?v=67"></script>
+    <script src="../assets/js/mobile.js?v=69"></script>
 </body>
 </html>

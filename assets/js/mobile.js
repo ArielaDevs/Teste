@@ -4729,3 +4729,95 @@
     if (mq.addEventListener) { mq.addEventListener('change', sync); }
     else if (mq.addListener) { mq.addListener(sync); }
 })();
+
+/* ==========================================================================
+   LAYER 41i - Domains: a domain's actions in a sticky footer (Ed)
+
+   Refresh, Check now, Edit and Delete sat in a wrapping row under the hero,
+   scrolled away as soon as you read down the page. They move to a footer
+   pinned to the bottom, as icons - the Checklists editor's 40c, done the same
+   way:
+
+   - The REAL buttons move, never copies: domains-view.js binds each by id,
+     so a clone would do nothing beside an original that still works.
+   - Each button's own label goes into aria-label (an icon has no name), and
+     Refresh and Check keep the icon they already carry; only Edit and Delete
+     get one here.
+   - busy() swaps a button's contents for "Working..." and back, saving what
+     was there when clicked - so the icon is what comes back.
+   - Above 768px everything returns exactly where it was, title text and all.
+   ========================================================================== */
+(function () {
+    'use strict';
+
+    if (!document.body || document.body.getAttribute('data-mobile-page') !== 'domains-view') return;
+
+    var mq = window.matchMedia('(max-width: 768px)');
+    // Back first, as in the Checklists editor's footer (Ed: "a proper back button").
+    var ids = ['domBack', 'btnRefresh', 'btnCheck', 'btnEdit', 'btnDelete'];
+    var btns = ids.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    if (btns.length !== ids.length) return;
+
+    var ICONS = {
+        domBack:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
+        btnEdit:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+        btnDelete: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>'
+    };
+
+    var footer = null;
+    var saved = [];
+
+    function build() {
+        if (footer) return;
+        footer = document.createElement('div');
+        footer.className = 'dom-view-bar';
+        document.body.appendChild(footer);
+    }
+
+    function toIcons() {
+        if (saved.length) return;
+        btns.forEach(function (el) {
+            saved.push({ el: el, html: el.innerHTML, parent: el.parentNode, next: el.nextSibling,
+                         hadAria: el.hasAttribute('aria-label') });
+            // The back link reads "← All domains": the arrow is the icon now.
+            var label = (el.textContent || '').replace(/\s+/g, ' ').replace(/^[\u2190<]+\s*/, '').trim();
+            var own = el.querySelector('svg');
+            el.innerHTML = ICONS[el.id] || (own ? own.outerHTML : '');
+            if (label) el.setAttribute('aria-label', label);
+            el.classList.add('dom-vb-btn');
+            footer.appendChild(el);
+        });
+    }
+
+    function toText() {
+        saved.forEach(function (s) {
+            s.el.innerHTML = s.html;
+            if (!s.hadAria) s.el.removeAttribute('aria-label');
+            s.el.classList.remove('dom-vb-btn');
+            s.parent.insertBefore(s.el, s.next);      // exactly where it was
+        });
+        saved = [];
+    }
+
+    /* Reserve the footer's real height, so the last card is not behind it. */
+    function reserve() {
+        if (!footer) return;
+        document.body.style.setProperty('--dom-vbar-h', Math.ceil(footer.getBoundingClientRect().height) + 'px');
+    }
+
+    function sync() {
+        if (mq.matches) {
+            build();
+            footer.style.display = '';
+            toIcons();
+            reserve();
+        } else {
+            toText();
+            if (footer) footer.style.display = 'none';
+            document.body.style.removeProperty('--dom-vbar-h');
+        }
+    }
+    sync();
+    if (mq.addEventListener) { mq.addEventListener('change', sync); }
+    else if (mq.addListener) { mq.addListener(sync); }
+})();

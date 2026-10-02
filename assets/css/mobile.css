@@ -14360,4 +14360,56 @@
     }
     body[data-mobile-module="domains"] .dom-card-h > * { min-width: 0; }
     body[data-mobile-module="domains"] .dom-card-b { padding: 12px 14px; }
+
+    /* ---- 41i. A domain's actions in a sticky footer (Ed) ----------------
+       mobile.js moves the real Refresh / Check now / Edit / Delete buttons
+       into this bar as icons; this is the furniture - the Checklists editor's
+       40c shape (fixed, bottom, z-index 1200 so dialogs at 2000 cover it,
+       env() for the iPhone home indicator, height measured not assumed).
+       The four share the width rather than being 52px squares, so busy()'s
+       "Working..." fits while a refresh runs. Delete keeps the module's own
+       danger colour and sits apart from the other three. */
+    body[data-mobile-page="domains-view"] .dom-view-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1200;
+        display: flex;
+        gap: 8px;
+        padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+        background: var(--surface, #fff);
+        border-top: 1px solid var(--border, #ddd);
+    }
+    body[data-mobile-page="domains-view"] .dom-vb-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 46px;
+        padding: 0 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    body[data-mobile-page="domains-view"] .dom-vb-btn svg { width: 20px; height: 20px; flex: 0 0 auto; }
+    body[data-mobile-page="domains-view"] #btnDelete.dom-vb-btn { margin-left: 10px; }
+    /* Back: a square at the left, the Checklists editor's 52px shape. It is an
+       <a>, so it needs the button look the others get from .dom-btn. */
+    body[data-mobile-page="domains-view"] #domBack.dom-vb-btn {
+        flex: 0 0 46px;
+        border: 1px solid var(--border, #ddd);
+        background: var(--surface, #fff);
+        color: var(--text, #333);
+        text-decoration: none;
+    }
+    body[data-mobile-page="domains-view"] .dom-back-row { display: none; }
+    /* The row the buttons left would be an empty strip with a spacer in it. */
+    body[data-mobile-page="domains-view"] .dom-actions { display: none; }
+    body[data-mobile-page="domains-view"] .dom-shell-pad {
+        padding-bottom: calc(var(--dom-vbar-h, 64px) + 16px);
+    }
 }

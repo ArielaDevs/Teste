@@ -1476,7 +1476,7 @@ $translationNamespaces = ['common', 'asset-management'];
              <style> block so its @media rules win on ties — the ordering rule
              from the wiki's Mobile-Friendly-Techniques. Every rule inside it is
              gated at 768px, so the desktop layout is untouched. */ ?>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=159">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=161">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
@@ -4524,6 +4524,6 @@ $translationNamespaces = ['common', 'asset-management'];
              behaviour inside is gated on matchMedia(768px), so on desktop it is
              inert. (#936) */ ?>
     <script src="../assets/js/network-mapper-icons.js?v=3"></script>
-    <script src="../assets/js/mobile.js?v=67"></script>
+    <script src="../assets/js/mobile.js?v=69"></script>
 </body>
 </html>
