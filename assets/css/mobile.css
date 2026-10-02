@@ -14620,3 +14620,201 @@
     body[data-mobile-module="people"] .ppl-stat .v { font-size: 17px; }
     body[data-mobile-module="people"] .ppl-showall { min-height: 44px; }
 }
+
+@media (max-width: 768px) {
+    /* ====================================================================
+       LAYER 43 - Assets > Users, and the Manager access page it opens
+       --------------------------------------------------------------------
+       Both pages were simply never opted in - no mobile.css, no mobile.js,
+       no marker - so none of the rollout reached them. Measured at 360x740
+       before anything was written:
+
+         users   the header nav ran to 1,379px: §3's reflow trigger, which
+                 on an iPhone puts the whole page back to desktop width;
+                 <body> clips, so the detail stacked under a 320px list was
+                 unreachable; the equipment table 516px in a 326px panel;
+                 every field 13-14px; an Add button 24px tall
+         manager the same header; a results table with a 12px column and
+                 ten crushed cells; 26px buttons; 13px search fields
+
+       Users is Tickets > Users with assets in it, so it gets the same
+       answer: LAYER 39a's pane stack, now one block serving both pages.
+       Manager access is ONE shared page (includes/manager_access_page.php)
+       behind both modules, so its marker is the page's, not the module's.
+       ⚠️ That include prints its <style> inside <body> - after this file -
+       so every rule below wins on specificity, never on order (§24).
+       ==================================================================== */
+
+    /* ---- 43a. Users: the pane stack (39a's, one more page) ---------------
+       The page's own 900px block already stacks the grid; on a phone the
+       two panels become two screens. The list scrolls inside its panel and
+       the detail scrolls itself - the page never scrolls (§28). */
+    body[data-mobile-page="assets-users"] .au-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px 12px;
+        gap: 0;
+        /* §16: the page's grid says `align-items: start` (top-align the two
+           panels). In a flex COLUMN that means "do not stretch the width",
+           and the list sized itself to its content - 357px in a 336px slot. */
+        align-items: stretch;
+    }
+    body[data-mobile-page="assets-users"] .au-wrap > .au-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;                 /* §14: the list measured 357px in 336 */
+        display: flex;
+        flex-direction: column;
+    }
+    body[data-mobile-page="assets-users"] .au-person > div { min-width: 0; }
+    body[data-mobile-page="assets-users"][data-users-pane="list"] #auDetail { display: none; }
+    body[data-mobile-page="assets-users"][data-users-pane="detail"] .au-wrap > .au-panel:first-child { display: none; }
+    body[data-mobile-page="assets-users"] .au-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    body[data-mobile-page="assets-users"] #auDetail {
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    body[data-mobile-page="assets-users"] .users-mobile-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        align-self: flex-start;
+        flex-shrink: 0;
+        margin: 10px 12px 0;
+        padding: 8px 12px 8px 8px;
+        min-height: 44px;
+        border: 1px solid var(--border, #ddd);
+        border-radius: 8px;
+        background: var(--surface, #fff);
+        color: var(--accent, #0078d4);
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    body[data-mobile-page="assets-users"] .users-mobile-back svg { width: 18px; height: 18px; }
+    /* The detail is a flex column now, so its own blocks must not shrink
+       to fit the screen - they stack and the pane scrolls. */
+    body[data-mobile-page="assets-users"] #auDetail > * { flex-shrink: 0; }
+
+    /* ---- 43b. Users: fields and buttons --------------------------------- */
+    body[data-mobile-page="assets-users"] .au-search { flex-wrap: wrap; padding: 10px 12px; }
+    body[data-mobile-page="assets-users"] .au-search input,
+    body[data-mobile-page="assets-users"] .au-search select {
+        font-size: 16px;                         /* §3 */
+        min-height: 40px;
+        flex: 1 1 140px;
+        min-width: 0;
+    }
+    body[data-mobile-page="assets-users"] .au-search input[type=search] { flex-basis: 100%; }
+    body[data-mobile-page="assets-users"] .au-head-btn { min-height: 36px; padding: 6px 14px; font-size: 13px; }
+    body[data-mobile-page="assets-users"] .au-person { padding: 12px 14px; min-height: 52px; box-sizing: border-box; }
+    body[data-mobile-page="assets-users"] .au-btn { min-height: 40px; }
+    body[data-mobile-page="assets-users"] .au-detail-head { padding: 14px 12px; }
+    body[data-mobile-page="assets-users"] .au-actions { gap: 6px; }
+    /* Facts two-up rather than one per row (§10): short values, read across. */
+    body[data-mobile-page="assets-users"] .au-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 14px;
+        padding: 12px;
+    }
+    body[data-mobile-page="assets-users"] .au-fact-value { overflow-wrap: anywhere; }
+    body[data-mobile-page="assets-users"] .au-managed-note { margin: 0 12px 12px; }
+    /* The reports' hover is a colour swap - a nicety a phone never sees (§26),
+       but a chip that small is a poor target. */
+    body[data-mobile-page="assets-users"] .au-report { padding: 6px 12px; }
+
+    /* ---- 43c. Users: the equipment as a card feed (§11, §21, §23) ---------
+       Six known columns, read one item at a time. The name leads with its
+       type pill at the right; make/model on the next line; serial, tag and
+       the date - three bare values that are meaningless alone - carry their
+       headings, harvested by mobile.js from the table's own <thead>. The
+       table is rebuilt with the whole detail pane, so the feed WATCHES the
+       pane (§30's note on tables that do not exist at load). */
+    body[data-mobile-page="assets-users"] .au-table,
+    body[data-mobile-page="assets-users"] .au-table tbody { display: block; width: 100%; }
+    body[data-mobile-page="assets-users"] .au-table thead { display: none; }
+    body[data-mobile-page="assets-users"] .au-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 3px 12px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-soft, #f0f0f0);
+    }
+    body[data-mobile-page="assets-users"] .au-table tbody tr::after {
+        content: ""; order: 2; flex: 0 0 100%; height: 0;
+    }
+    body[data-mobile-page="assets-users"] .au-table td {
+        display: block;
+        padding: 0;
+        border: none;
+        min-width: 0;
+        order: 4;
+        font-size: 13px;
+        color: var(--text-muted, #555);
+        overflow-wrap: anywhere;
+    }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(2) {
+        order: 0;
+        flex: 1 1 60%;
+        font-size: 14px;
+        color: var(--text, #333);
+    }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(2) a { display: inline-block; padding: 4px 0; }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(1) { order: 1; flex: 0 0 auto; }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(3) { order: 3; flex: 0 0 100%; }
+    body[data-mobile-page="assets-users"] .au-table td[data-mobile-label]::before {
+        content: attr(data-mobile-label) "\00a0";
+        color: var(--text-dim, #888);
+        font-size: 12px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;   /* the app's own (inbox.css) - not the code font of the serial and tag cells */
+    }
+    /* "No equipment" is one colspan cell: keep it whole and centred. */
+    body[data-mobile-page="assets-users"] .au-table td[colspan] { flex: 1 1 100%; order: 0; }
+    body[data-mobile-page="assets-users"] .au-table tbody tr:has(> td[colspan])::after { display: none; }
+
+    /* ---- 43d. Manager access (both modules) ----------------------------- */
+    body[data-mobile-page="manager-access"] .ma-search,
+    body[data-mobile-page="manager-access"] .ma-option select {
+        font-size: 16px;                         /* §3 */
+        min-height: 40px;
+    }
+    body[data-mobile-page="manager-access"] .ma-wrap { padding: 12px; }
+    body[data-mobile-page="manager-access"] .ma-back { min-height: 40px; padding: 6px 14px; font-size: 14px; }
+    body[data-mobile-page="manager-access"] .ma-stat { min-width: 0; flex: 1 1 100%; }
+    body[data-mobile-page="manager-access"] .ma-btn { min-height: 36px; padding: 6px 12px; }
+    /* The search results: name (and its job line) take the full width, the
+       member count and the Add / Exclude pair go underneath, right-aligned.
+       As a table the name got 179px and the count column 12. */
+    body[data-mobile-page="manager-access"] .ma-table,
+    body[data-mobile-page="manager-access"] .ma-table tbody { display: block; width: 100%; }
+    body[data-mobile-page="manager-access"] .ma-table tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    body[data-mobile-page="manager-access"] .ma-table td {
+        display: block;
+        padding: 0;
+        border: none;
+        min-width: 0;
+    }
+    body[data-mobile-page="manager-access"] .ma-table td:first-child { flex: 1 1 100%; overflow-wrap: anywhere; }
+    body[data-mobile-page="manager-access"] .ma-table td:empty { display: none; }
+    body[data-mobile-page="manager-access"] .ma-table td.acts { margin-left: auto; }
+    body[data-mobile-page="manager-access"] .ma-line { flex-wrap: wrap; }
+    body[data-mobile-page="manager-access"] .ma-team li { padding: 10px 8px; }
+}

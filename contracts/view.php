@@ -377,7 +377,7 @@ $peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analys
         .checkbox-row label { margin: 0; }
     </style>
     <!-- Mobile layer: linked AFTER this page's own <style> so its @media rules win on ties. -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=162">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=163">
 </head>
 <body data-mobile-module="contracts" data-mobile-page="contract-view">
     <?php include 'includes/header.php'; ?>
@@ -1441,6 +1441,6 @@ $peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analys
             </div>
         </div>
     </div>
-    <script src="../assets/js/mobile.js?v=69"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

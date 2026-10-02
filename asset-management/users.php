@@ -188,8 +188,10 @@ $translationNamespaces = ['common', 'asset-management'];
             .au-list { max-height: 320px; }
         }
     </style>
+    <!-- Mobile layer: AFTER the page's own <style> so its @media rules win on ties (Techniques §9). -->
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=163">
 </head>
-<body>
+<body data-mobile-module="assets" data-mobile-page="assets-users">
 <?php include 'includes/header.php'; ?>
 
 <div class="au-wrap">
@@ -247,12 +249,17 @@ let selectedId = null;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
     ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
-function fmtDate(d) {
-    if (!d) return '—';
-    // Stored as UTC without a zone marker; without the Z, Safari and Firefox
-    // read it as local and the date can slip by a day.
-    const dt = new Date(String(d).replace(' ', 'T') + 'Z');
-    return isNaN(dt) ? '—' : fmtDate(dt);
+/**
+ * The date a thing was issued, or a dash.
+ *
+ * 🔴 This was a top-level `function fmtDate`, which SHADOWED tz.js's global
+ * fmtDate for the whole page - so its last line called itself with a Date,
+ * which never parses, and the Assigned column printed "—" for everybody from
+ * #1195 onwards. The same commit renamed triage's copy for exactly this
+ * reason. tz.js's fmtDate already reads a stored UTC string as UTC.
+ */
+function fmtAssigned(d) {
+    return (d && window.fmtDate(d)) || '—';
 }
 
 /** "Baikal (address book)" - a source by name and by what kind it is. */
@@ -401,7 +408,7 @@ function renderDetail(user, assets) {
             <td>${esc([a.manufacturer, a.model].filter(Boolean).join(' ') || '—')}</td>
             <td class="au-mono">${esc(a.service_tag || '—')}</td>
             <td class="au-mono">${esc(a.asset_tag || '—')}</td>
-            <td>${esc(fmtDate(a.assigned_datetime))}</td>
+            <td>${esc(fmtAssigned(a.assigned_datetime))}</td>
         </tr>`).join('')
         : `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted,#666);">
              ${esc(window.t('asset-management.users.no_assets'))}</td></tr>`;
@@ -571,5 +578,6 @@ loadPeople('');
     if (n > 0) selectPerson(n);
 })();
 </script>
+<script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

@@ -1980,7 +1980,16 @@
         /* Accounts: everything after the account's own name - a reference, a
            person, a bare domain count and a date mean nothing alone. */
         { table: 'body[data-mobile-page="domains-accounts"] .dom-table',
-          columns: [1, 2, 3, 4, 5, 6] }
+          columns: [1, 2, 3, 4, 5, 6] },
+
+        /* ---- Assets > Users (LAYER 43c) ----
+           A person's equipment: serial, asset tag and the date it was
+           issued are three bare values side by side - two codes that look
+           alike and a date that could mean anything. The table is rebuilt
+           with the whole detail pane, so it does not exist at load: watch
+           the pane. */
+        { table: 'body[data-mobile-page="assets-users"] .au-table',
+          columns: [3, 4, 5], watch: '#auDetail' }
     ];
 
     function labelCardFeed(table, columns) {
@@ -4164,7 +4173,8 @@
 })();
 
 /* ============================================================================
-   LAYER 39a - Tickets > Users: the detail pane was 0px wide at x=360.
+   LAYER 39a - a list-and-detail page as a pane stack: Tickets > Users, and
+   (LAYER 43) Assets > Users, which is the same shape with assets in it.
 
    🔴 Tapping a user "did nothing", and so did tapping a group. Both were
    working perfectly: measured after a tap, `.user-detail-container` held 1748
@@ -4177,18 +4187,39 @@
    The fault is the oldest one in this rollout: a fixed-width pane beside a
    flexible one on a screen narrower than the fixed pane.
 
-   Both users and groups render into that same container - selectGroup()
-   redraws the whole detail pane - so one pane stack serves both.
+   ⭐ One block, a list of pages (extract on the second use - Mobile: Assets).
+   Each entry names the two panes and the globals that open a record:
+     page         the body's data-mobile-page
+     list/detail  the two panes
+     wraps        globals that open a record; wrapped, never edited (§1)
+     deepLink     a query parameter that opens straight to a record. Assets
+                  calls selectPerson() inline for ?user_id=, BEFORE this file
+                  loads, so the wrap never sees it and the stack would sit on
+                  the list with the person loaded out of sight.
    ========================================================================== */
 (function () {
     'use strict';
 
-    if (!document.body || document.body.getAttribute('data-mobile-page') !== 'tickets-users') return;
+    var STACKS = [
+        /* Both users and groups render into the one detail container -
+           selectGroup() redraws the whole pane - so one stack serves both. */
+        { page: 'tickets-users', list: '.users-list-container',
+          detail: '#userDetail, .user-detail-container',
+          wraps: ['selectUser', 'selectGroup'], deepLink: 'user_id' },
+        { page: 'assets-users', list: '.au-wrap > .au-panel:first-child',
+          detail: '#auDetail',
+          wraps: ['selectPerson'], deepLink: 'user_id' }
+    ];
+
+    var cfg = null;
+    for (var i = 0; i < STACKS.length; i++) {
+        if (document.body && document.body.getAttribute('data-mobile-page') === STACKS[i].page) { cfg = STACKS[i]; break; }
+    }
+    if (!cfg) return;
 
     var mq = window.matchMedia('(max-width: 768px)');
-    var detail = document.getElementById('userDetail')
-              || document.querySelector('.user-detail-container');
-    var list = document.querySelector('.users-list-container');
+    var detail = document.querySelector(cfg.detail);
+    var list = document.querySelector(cfg.list);
     if (!detail || !list) return;
 
     function tr(key, fallback) {
@@ -4199,11 +4230,10 @@
 
     var back = null;
 
-    /* 🔴 selectUser() and selectGroup() REDRAW the detail pane wholesale, which
+    /* 🔴 The open-a-record functions REDRAW the detail pane wholesale, which
        throws this button away with everything else. Exactly the same fault as
-       the rota chooser, written up one layer earlier and still walked into
-       here: anything injected into a pane a page re-renders has to be put
-       back, and the only reliable trigger is watching the pane. */
+       the rota chooser: anything injected into a pane a page re-renders has to
+       be put back, and the only reliable trigger is watching the pane. */
     function buildBack() {
         if (back && back.isConnected) return;
         if (back) { detail.insertBefore(back, detail.firstChild); return; }
@@ -4227,18 +4257,18 @@
         }
     }
 
-    /* Wrap rather than edit (§1). users.php calls these globals from the row
-       markup it generates, so wrapping catches every row including the ones
+    /* Wrap rather than edit (§1). The pages call these globals from the row
+       markup they generate, so wrapping catches every row including the ones
        drawn after a search or a re-render - which a listener bound to the rows
        would not. */
-    ['selectUser', 'selectGroup'].forEach(function (name) {
+    cfg.wraps.forEach(function (name) {
         var orig = window[name];
         if (typeof orig !== 'function') return;
         window[name] = function () {
             var out = orig.apply(this, arguments);
             if (mq.matches) {
-                // selectGroup is async and redraws the pane; switching now is
-                // still correct because the pane is what we are revealing.
+                // These are async and redraw the pane; switching now is still
+                // correct because the pane is what we are revealing.
                 showPane('detail');
             }
             return out;
@@ -4250,11 +4280,16 @@
         if (mq.matches) buildBack();
     }).observe(detail, { childList: true });
 
+    var linked = false;
+    if (cfg.deepLink) {
+        try { linked = parseInt(new URLSearchParams(window.location.search).get(cfg.deepLink) || '', 10) > 0; } catch (e) {}
+    }
+
     function sync() {
         if (mq.matches) {
             buildBack();
             if (back) back.style.display = '';
-            if (!document.body.getAttribute('data-users-pane')) showPane('list');
+            if (!document.body.getAttribute('data-users-pane')) showPane(linked ? 'detail' : 'list');
         } else {
             // Desktop is a two-pane screen and must stay one.
             if (back) back.style.display = 'none';

@@ -299,7 +299,7 @@ $translationNamespaces = ['common', 'tickets'];
             stroke: #ccc;
         }
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=162">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=163">
 </head>
 <body data-mobile-page="tickets-activity">
     <?php include 'includes/header.php'; ?>
@@ -677,6 +677,6 @@ $translationNamespaces = ['common', 'tickets'];
 
         init();
     </script>
-    <script src="../assets/js/mobile.js?v=69"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

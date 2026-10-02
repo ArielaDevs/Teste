@@ -780,7 +780,7 @@ $translationNamespaces = ['common', 'cmdb'];
         }
     </style>
     <!-- Mobile layer: after this page's own <style> (Techniques §9). -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=162">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=163">
 </head>
 <body data-mobile-module="cmdb" data-mobile-page="cmdb-object">
     <?php include 'includes/header.php'; ?>
@@ -920,7 +920,7 @@ $translationNamespaces = ['common', 'cmdb'];
     <script src="../assets/js/network-mapper-icons.js?v=3"></script>
     <!-- The shared dropdown-options editor, same one the settings page uses. -->
     <script src="options-editor.js?v=3"></script>
-    <script src="object.js?v=9"></script>
-    <script src="../assets/js/mobile.js?v=69"></script>
+    <script src="object.js?v=10"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>
