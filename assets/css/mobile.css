@@ -14413,3 +14413,210 @@
         padding-bottom: calc(var(--dom-vbar-h, 64px) + 16px);
     }
 }
+
+@media (max-width: 768px) {
+    /* ====================================================================
+       LAYER 42 - People
+       --------------------------------------------------------------------
+       Built after the rollout with mobile.css linked and a marker on all
+       five pages, and with its own `@media (max-width: 640px)` block that
+       already turned the tables into labelled blocks. Measured at 360x740
+       through an explicit-width iframe (§8/§30), what was still wrong:
+
+         every page  could not be SCROLLED by a finger (§28): inbox.css
+                     makes <body> overflow: hidden, LAYER 2 makes it a
+                     100dvh column, and no People container took the
+                     scroller role - a person page was 9,712px of document
+                     behind a viewport that clips. Only scrollTo() moved it.
+         list        three filters at 13px (§3) and their headings filled
+                     320px before the first person
+         tables      every value labelled, the empty ones too ("Job
+                     title:" over nothing - §21's never-label-empty), and
+                     a ticket's subject given no more room than its date
+         company     a 420px nested scroller for its people inside the
+                     page's own - a scroll trap on a touch screen
+
+       The module's 640px block moved here (Morning Checks' precedent,
+       LAYER 26): one place answers "what does People look like on a
+       phone", and it now starts at 768 like everything else. Its 900px
+       block stays in people.css - that is a narrow DESKTOP window.
+       ==================================================================== */
+
+    /* ---- 42a. The scroller role (§28) -----------------------------------
+       The record pages scroll .ppl-page; the list page keeps its filters
+       pinned and scrolls the list. min-height: 0 or the content becomes
+       the floor and nothing scrolls. The desktop's calc(100vh - 62px)
+       heights go: LAYER 2's flex body hands out the remainder. */
+    body[data-mobile-module="people"] .ppl-page {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 12px 24px;
+    }
+    body[data-mobile-module="people"] .ppl-layout {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    body[data-mobile-module="people"] .ppl-main-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 12px 24px;
+    }
+
+    /* ---- 42b. 16px on every field (§3) ---------------------------------- */
+    body[data-mobile-module="people"] input:not([type="checkbox"]):not([type="radio"]),
+    body[data-mobile-module="people"] select,
+    body[data-mobile-module="people"] textarea {
+        font-size: 16px;
+    }
+
+    /* ---- 42c. The list's filters: a compact strip ------------------------
+       Search on its own row, the two drop-downs side by side beneath it.
+       The headings go: each control carries an aria-label, the search has
+       a placeholder and the selects show their value ("Current people",
+       "All companies"), so the words were saying it twice. */
+    body[data-mobile-page="people-list"] .ppl-sidebar {
+        flex: 0 0 auto;
+        width: auto;
+        overflow: visible;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+        border-right: none;
+        border-bottom: 1px solid var(--border, #ddd);
+    }
+    body[data-mobile-page="people-list"] .ppl-sidebar h3,
+    body[data-mobile-page="people-list"] .ppl-intro { display: none; }
+    body[data-mobile-page="people-list"] .ppl-sidebar input,
+    body[data-mobile-page="people-list"] .ppl-sidebar select {
+        margin: 0;
+        min-height: 40px;
+        flex: 1 1 140px;
+        min-width: 0;
+    }
+    body[data-mobile-page="people-list"] .ppl-sidebar input { flex-basis: 100%; }
+
+    /* ---- 42d. Every table as a card feed (§11, §23) ----------------------
+       One card per row: the identifier leads, a status pill sits at the
+       right of the same line, a forced break (the zero-height full-width
+       item placed by `order` - the Domains technique) starts a new line,
+       prose gets a line of its own, and the short facts flow after it. */
+    body[data-mobile-module="people"] .ppl-table,
+    body[data-mobile-module="people"] .ppl-table tbody { display: block; width: 100%; }
+    body[data-mobile-module="people"] .ppl-table thead { display: none; }
+    body[data-mobile-module="people"] .ppl-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 3px 12px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border, #eee);
+    }
+    /* 🔴 display: flex defeats [hidden] - "Show all" and the company's own
+       people filter both work by hiding rows. */
+    body[data-mobile-module="people"] .ppl-table tbody tr[hidden] { display: none; }
+    body[data-mobile-module="people"] .ppl-table tbody tr:last-child { border-bottom: none; }
+    body[data-mobile-module="people"] .ppl-table tbody tr::after {
+        content: ""; order: 2; flex: 0 0 100%; height: 0;
+    }
+    body[data-mobile-module="people"] .ppl-table td {
+        display: block;
+        padding: 0;
+        border: none;
+        min-width: 0;
+        order: 4;
+        font-size: 13px;
+        color: var(--text-muted, #555);
+        overflow-wrap: anywhere;
+    }
+    body[data-mobile-module="people"] .ppl-table td:empty { display: none; }
+    body[data-mobile-module="people"] .ppl-table td:first-child {
+        order: 0;
+        flex: 1 1 60%;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text, #222);
+    }
+    /* The identifier is the tap target, so it gets a tap-sized box (an
+       inline <a> ignores min-height - §30's inline-box note). */
+    body[data-mobile-module="people"] .ppl-table td:first-child > a,
+    body[data-mobile-module="people"] .ppl-table td:first-child .ppl-ref > a {
+        display: inline-block;
+        padding: 4px 0;
+    }
+    body[data-mobile-module="people"] .ppl-table td.ppl-empty {
+        flex: 1 1 100%;
+        text-align: center;
+        font-weight: 400;
+        color: var(--text-dim, #888);
+        padding: 8px 0;
+    }
+    body[data-mobile-module="people"] .ppl-table tbody tr:has(> td.ppl-empty)::after { display: none; }
+
+    /* A label only where the value means nothing alone (§21): a bare date,
+       count, priority word or a second name. Never on an empty cell - the
+       :empty rule above removes the cell, so no label is left hanging. The
+       words are the module's own translated column headings (data-label). */
+    body[data-mobile-page="people-list"] .ppl-list td:nth-child(4)::before,
+    body[data-mobile-module="people"] #sec-tickets td:nth-child(n+4)::before,
+    body[data-mobile-module="people"] #sec-assets td:nth-child(n+4)::before,
+    body[data-mobile-module="people"] #sec-contracts td:nth-child(n+2)::before,
+    body[data-mobile-module="people"] #sec-domains td:nth-child(n+3)::before,
+    body[data-mobile-module="people"] #sec-courses td:nth-child(n+3)::before,
+    body[data-mobile-module="people"] #sec-courses .ppl-table:not(:has(thead th:nth-child(4))) td:nth-child(2)::before,
+    body[data-mobile-module="people"] #sec-forms td:nth-child(n+2)::before {
+        content: attr(data-label) "\00a0";
+        color: var(--text-dim, #888);
+        font-size: 12px;
+    }
+
+    /* Status pills ride on the first line, at the right (§23). A person's
+       courses have one in column 2; a company's courses table (three
+       columns, all counts) does not - keyed on column count, not position. */
+    body[data-mobile-module="people"] #sec-tickets td:nth-child(3),
+    body[data-mobile-module="people"] #sec-domains td:nth-child(2),
+    body[data-mobile-module="people"] #sec-courses .ppl-table:has(thead th:nth-child(4)) td:nth-child(2) {
+        order: 1;
+        flex: 0 0 auto;
+    }
+
+    /* A person card: the email on a line of its own. Left to flow, a short
+       address pulled the role up beside it and a long one did not - two
+       card shapes decided by the data (§23's tell). */
+    body[data-mobile-page="people-list"] .ppl-list td:nth-child(2),
+    body[data-mobile-module="people"] #pplPeople td:nth-child(2) {
+        flex: 0 0 100%;
+    }
+
+    /* A ticket's subject is a sentence: a full line of its own (§11). */
+    body[data-mobile-module="people"] #sec-tickets td:nth-child(2) {
+        order: 3;
+        flex: 0 0 100%;
+        font-size: 14px;
+        color: var(--text, #333);
+    }
+
+    /* ---- 42e. Record pages ----------------------------------------------
+       The company's people list scrolled inside a 420px box inside the
+       page - two scrollers under one thumb. The page scrolls; this does
+       not. The filter beside the heading takes its own row. */
+    body[data-mobile-module="people"] .ppl-people-wrap { max-height: none; overflow: visible; }
+    body[data-mobile-module="people"] .ppl-table-wrap { overflow: visible; }
+    body[data-mobile-module="people"] .ppl-filter { flex: 1 1 100%; min-width: 0; width: 100%; margin-left: 0; min-height: 40px; }
+    body[data-mobile-module="people"] .ppl-hero { padding: 14px; gap: 12px; }
+    body[data-mobile-module="people"] .ppl-hero h1 { font-size: 19px; }
+    body[data-mobile-module="people"] .ppl-hero-actions .ppl-btn { min-height: 36px; }
+    body[data-mobile-module="people"] .ppl-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    body[data-mobile-module="people"] .ppl-stat { padding: 10px 12px; }
+    body[data-mobile-module="people"] .ppl-stat .v { font-size: 17px; }
+    body[data-mobile-module="people"] .ppl-showall { min-height: 44px; }
+}

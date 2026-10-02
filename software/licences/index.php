@@ -420,7 +420,7 @@ $translationNamespaces = ['common', 'software'];
             font-weight: 500;
         }
     </style>
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=161">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=162">
 </head>
 <body>
     <?php include '../includes/header.php'; ?>

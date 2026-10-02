@@ -185,8 +185,8 @@ function pplHead(string $title, array $namespaces = ['common', 'people']): void
     <script src="<?php echo BASE_URL; ?>assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/theme.css?v=25">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/people.css?v=1">
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/mobile.css?v=161">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/people.css?v=2">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/mobile.css?v=162">
     <script>function pplShowAll(b) { b.closest('.ppl-card').querySelectorAll('tr.ppl-extra').forEach(function (r) { r.hidden = false; }); b.remove(); }</script>
     <?php
 }

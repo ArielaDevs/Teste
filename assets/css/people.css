@@ -131,22 +131,11 @@ body { --ppl-accent: #a21caf; --ppl-accent-soft: rgba(162, 28, 175, .1); }
 .ppl-company .n { font-weight: 600; color: var(--text, #222); font-size: 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .ppl-company .c { font-size: 12px; color: var(--text-dim, #888); margin-top: 2px; }
 
-/* ---------- narrow screens: stack everything, tables become cards ---------- */
+/* ---------- narrow windows: stack the panes. A phone is mobile.css LAYER 42. */
 @media (max-width: 900px) {
     .ppl-grid { grid-template-columns: 1fr; }
     .ppl-layout { flex-direction: column; height: auto; }
     .ppl-sidebar { width: auto; border-right: none; border-bottom: 1px solid var(--border, #ddd); }
     .ppl-intro { display: none; }
     .ppl-main-list, .ppl-page { padding: 14px; }
-}
-@media (max-width: 640px) {
-    .ppl-table thead { display: none; }
-    .ppl-table, .ppl-table tbody, .ppl-table tr, .ppl-table td { display: block; width: 100%; box-sizing: border-box; }
-    .ppl-table tr { padding: 8px 0; border-bottom: 1px solid var(--border, #eee); }
-    .ppl-table td { border: none; padding: 3px 16px; }
-    .ppl-table td[data-label]:not(:first-child)::before { content: attr(data-label) ": "; color: var(--text-dim, #888); font-size: 12px; }
-    .ppl-table td:first-child { font-weight: 600; }
-    .ppl-filter { min-width: 0; width: 100%; margin-left: 0; }
-    .ppl-hero { padding: 14px; }
-    .ppl-hero h1 { font-size: 19px; }
 }

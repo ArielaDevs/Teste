@@ -55,7 +55,7 @@ $translationNamespaces = ['common', 'tasks'];
             --on-accent:    var(--tsk-on-accent);
         }
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=161">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=162">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
