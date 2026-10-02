@@ -14,7 +14,6 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
-| 2081 | Tickets           | Fix         | A reply or forward whose quoted thread held a picture from the ticket failed on every provider with "Undefined constant INLINE_THREAD_BUDGET", because 2.10.0 declared the top-level const below the code that calls processInlineImages(); it now sits under the requires, a fault embedding one picture (any Throwable) leaves that link as it was instead of stopping the send, and tests/outbound-email-mime.php checks the order it could not see before (GH #158, reported by An Duong). |
 
 
 
@@ -1168,6 +1167,12 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 317 | Tasks             | Fix         | **Drag-reorder drop indicator invisible in scrolling board columns.** The purple line that shows where a dragged card will land vanished whenever its column had enough cards to scroll. Cause: `.board-cards` is a `flex-direction:column` container and the `.drop-indicator` is an empty `<div>` &mdash; so its min-content height is 0, and when the column overflowed, flexbox's `flex-shrink` compressed the indicator to 0px (the cards resist because their text gives them a min-content height; the empty indicator does not). Fixed by adding `flex-shrink:0` to `.drop-indicator` (and to `.task-card` for good measure, so cards can never be squished either). `tasks.css` bumped to `?v=6`. |
 
 ## Published
+
+### 2.10.1 - 2 October 2026
+
+| ID   | Module            | Type        | Description |
+|------|-------------------|-------------|-------------|
+| 2081 | Tickets           | Fix         | A reply or forward whose quoted thread held a picture from the ticket failed on every provider with "Undefined constant INLINE_THREAD_BUDGET", because 2.10.0 declared the top-level const below the code that calls processInlineImages(); it now sits under the requires, a fault embedding one picture (any Throwable) leaves that link as it was instead of stopping the send, and tests/outbound-email-mime.php checks the order it could not see before (GH #158, reported by An Duong). |
 
 ### 2.10.0 - 2 October 2026
 
