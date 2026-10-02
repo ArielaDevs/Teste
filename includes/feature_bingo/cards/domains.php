@@ -215,6 +215,18 @@ return [
         'check'    => ['rows', 'domain_knowledge_articles'],
     ],
     [
+        'id'       => 'domains.tickets',
+        'module'   => 'domains',
+        'tier'     => 'extra',
+        'category' => 'organisation',
+        'title'    => 'Tickets about a domain',
+        'what'     => 'A ticket linked to the domain it is about - from the ticket\'s Domains panel or the domain\'s Connections tab - shown on both.',
+        'why'      => 'A domain\'s history of renewals, DNS changes and email problems sits on its page, ready for the next time.',
+        'done'     => 'At least one ticket is linked to a domain.',
+        'link'     => 'domains/',
+        'check'    => ['rows', 'ticket_domains'],
+    ],
+    [
         'id'       => 'domains.workflow',
         'module'   => 'domains',
         'tier'     => 'extra',

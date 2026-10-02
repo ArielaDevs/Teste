@@ -48,6 +48,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2116 | Domains           | Feature     | Right-click a domain in the register: Open, Open in a new tab, Edit (opens the domain with its Edit dialog), Refresh lookup, Check now, Status ›, Owner ›, Assign to me, Connections, Visit website, Copy name and Delete - each through the same endpoint as the domain's own page. |
 | 2117 | CMDB              | Fix         | A CI's ticket list showed every ticket as #id with an unknown status: the page read reference / status_name / priority_name, which the API never sends (it sends ticket_number / status / priority). |
 | 2118 | Reporting         | Fix         | The Reporting landing page was laid out for three 280px cards in a 700px box; Report Packs made it four, so each card was squeezed by a different amount and the descriptions wrapped a word or two to a line. On desktop widths the cards are now an even grid (two-by-two on a narrower window); the phone layout is unchanged. |
+| 2119 | System            | Improvement | Feature Bingo caught up with 3.0.0: People is a Feature Bingo module with three cards (people grouped by company, managers, job titles and departments) and Domains gains "Tickets about a domain" - 610 cards, checker clean. |
 
 
 
