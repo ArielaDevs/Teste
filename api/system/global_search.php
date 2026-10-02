@@ -294,17 +294,19 @@ try {
     }
 
     // --- Contracts: by reference or title -------------------------------
-    // Contracts are install-wide (no tenant_id column), so there is no company
-    // scope to apply here.
+    // Contracts have no tenant_id, but a CUSTOMER contract belongs to its
+    // customer's company and is hidden from analysts outside it (#153).
     if ($can('contracts')) {
         try {
+            require_once __DIR__ . '/../../includes/contract_party.php';
+            [$kVis, $kArgs] = contractVisibilitySql($conn, $analystId, 'k');
             $sql = "SELECT k.id, k.contract_number, k.title
                       FROM contracts k
-                     WHERE (k.contract_number LIKE ? OR k.title LIKE ?)
+                     WHERE (k.contract_number LIKE ? OR k.title LIKE ?)$kVis
                      ORDER BY k.title
                      LIMIT " . $perType;
             $stmt = $conn->prepare($sql);
-            $stmt->execute([$like, $like]);
+            $stmt->execute(array_merge([$like, $like], $kArgs));
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $results[] = [
                     'type'     => 'contract',

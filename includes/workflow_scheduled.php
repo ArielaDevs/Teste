@@ -21,6 +21,7 @@
  */
 
 require_once __DIR__ . '/../workflow/includes/engine.php';
+require_once __DIR__ . '/contract_party.php';   // who a contract is with (#153)
 require_once __DIR__ . '/timezone.php';   // naive_today_sql() — expiry dates are bare dates (GH #126)
 
 /**
@@ -116,6 +117,7 @@ function workflowEmitContractExpiries(PDO $conn): int
     $maxWindow = max($windows);
     $today = naive_today_sql();
 
+    [$partyCols, $partyJoins] = contractPartySql($conn, 'c');
     $rows = $conn->prepare(
         // Suppliers have no single `name`: trading_name is what people call them,
         // legal_name is what's on the contract. Prefer the former, fall back.
@@ -127,9 +129,12 @@ function workflowEmitContractExpiries(PDO $conn): int
         // the wall clock is the installation's own zone, which is right.
         "SELECT c.id, c.contract_number, c.title, c.contract_end, c.supplier_id,
                 COALESCE(NULLIF(s.trading_name, ''), s.legal_name) AS supplier_name,
+                s.legal_name AS supplier_legal_name, s.trading_name AS supplier_trading_name,
                 DATEDIFF(c.contract_end, $today) AS days_remaining
+                $partyCols
            FROM contracts c
       LEFT JOIN suppliers s ON s.id = c.supplier_id
+                $partyJoins
           WHERE c.is_active = 1
             AND c.contract_end IS NOT NULL
             AND c.contract_end >= $today
@@ -158,6 +163,11 @@ function workflowEmitContractExpiries(PDO $conn): int
                         'days_remaining'  => $days,
                         'supplier_id'     => $c['supplier_id'] !== null ? (int)$c['supplier_id'] : null,
                         'supplier_name'   => $c['supplier_name'],
+                        // Who it is WITH (#153): supplier or customer, and a name either way.
+                        'party_type'         => $c['party_type'] ?? 'supplier',
+                        'party_name'         => contractPartyLabel(['supplier_name' => $c['supplier_legal_name'], 'supplier_trading_name' => $c['supplier_trading_name']] + $c),
+                        'customer_tenant_id' => isset($c['customer_tenant_id']) ? (int)$c['customer_tenant_id'] : null,
+                        'customer_user_id'   => isset($c['customer_user_id']) ? (int)$c['customer_user_id'] : null,
                     ],
                     'window_days' => $w,
                 ]

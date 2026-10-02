@@ -465,12 +465,12 @@ function recentTrailLabelsForType(PDO $conn, int $analystId, string $type, array
             break;
 
         case 'contract':
-            // ⚠️ No record gate: contracts carry no tenant_id, so the module gate
-            // already applied is the whole of the check. Same as the preview, and
-            // for the same reason — see includes/contract_assets.php.
+            // Supplier contracts are install-wide; a CUSTOMER contract is gated by
+            // its customer's company (#153).
+            require_once __DIR__ . '/contract_party.php';
             $sql = "SELECT id, TRIM(CONCAT(COALESCE(contract_number,''), ' ', COALESCE(title,''))) AS label
                       FROM contracts WHERE id IN ($in)";
-            $gate = fn($id) => true;
+            $gate = fn($id) => contractCanView($conn, $analystId, (int)$id);
             break;
 
         case 'knowledge_article':

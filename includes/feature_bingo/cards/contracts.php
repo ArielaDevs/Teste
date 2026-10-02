@@ -210,6 +210,18 @@ return [
         'link'     => 'contracts/',
         'check'    => ['rows', 'contract_assets'],
     ],
+    [
+        'id'       => 'contracts.customer_contracts',
+        'module'   => 'contracts',
+        'tier'     => 'extra',
+        'category' => 'organisation',
+        'title'    => 'Contracts with customers',
+        'what'     => 'A contract you sell rather than buy - a support agreement, a managed service - recorded against the customer\'s company, a person, or both.',
+        'why'      => 'The renewals you are owed sit beside the ones you owe, with the same reminders, and only the people who look after that customer see them.',
+        'done'     => 'At least one contract is with a customer (demo data not counted).',
+        'link'     => 'contracts/edit.php',
+        'check'    => ['rows', 'contracts', "party_type = 'customer' AND is_demo = 0"],
+    ],
 
     // --- RFP Builder -----------------------------------------------------
     [

@@ -34,6 +34,18 @@ return [
         'check'    => ['sql', "SELECT CASE WHEN COUNT(*) > 0 AND SUM(owner_analyst_id IS NULL) = 0 THEN 1 ELSE 0 END FROM domains WHERE $real", 1],
     ],
     [
+        'id'       => 'domains.customer',
+        'module'   => 'domains',
+        'tier'     => 'extra',
+        'category' => 'organisation',
+        'title'    => 'Domains named for a customer',
+        'what'     => 'The person a domain is looked after for, chosen from the people in the domain\'s company.',
+        'why'      => 'When a customer asks "which of our domains do you manage?", or leaves, the answer is a filter rather than a memory.',
+        'done'     => 'At least one domain names its customer (demo data not counted).',
+        'link'     => 'domains/?view=all',
+        'check'    => ['rows', 'domains', 'customer_user_id IS NOT NULL AND is_demo = 0'],
+    ],
+    [
         'id'       => 'domains.alerts',
         'module'   => 'domains',
         'tier'     => 'essential',

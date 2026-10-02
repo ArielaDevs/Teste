@@ -36,6 +36,8 @@ require_once __DIR__ . '/../domains/names.php';
 require_once __DIR__ . '/../domains/lookup.php';
 require_once __DIR__ . '/../domains/checks.php';
 require_once __DIR__ . '/../domains/monitor.php';
+require_once __DIR__ . '/../domains/customer.php';
+require_once __DIR__ . '/../contract_party.php';
 require_once dirname(__DIR__, 2) . '/workflow/includes/engine.php';
 
 class DomainsService
@@ -63,6 +65,7 @@ class DomainsService
             'registrant_name'       => ['type' => 'string', 'max' => 255],
             'owner_analyst_id'      => ['type' => 'analyst'],
             'tech_contact_id'       => ['type' => 'lookup', 'table' => 'contacts'],
+            'customer_user_id'      => ['type' => 'customer'],   // #153 - a person in the domain's company
             'nameservers'           => ['type' => 'lines'],
             'dns_provider'          => ['type' => 'string', 'max' => 255],
             'hosting_provider'      => ['type' => 'string', 'max' => 255],
@@ -129,7 +132,9 @@ class DomainsService
         $row  = ['tenant_id' => $store];
         foreach (self::fieldMap() as $field => $def) {
             if (!array_key_exists($field, $in)) continue;
+            if ($field === 'customer_user_id' && !domainCustomerReady($conn)) continue;   // before Database Verification
             $v = self::validateField($conn, $field, $in[$field], $def, $row, $n['name']);
+            if ($field === 'contract_id') self::assertContractVisible($conn, $ctx, $v);
             $cols[] = $field;
             $vals[] = $v;
         }
@@ -180,8 +185,10 @@ class DomainsService
 
         foreach (self::fieldMap() as $field => $def) {
             if (!array_key_exists($field, $in)) continue;
+            if ($field === 'customer_user_id' && !domainCustomerReady($conn)) continue;   // before Database Verification
             $v = self::validateField($conn, $field, $in[$field], $def, $cur, $cur['domain_name']);
             if (self::same($cur[$field], $v)) continue;
+            if ($field === 'contract_id') self::assertContractVisible($conn, $ctx, $v);
             $sets[] = "$field = ?"; $args[] = $v;
             $changes[] = [$field, $cur[$field], $v];
         }
@@ -597,6 +604,14 @@ class DomainsService
         switch ($def['type']) {
             case 'lookup':
                 return self::lookup($conn, $def['table'], $v, str_replace('_', ' ', preg_replace('/_id$/', '', $field)));
+            case 'customer':
+                // A person in the domain's own company (#153): the domain's company
+                // IS the customer's company, so there is nothing else to choose.
+                if ($blank) return null;
+                if (!domainCustomerPersonOk($conn, (int)$v, isset($row['tenant_id']) ? (int)$row['tenant_id'] : null)) {
+                    throw new ServiceError('validation', 'invalid_field', 'That person is not in this domain\'s company.');
+                }
+                return (int)$v;
             case 'account':
                 if ($blank) return null;
                 $st = $conn->prepare("SELECT tenant_id FROM domain_registrar_accounts WHERE id = ?");
@@ -736,6 +751,20 @@ class DomainsService
         }
     }
 
+    /**
+     * A domain may only be linked to a contract its editor can see: a CUSTOMER
+     * contract outside their companies (#153) is "unknown", as everywhere else.
+     */
+    private static function assertContractVisible(PDO $conn, ActorContext $ctx, $contractId): void
+    {
+        if ($contractId === null) return;
+        [$vis, $args] = contractVisibilitySqlForScope($conn, $ctx->companyScope, 'k');
+        if ($vis === '') return;
+        $st = $conn->prepare("SELECT 1 FROM contracts k WHERE k.id = ?$vis");
+        $st->execute(array_merge([(int)$contractId], $args));
+        if (!$st->fetchColumn()) throw new ServiceError('validation', 'invalid_field', 'Unknown contract id: ' . (int)$contractId);
+    }
+
     /** Ids stored as names, so the history reads as English a year later. */
     private static function auditDisplay(PDO $conn, string $field, $v): ?string
     {
@@ -747,6 +776,7 @@ class DomainsService
             'owner_analyst_id'      => "SELECT full_name FROM analysts WHERE id = ?",
             'tech_contact_id'       => "SELECT CONCAT(first_name, ' ', surname) FROM contacts WHERE id = ?",
             'contract_id'           => "SELECT CONCAT(contract_number, ' ', title) FROM contracts WHERE id = ?",
+            'customer_user_id'      => "SELECT COALESCE(NULLIF(display_name, ''), email) FROM users WHERE id = ?",
         ][$field] ?? null;
         if ($q) {
             try { $st = $conn->prepare($q); $st->execute([(int)$v]); $n = $st->fetchColumn(); if ($n) return (string)$n; }
@@ -768,6 +798,7 @@ class DomainsService
             'owner_analyst_id' => $row['owner_analyst_id'] !== null ? (int)$row['owner_analyst_id'] : null,
             'registrar'        => $row['registrar_name'],
             'company_id'       => $row['tenant_id'] !== null ? (int)$row['tenant_id'] : null,
+            'customer_user_id' => isset($row['customer_user_id']) ? (int)$row['customer_user_id'] : null,
             'security_grade'   => $row['security_grade'],
         ];
     }

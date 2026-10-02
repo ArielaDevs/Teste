@@ -25,6 +25,7 @@
  */
 
 require_once __DIR__ . '/tenancy.php';
+require_once __DIR__ . '/contract_party.php';
 
 /**
  * Can this analyst reach this asset at all?
@@ -62,6 +63,7 @@ function contractAssetSelect(): string
  */
 function contractAssetsFor(PDO $conn, int $analystId, int $contractId): array
 {
+    if (!contractCanView($conn, $analystId, $contractId)) return [];   // #153
     [$where, $args] = activeTenantFilter($conn, $analystId, 'a');
     $stmt = $conn->prepare(
         contractAssetSelect() . " WHERE ca.contract_id = ?" . $where .
@@ -85,8 +87,13 @@ function contractAssetsFor(PDO $conn, int $analystId, int $contractId): array
  * company-scoped, so there is nothing further to filter by. If contracts ever
  * gain a tenant_id, this is the function that grows a filter.
  */
-function contractsForAsset(PDO $conn, int $assetId): array
+function contractsForAsset(PDO $conn, int $assetId, ?int $analystId = null): array
 {
+    // A CUSTOMER contract is hidden from an analyst who cannot see its customer's
+    // company (#153). Null analyst = no filter, for callers with no viewer.
+    require_once __DIR__ . '/contract_party.php';
+    [$partyCols, $partyJoins] = contractPartySql($conn, 'c');
+    [$vis, $visParams] = $analystId !== null ? contractVisibilitySql($conn, $analystId, 'c') : ['', []];
     $stmt = $conn->prepare(
         "SELECT ca.id AS link_id, ca.reference,
                 c.id AS contract_id, c.contract_number, c.title,
@@ -97,19 +104,22 @@ function contractsForAsset(PDO $conn, int $assetId): array
                 -- column, so there is nothing to select for one.
                 s.legal_name AS supplier_name, s.trading_name AS supplier_trading_name,
                 st.name AS status_name
+                $partyCols
            FROM contract_assets ca
            JOIN contracts c            ON c.id = ca.contract_id
       LEFT JOIN suppliers s            ON s.id = c.supplier_id
       LEFT JOIN contract_statuses st   ON st.id = c.contract_status_id
-          WHERE ca.asset_id = ?
+                $partyJoins
+          WHERE ca.asset_id = ?$vis
        ORDER BY c.contract_end IS NULL, c.contract_end, c.title"
     );
-    $stmt->execute([$assetId]);
+    $stmt->execute(array_merge([$assetId], $visParams));
 
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as &$r) {
         $r['link_id']     = (int)$r['link_id'];
         $r['contract_id'] = (int)$r['contract_id'];
+        $r['party_label'] = contractPartyLabel($r);
     }
     return $rows;
 }
@@ -125,9 +135,9 @@ function contractsForAsset(PDO $conn, int $assetId): array
  */
 function contractAssetLink(PDO $conn, int $analystId, int $contractId, int $assetId, ?string $reference): int
 {
-    $exists = $conn->prepare("SELECT 1 FROM contracts WHERE id = ?");
-    $exists->execute([$contractId]);
-    if (!$exists->fetchColumn()) {
+    // contractCanView is also the existence check: a customer contract out of
+    // this analyst's companies (#153) is "no such contract".
+    if (!contractCanView($conn, $analystId, $contractId)) {
         throw new RuntimeException('No such contract');
     }
     if (!contractAssetCanReach($conn, $analystId, $assetId)) {
@@ -190,7 +200,8 @@ function contractAssetLoad(PDO $conn, int $analystId, int $linkId): array
     $stmt->execute([$linkId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$row || !contractAssetCanReach($conn, $analystId, (int)$row['asset_id'])) {
+    if (!$row || !contractAssetCanReach($conn, $analystId, (int)$row['asset_id'])
+        || !contractCanView($conn, $analystId, (int)$row['contract_id'])) {
         throw new RuntimeException('No such link');
     }
     $row['id'] = (int)$row['id'];
@@ -207,6 +218,7 @@ function contractAssetLoad(PDO $conn, int $analystId, int $linkId): array
  */
 function contractAssetSearch(PDO $conn, int $analystId, int $contractId, string $q, int $limit = 25): array
 {
+    if (!contractCanView($conn, $analystId, $contractId)) return [];   // #153
     [$where, $args] = activeTenantFilter($conn, $analystId, 'a');
 
     $sql =

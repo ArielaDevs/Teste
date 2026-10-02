@@ -200,6 +200,7 @@ $translationNamespaces = ['common', 'contracts'];
                         </div>
                     </div>
                     <p><?php echo t('contracts.help.managing_dashboard'); ?></p>
+                    <p><?php echo t('contracts.help.managing_customers'); ?></p>
                     <p class="help-note"><?php echo t('contracts.help.managing_tip'); ?></p>
                 </div>
 

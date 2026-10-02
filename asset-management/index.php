@@ -2556,7 +2556,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     </div>`;
 
                 list.innerHTML = addBar + head + rows.map(c => {
-                    const supplier = c.supplier_trading_name || c.supplier_name || '';
+                    const supplier = c.party_label || c.supplier_trading_name || c.supplier_name || '';   // supplier or customer (#153)
                     // Bare dates. The words that used to prefix them are now
                     // column headings (Ed) — "Ends" and "Notice by" repeated on
                     // every row is the same two words said as many times as you
@@ -2752,7 +2752,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     return;
                 }
                 results.innerHTML = data.contracts.map(c => {
-                    const supplier = c.supplier_trading_name || c.supplier_name || '';
+                    const supplier = c.party_label || c.supplier_trading_name || c.supplier_name || '';   // supplier or customer (#153)
                     const ends = c.contract_end
                         ? `${window.t('asset-management.detail.contract_ends')} ${c.contract_end}`
                         : window.t('asset-management.detail.contract_no_end');

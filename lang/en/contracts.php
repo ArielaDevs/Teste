@@ -206,6 +206,32 @@ return [
         'toast_save_failed'    => 'Failed to save contract',
     ],
 
+    // Who a contract is WITH (#153): a supplier (you buy) or a customer (you sell)
+    'party' => [
+        'with'                 => 'Contract with',
+        'supplier'             => 'Supplier',
+        'customer'             => 'Customer',
+        'company'              => 'Company',
+        'select_company'       => 'Select company',
+        'person'               => 'Person',
+        'person_ph'            => 'Search for a person (optional)...',
+        'clear_person'         => 'Clear',
+        'no_people'            => 'Nobody matches.',
+        'hint_multi'           => 'Choose the company, a person, or both. Only analysts who can see that company will see this contract, unless Settings says otherwise.',
+        'hint_single'          => 'Choose the person you sell this contract to.',
+        'col_with'             => 'With',
+        'filter'               => 'Show contracts with',
+        'filter_all'           => 'Suppliers and customers',
+        'filter_supplier'      => 'Suppliers only',
+        'filter_customer'      => 'Customers only',
+        'customer_suffix'      => '(Customer: {customer})',
+        'err_customer_required'=> 'Choose the customer: a company, a person, or both.',
+        'err_type'             => 'A contract is with a supplier or a customer.',
+        'err_company'          => 'That company is not one you can access.',
+        'err_person'           => 'That person is not one you can see.',
+        'err_person_company'   => 'That person is not in the company you chose.',
+    ],
+
     // Settings (settings/index.php)
     'settings' => [
         'page_title'              => 'Service Desk - Contract settings',
@@ -217,6 +243,7 @@ return [
         'tab_rfp_departments'     => 'RFP departments',
         'tab_rfp_ai'              => 'RFP AI',
         'tab_left_panel'          => 'Left panel',
+        'tab_customer_contracts'  => 'Customer contracts',
         'col_name'                => 'Name',
         'col_description'         => 'Description',
         'col_order'               => 'Order',
@@ -285,6 +312,16 @@ return [
         'left_panel_always_desc'  => 'The sidebar stays pinned open at 260px. Good when you want stats and quick links one click away.',
         'left_panel_hover'        => 'Show on hover',
         'left_panel_hover_desc'   => 'Collapses to a thin 16px strip at the edge of the page; hovering over it slides the full sidebar back in. Frees space for the main content.',
+        // Customer contracts (#153)
+        'customer_intro'          => 'A contract can be with a customer you sell to, as well as a supplier you buy from. A customer belongs to a company, so you can choose who sees those contracts.',
+        'customer_visibility'     => 'Who can see customer contracts',
+        'customer_vis_company'    => 'Analysts who can see the customer\'s company',
+        'customer_vis_company_desc' => 'Recommended. A customer contract is hidden from analysts who cannot see that company - in the list, search, Watchtower and the API.',
+        'customer_vis_all'        => 'Everyone with access to Contracts',
+        'customer_vis_all_desc'   => 'Customer contracts are shown to everyone who can open Contracts, the same as supplier contracts.',
+        'customer_saved'          => 'Saved',
+        'customer_load_failed'    => 'The setting could not be loaded.',
+        'customer_single_company' => 'This install has one company, so the choice makes no difference yet. It applies as soon as you add a second company.',
     ],
 
     // Suppliers (suppliers/index.php + suppliers/view/index.php)
@@ -435,13 +472,14 @@ return [
         'feature_settings'  => 'Configure the dropdown options that drive the module &mdash; supplier types, supplier statuses, contract statuses, payment schedules, and custom contract term tabs.',
 
         'managing_intro'     => 'Contracts are the core of this module. Each contract record captures everything you need to know about a supplier agreement &mdash; who it\'s with, how long it runs, what it costs, and what documents support it.',
-        'managing_step1'     => '<strong>Create a contract</strong> &mdash; from the contracts dashboard, click the Add button. Fill in the contract name, select a supplier, and set the status.',
+        'managing_step1'     => '<strong>Create a contract</strong> &mdash; from the contracts dashboard, click the Add button. Fill in the contract name, choose who it is with (a supplier, or a customer), and set the status.',
         'managing_step2'     => '<strong>Set the dates</strong> &mdash; enter the start date, end date, and review date. The review date acts as your early warning so you have time to renegotiate or renew before the contract expires.',
         'managing_step3'     => '<strong>Record the financials</strong> &mdash; enter the total contract value and select the payment schedule (monthly, quarterly, annually, or a custom schedule configured in settings).',
         'managing_step4'     => '<strong>Add contract terms</strong> &mdash; use the rich text tabs to write out SLAs, KPIs, special conditions, or any other terms. Each tab uses the TinyMCE editor for full formatting.',
         'managing_step5'     => '<strong>Upload documents</strong> &mdash; attach signed copies, schedules, amendments, or any other supporting files directly to the contract record.',
         'managing_step6'     => '<strong>Save</strong> and the contract appears on your dashboard. You can return to edit it at any time or update the status as it moves through its lifecycle.',
         'managing_dashboard' => 'The contracts dashboard gives you an at-a-glance view of all active, expiring, and expired contracts. The sidebar shows summary statistics &mdash; total contracts, those expiring soon, and quick links to create new records or jump to suppliers.',
+        'managing_customers' => '<strong>Contracts you sell.</strong> A contract can be with a <em>customer</em> as well as a supplier &mdash; for example a support contract you provide. Choose <strong>Customer</strong> under <em>Contract with</em>, then pick the company, a person, or both. The list shows who each contract is with, and the drop-down above it narrows the list to suppliers or customers. A customer contract belongs to that customer\'s company, so analysts who cannot see the company do not see the contract; <strong>Settings &rarr; Customer contracts</strong> can show them to everyone with access to Contracts instead.',
         'managing_tip'       => 'Use the review date field to set reminders well before a contract\'s end date. This gives your procurement or legal team enough lead time to negotiate renewals on favourable terms.',
 
         'terms_title'             => 'Contract terms &mdash; rich text tabs',

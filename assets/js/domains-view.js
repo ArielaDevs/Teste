@@ -98,6 +98,7 @@
         const people = '<div class="dom-card"><div class="dom-card-h"><h3>' + esc(T('page.people_money')) + '</h3></div><div class="dom-card-b"><div class="dom-fields">'
             + row('field.owner', esc(D.owner_name || ''))
             + row('field.tech_contact', esc(D.tech_contact_name || ''))
+            + row('field.customer', D.customer_user_id ? esc(D.customer_user_name || ('#' + D.customer_user_id)) + (D.customer_user_email && D.customer_user_email !== D.customer_user_name ? '<div class="dom-sub">' + esc(D.customer_user_email) + '</div>' : '') : '')
             + (data.multi_company ? row('field.company', esc(D.company_name || '')) : '')
             + row('field.cost', D.cost !== null ? esc(money(D.cost, D.currency)) + (D.billing_years > 1 ? ' <span class="dom-sub">/ ' + esc(T('page.years', { n: D.billing_years })) + '</span>' : '') : '')
             + row('field.cost_centre', esc(D.cost_centre || ''))
@@ -274,7 +275,11 @@
         F('eAccount', acc, { blank: '—' });
         F('eRenewal', L.renewal_modes.map(m => ({ id: m, name: renewal(m) })));
         F('eTLock', [{ id: '1', name: T('lock.on') }, { id: '0', name: T('lock.off') }], { blank: T('lock.unknown') });
-        F('eContract', L.contracts || [], { blank: '—' });
+        // A linked customer contract this analyst cannot see (#153) is not in the
+        // list; keep it as an option so saving the form does not unlink it.
+        const contracts = (L.contracts || []).slice();
+        if (D.contract_id && !contracts.some(c => +c.id === D.contract_id)) contracts.unshift({ id: D.contract_id, name: T('field.contract_hidden') });
+        F('eContract', contracts, { blank: '—' });
         F('eTech', L.contacts || [], { blank: '—' });
         document.querySelectorAll('#editForm [data-f]').forEach(el => {
             const k = el.dataset.f;
@@ -284,8 +289,67 @@
             el.value = v === null || v === undefined ? '' : v;
         });
         document.getElementById('ePurposeHint').textContent = T('purpose_hint.' + D.purpose);
+        setCustomer(D.customer_user_id, D.customer_user_name);
         window.Dom.openModal('mEdit');
     }
+
+    // ------------------------------------------------- customer person (#153)
+    function setCustomer(id, label) {
+        document.getElementById('eCustomerId').value = id || '';
+        document.getElementById('eCustomer').value = label || '';
+        document.getElementById('eCustomerClear').hidden = !id;
+        hideCustomers();
+    }
+    function hideCustomers() { const ul = document.getElementById('eCustomerResults'); ul.hidden = true; ul.replaceChildren(); }
+    let custTimer = null, custSeq = 0;
+    function searchCustomers() {
+        document.getElementById('eCustomerId').value = '';   // typing again means choosing again
+        document.getElementById('eCustomerClear').hidden = true;
+        clearTimeout(custTimer);
+        const q = document.getElementById('eCustomer').value.trim();
+        if (q.length < 2) { hideCustomers(); return; }
+        custTimer = setTimeout(async () => {
+            const seq = ++custSeq;
+            let people = [];
+            try { people = (await api('people.php?domain_id=' + ID + '&q=' + encodeURIComponent(q))).people || []; } catch (e) { people = []; }
+            if (seq !== custSeq) return;
+            const ul = document.getElementById('eCustomerResults');
+            if (!people.length) {
+                const li = document.createElement('li'); li.textContent = T('field.customer_none'); li.setAttribute('aria-disabled', 'true');
+                ul.replaceChildren(li); ul.hidden = false; return;
+            }
+            ul.replaceChildren(...people.map(p => {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option'); li.dataset.id = p.id; li.dataset.label = p.name;
+                li.append(document.createTextNode(p.name));
+                if (p.email && p.email !== p.name) { const s = document.createElement('small'); s.textContent = p.email; li.append(s); }
+                li.addEventListener('mousedown', e => { e.preventDefault(); setCustomer(p.id, p.name); });
+                return li;
+            }));
+            ul.hidden = false;
+        }, 220);
+    }
+    function customerKeys(e) {
+        const ul = document.getElementById('eCustomerResults');
+        const items = Array.from(ul.querySelectorAll('li[role=option]'));
+        if (ul.hidden || !items.length) return;
+        let i = items.findIndex(li => li.getAttribute('aria-selected') === 'true');
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
+            items.forEach((li, n) => li.setAttribute('aria-selected', n === i ? 'true' : 'false'));
+        } else if (e.key === 'Enter' && i >= 0) {
+            e.preventDefault(); setCustomer(items[i].dataset.id, items[i].dataset.label);
+        } else if (e.key === 'Escape') { hideCustomers(); }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        const input = document.getElementById('eCustomer');
+        if (!input) return;   // no edit modal for a domain that does not exist
+        input.addEventListener('input', searchCustomers);
+        input.addEventListener('keydown', customerKeys);
+        document.getElementById('eCustomerClear').addEventListener('click', () => { setCustomer('', ''); input.focus(); });
+        document.addEventListener('click', e => { if (!e.target.closest('.dom-person')) hideCustomers(); });
+    });
 
     async function saveEdit() {
         const body = { id: ID };

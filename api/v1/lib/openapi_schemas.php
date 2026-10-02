@@ -2946,11 +2946,55 @@ return array (
           'type' => 'string',
           'nullable' => true,
         ),
-        'supplier' => 
+        'party_type' =>
+        array (
+          'type' => 'string',
+          'enum' =>
+          array (
+            0 => 'supplier',
+            1 => 'customer',
+          ),
+          'example' => 'supplier',
+        ),
+        'supplier' =>
         array (
           '$ref' => '#/components/schemas/LookupRef',
         ),
-        'owner' => 
+        'customer' =>
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'Set when party_type is customer: the company, the person, or both.',
+          'properties' =>
+          array (
+            'company' =>
+            array (
+              '$ref' => '#/components/schemas/LookupRef',
+            ),
+            'person' =>
+            array (
+              'type' => 'object',
+              'nullable' => true,
+              'properties' =>
+              array (
+                'id' =>
+                array (
+                  'type' => 'integer',
+                ),
+                'name' =>
+                array (
+                  'type' => 'string',
+                ),
+                'email' =>
+                array (
+                  'type' => 'string',
+                  'nullable' => true,
+                ),
+              ),
+            ),
+          ),
+        ),
+        'owner' =>
         array (
           '$ref' => '#/components/schemas/LookupRef',
         ),
@@ -3320,6 +3364,28 @@ return array (
             ),
           ),
         ),
+        'customer' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The person the domain is looked after for (#153): a user in the domain\'s own company.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+            'email' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
         'tech_contact' => 
         array (
           'type' => 'object',
@@ -3674,6 +3740,28 @@ return array (
               'type' => 'integer',
             ),
             'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The person the domain is looked after for (#153): a user in the domain\'s own company.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+            'email' => 
             array (
               'type' => 'string',
               'nullable' => true,
@@ -4042,6 +4130,28 @@ return array (
               'type' => 'integer',
             ),
             'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The person the domain is looked after for (#153): a user in the domain\'s own company.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+            'email' => 
             array (
               'type' => 'string',
               'nullable' => true,

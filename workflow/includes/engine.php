@@ -209,8 +209,8 @@ class WorkflowEngine
         // service method or a settings endpoint) — no dead triggers.
         return [
             // Domain entities
-            'contract'          => ['A contract', ['contract.id', 'contract.title', 'contract.status_id', 'contract.supplier_id']],
-            'domain'            => ['A domain', ['domain.id', 'domain.name', 'domain.expiry_date', 'domain.status_id', 'domain.purpose', 'domain.owner_analyst_id', 'domain.registrar', 'domain.company_id', 'domain.security_grade']],
+            'contract'          => ['A contract', ['contract.id', 'contract.title', 'contract.status_id', 'contract.supplier_id', 'contract.party_type', 'contract.customer_tenant_id', 'contract.customer_user_id']],
+            'domain'            => ['A domain', ['domain.id', 'domain.name', 'domain.expiry_date', 'domain.status_id', 'domain.purpose', 'domain.owner_analyst_id', 'domain.registrar', 'domain.company_id', 'domain.customer_user_id', 'domain.security_grade']],
             'supplier'          => ['A supplier', ['supplier.id', 'supplier.name', 'supplier.status_id', 'supplier.type_id']],
             'supplier_contact'  => ['A supplier contact', ['supplier_contact.id', 'supplier_contact.name', 'supplier_contact.supplier_id']],
             'calendar_event'    => ['A calendar event', ['calendar_event.id', 'calendar_event.title', 'calendar_event.category_id']],
@@ -406,6 +406,7 @@ class WorkflowEngine
             'contract.expiring' => [
                 'contract.id', 'contract.number', 'contract.title', 'contract.end_date',
                 'contract.days_remaining', 'contract.supplier_id', 'contract.supplier_name',
+                'contract.party_type', 'contract.party_name', 'contract.customer_tenant_id', 'contract.customer_user_id',
                 'window_days',
             ],
             'asset.warranty_expiring' => [
@@ -2795,7 +2796,7 @@ class WorkflowEngine
             return function (int $id) use ($conn, $R, $resourceFile, $selectFn, $where, $serialize) {
                 require_once $R . '/api/v1/lib/response.php';
                 require_once $R . '/api/v1/resources/' . $resourceFile;
-                $stmt = $conn->prepare($selectFn() . $where);
+                $stmt = $conn->prepare($selectFn($conn) . $where);   // extra arg ignored by selects that take none
                 $stmt->execute([$id]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 return $row ? $serialize($conn, $row) : null;

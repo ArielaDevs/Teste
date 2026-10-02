@@ -562,10 +562,13 @@ entityVisit('contract', (int) $contract_id);
                         <label>${escapeHtml(window.t('contracts.detail.description'))}</label>
                         <div class="value">${escapeHtml(c.description)}</div>
                     </div>` : ''}
-                    <div class="detail-group">
+                    ${c.party_type === 'customer' ? `<div class="detail-group">
+                        <label>${escapeHtml(window.t('contracts.party.customer'))}</label>
+                        <div class="value">${escapeHtml(c.customer_company_name || '')}${c.customer_company_name && c.customer_person_name ? '<br>' : ''}${c.customer_person_name ? escapeHtml(c.customer_person_name) + (c.customer_person_email ? ' <span style="color:var(--text-dim, #888);">' + escapeHtml(c.customer_person_email) + '</span>' : '') : ''}${!c.customer_company_name && !c.customer_person_name ? '-' : ''}</div>
+                    </div>` : `<div class="detail-group">
                         <label>${escapeHtml(window.t('contracts.detail.supplier'))}</label>
                         <div class="value">${escapeHtml(c.supplier_name || '-')}${c.supplier_trading_name ? ' <span style="color:var(--text-dim, #888);">(t/a ' + escapeHtml(c.supplier_trading_name) + ')</span>' : ''}</div>
-                    </div>
+                    </div>`}
                     <div class="detail-group">
                         <label>${escapeHtml(window.t('contracts.detail.owner'))}</label>
                         <div class="value">${escapeHtml(c.owner_name || '-')}</div>
@@ -718,6 +721,14 @@ entityVisit('contract', (int) $contract_id);
                 agreed: window.t('contracts.terms_status.agreed')
             };
             return labels[val] || val;
+        }
+
+        /** " (Supplier: X)" or " (Customer: X)" for a task or event made from this contract (#153). */
+        function partySuffix(c) {
+            if (c.party_type === 'customer') {
+                return c.party_label ? ' ' + window.t('contracts.party.customer_suffix', { customer: c.party_label }) : '';
+            }
+            return c.supplier_name ? ' ' + window.t('contracts.detail.supplier_suffix', { supplier: c.supplier_name }) : '';
         }
 
         function escapeHtml(text) {
@@ -1118,7 +1129,7 @@ entityVisit('contract', (int) $contract_id);
             const assigneeDefault = c.contract_owner_id || '';
 
             document.getElementById('taskTitle').value = titleDefault;
-            document.getElementById('taskDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + (c.supplier_name ? ' ' + window.t('contracts.detail.supplier_suffix', { supplier: c.supplier_name }) : '');
+            document.getElementById('taskDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + partySuffix(c);
             document.getElementById('taskDueDate').value = dueDefault ? dueDefault.substring(0, 10) : '';
             document.getElementById('taskPriority').value = 'Medium';
             document.getElementById('taskStatus').value = 'To Do';
@@ -1193,7 +1204,7 @@ entityVisit('contract', (int) $contract_id);
             const titleDefault = `${c.contract_number} — ${c.title}`;
 
             document.getElementById('eventTitle').value = titleDefault;
-            document.getElementById('eventDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + (c.supplier_name ? ' ' + window.t('contracts.detail.supplier_suffix', { supplier: c.supplier_name }) : '');
+            document.getElementById('eventDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + partySuffix(c);
             document.getElementById('eventStart').value = dateDefault ? dateDefault.substring(0, 10) : '';
             document.getElementById('eventAllDay').checked = true;
             document.getElementById('eventLocation').value = '';

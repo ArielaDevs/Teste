@@ -24,6 +24,7 @@
 
 require_once __DIR__ . '/../service_context.php';
 require_once dirname(__DIR__, 2) . '/workflow/includes/engine.php';
+require_once __DIR__ . '/../contract_party.php';   // supplier or customer, and who may see a customer contract (#153)
 
 class ContractsService
 {
@@ -37,10 +38,13 @@ class ContractsService
         if (!empty($in['id'])) {
             $id      = (int)$in['id'];
             $current = self::loadRow($conn, 'contracts', $id, 'Contract not found.');
+            self::assertVisible($conn, $ctx, $id);
             if (!array_diff_key($in, ['id' => true])) {
                 throw new ServiceError('validation', 'missing_field', 'No fields to update.');
             }
             $f = self::contractFields($conn, $in, $current);
+            $party = self::partyFields($conn, $ctx, $in, $current);
+            $f['supplier_id'] = $party['supplier_id'];
             if ($f['contract_number'] !== $current['contract_number']) {
                 $dup = $conn->prepare("SELECT id FROM contracts WHERE contract_number = ? AND id != ?");
                 $dup->execute([$f['contract_number'], $id]);
@@ -55,11 +59,14 @@ class ContractsService
                     personal_data_transferred=?, dpia_required=?, dpia_completed_date=?, dpia_dms_link=?, is_active=?
                  WHERE id=?"
             )->execute([...self::contractParams($f), $id]);
-            WorkflowEngine::dispatch('contract.updated', ['contract' => ['id' => $id, 'title' => $f['title'] ?? null, 'status_id' => $f['contract_status_id'] ?? null, 'supplier_id' => $f['supplier_id'] ?? null]]);
+            self::writeParty($conn, $id, $party);
+            WorkflowEngine::dispatch('contract.updated', ['contract' => ['id' => $id, 'title' => $f['title'] ?? null, 'status_id' => $f['contract_status_id'] ?? null, 'supplier_id' => $f['supplier_id'] ?? null] + self::partyPayload($party)]);
             return ['id' => $id, 'created' => false];
         }
 
         $f = self::contractFields($conn, $in);
+        $party = self::partyFields($conn, $ctx, $in, []);
+        $f['supplier_id'] = $party['supplier_id'];
         $dup = $conn->prepare("SELECT id FROM contracts WHERE contract_number = ?");
         $dup->execute([$f['contract_number']]);
         $existing = $dup->fetchColumn();
@@ -75,7 +82,8 @@ class ContractsService
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())"
         )->execute(self::contractParams($f));
         $newId = (int)$conn->lastInsertId();
-        WorkflowEngine::dispatch('contract.created', ['contract' => ['id' => $newId, 'title' => $f['title'] ?? null, 'status_id' => $f['contract_status_id'] ?? null, 'supplier_id' => $f['supplier_id'] ?? null]]);
+        self::writeParty($conn, $newId, $party);
+        WorkflowEngine::dispatch('contract.created', ['contract' => ['id' => $newId, 'title' => $f['title'] ?? null, 'status_id' => $f['contract_status_id'] ?? null, 'supplier_id' => $f['supplier_id'] ?? null] + self::partyPayload($party)]);
         return ['id' => $newId, 'created' => true];
     }
 
@@ -83,6 +91,7 @@ class ContractsService
     public static function deleteContract(PDO $conn, ActorContext $ctx, int $id): int
     {
         $row = self::loadRow($conn, 'contracts', $id, 'Contract not found.');
+        self::assertVisible($conn, $ctx, $id);
         $conn->beginTransaction();
         try {
             $conn->prepare("DELETE FROM contract_term_values WHERE contract_id = ?")->execute([$id]);
@@ -97,7 +106,10 @@ class ContractsService
             if ($conn->inTransaction()) $conn->rollBack();
             throw $e;
         }
-        WorkflowEngine::dispatch('contract.deleted', ['contract' => ['id' => $id, 'title' => $row['title'] ?? null, 'status_id' => isset($row['contract_status_id']) ? (int)$row['contract_status_id'] : null, 'supplier_id' => isset($row['supplier_id']) ? (int)$row['supplier_id'] : null]]);
+        WorkflowEngine::dispatch('contract.deleted', ['contract' => ['id' => $id, 'title' => $row['title'] ?? null, 'status_id' => isset($row['contract_status_id']) ? (int)$row['contract_status_id'] : null, 'supplier_id' => isset($row['supplier_id']) ? (int)$row['supplier_id'] : null,
+            'party_type' => $row['party_type'] ?? 'supplier',
+            'customer_tenant_id' => isset($row['customer_tenant_id']) ? (int)$row['customer_tenant_id'] : null,
+            'customer_user_id' => isset($row['customer_user_id']) ? (int)$row['customer_user_id'] : null]]);
         return $id;
     }
 
@@ -105,6 +117,7 @@ class ContractsService
     public static function saveTerms(PDO $conn, ActorContext $ctx, int $contractId, $terms): void
     {
         self::loadRow($conn, 'contracts', $contractId, 'Contract not found.');
+        self::assertVisible($conn, $ctx, $contractId);
         if (!is_array($terms)) {
             throw new ServiceError('validation', 'missing_field', "'terms' is required: [{\"term_tab_id\": 1, \"content\": \"…\"}, …].");
         }
@@ -225,6 +238,52 @@ class ContractsService
     // ======================================================================
     //  Internals
     // ======================================================================
+
+    /** A customer contract the actor may not see is reported as not found (#153). */
+    private static function assertVisible(PDO $conn, ActorContext $ctx, int $id): void
+    {
+        if (!contractCanView($conn, $ctx->actorId, $id)) {
+            throw new ServiceError('not_found', 'not_found', 'Contract not found.');
+        }
+    }
+
+    /**
+     * Who the contract is with. Fields not sent keep their current value, so an
+     * update that only changes the title leaves a customer contract a customer
+     * contract. A supplier id is checked against suppliers as before.
+     */
+    private static function partyFields(PDO $conn, ActorContext $ctx, array $in, array $current): array
+    {
+        $pick = fn(string $k, $d = null) => array_key_exists($k, $in) ? $in[$k] : ($current[$k] ?? $d);
+        $data = [
+            'party_type'         => $pick('party_type', CONTRACT_PARTY_SUPPLIER),
+            'supplier_id'        => $pick('supplier_id'),
+            'customer_tenant_id' => $pick('customer_tenant_id'),
+            'customer_user_id'   => $pick('customer_user_id'),
+        ];
+        if (!contractPartyReady($conn)) {
+            $data['party_type'] = CONTRACT_PARTY_SUPPLIER;   // before Database Verification: suppliers only
+        }
+        try {
+            $p = contractNormaliseParty($conn, $ctx->actorId, $data);
+        } catch (InvalidArgumentException $e) {
+            throw new ServiceError('validation', 'invalid_field', $e->getMessage());
+        }
+        $p['supplier_id'] = self::lookup($conn, 'suppliers', $p['supplier_id'], 'supplier');
+        return $p;
+    }
+
+    private static function writeParty(PDO $conn, int $id, array $p): void
+    {
+        if (!contractPartyReady($conn)) return;
+        $conn->prepare("UPDATE contracts SET party_type = ?, customer_tenant_id = ?, customer_user_id = ? WHERE id = ?")
+             ->execute([$p['party_type'], $p['customer_tenant_id'], $p['customer_user_id'], $id]);
+    }
+
+    private static function partyPayload(array $p): array
+    {
+        return ['party_type' => $p['party_type'], 'customer_tenant_id' => $p['customer_tenant_id'], 'customer_user_id' => $p['customer_user_id']];
+    }
 
     private static function loadRow(PDO $conn, string $table, int $id, string $notFoundMsg): array
     {

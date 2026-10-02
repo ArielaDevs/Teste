@@ -303,6 +303,29 @@ $translationNamespaces = ['common', 'contracts'];
 
         <!-- Left panel tab — a per-analyst display preference, so it declares no
              capability and is never gated: everyone with the module sees it. -->
+        <div class="tab-content<?php echo $activeTabId === 'customer-contracts' ? ' active' : ''; ?>" id="customer-contracts-tab" data-capability="<?php echo Cap::CONTRACTS_CUSTOMER_VISIBILITY; ?>">
+            <div class="section-header">
+                <h2><?php echo htmlspecialchars(t('contracts.settings.tab_customer_contracts')); ?></h2>
+            </div>
+            <p style="color: var(--text-muted, #666); margin-bottom: 20px;"><?php echo htmlspecialchars(t('contracts.settings.customer_intro')); ?></p>
+            <form id="customerVisibilityForm" autocomplete="off" onsubmit="event.preventDefault();">
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 500; color: var(--text, #333);"><?php echo htmlspecialchars(t('contracts.settings.customer_visibility')); ?></label>
+                    <label style="display: block; padding: 10px 14px; border: 1px solid var(--border, #ddd); border-radius: 6px; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="customerVisibility" value="company" onchange="saveCustomerVisibility(this.value)">
+                        <strong><?php echo htmlspecialchars(t('contracts.settings.customer_vis_company')); ?></strong>
+                        <span style="display: block; font-size: 12px; color: var(--text-muted, #777); margin-top: 4px; margin-left: 22px;"><?php echo htmlspecialchars(t('contracts.settings.customer_vis_company_desc')); ?></span>
+                    </label>
+                    <label style="display: block; padding: 10px 14px; border: 1px solid var(--border, #ddd); border-radius: 6px; cursor: pointer;">
+                        <input type="radio" name="customerVisibility" value="all" onchange="saveCustomerVisibility(this.value)">
+                        <strong><?php echo htmlspecialchars(t('contracts.settings.customer_vis_all')); ?></strong>
+                        <span style="display: block; font-size: 12px; color: var(--text-muted, #777); margin-top: 4px; margin-left: 22px;"><?php echo htmlspecialchars(t('contracts.settings.customer_vis_all_desc')); ?></span>
+                    </label>
+                </div>
+                <p id="customerVisibilityNote" style="font-size: 12px; color: var(--text-muted, #777);"></p>
+            </form>
+        </div>
+
         <div class="tab-content<?php echo $activeTabId === 'left-panel' ? ' active' : ''; ?>" id="left-panel-tab" data-capability="none">
             <div class="section-header">
                 <h2><?php echo htmlspecialchars(t('contracts.settings.tab_left_panel')); ?></h2>
@@ -751,7 +774,42 @@ $translationNamespaces = ['common', 'contracts'];
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.getElementById(tab + '-tab').classList.add('active');
             if (tab === 'left-panel') loadSidebarMode();
+            if (tab === 'customer-contracts') loadCustomerVisibility();
         }
+
+        // --- Customer contracts: who may see them (#153) -----------------
+        let customerVisibilityLoaded = false;
+        async function loadCustomerVisibility() {
+            if (customerVisibilityLoaded) return;
+            customerVisibilityLoaded = true;
+            const note = document.getElementById('customerVisibilityNote');
+            try {
+                const r = await fetch('../../api/contracts/customer_visibility.php', { credentials: 'same-origin' });
+                const d = await r.json();
+                if (!d.success) throw new Error(d.error || '');
+                document.querySelectorAll('input[name="customerVisibility"]').forEach(i => { i.checked = (i.value === d.value); });
+                note.textContent = d.multi_company ? '' : window.t('contracts.settings.customer_single_company');
+            } catch (e) {
+                note.textContent = e.message || window.t('contracts.settings.customer_load_failed');
+            }
+        }
+        async function saveCustomerVisibility(value) {
+            const note = document.getElementById('customerVisibilityNote');
+            try {
+                const r = await fetch('../../api/contracts/customer_visibility.php', {
+                    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value })
+                });
+                const d = await r.json();
+                if (!d.success) throw new Error(d.error || '');
+                note.textContent = window.t('contracts.settings.customer_saved');
+            } catch (e) {
+                note.textContent = e.message || window.t('contracts.settings.customer_load_failed');
+                customerVisibilityLoaded = false;
+                loadCustomerVisibility();
+            }
+        }
+        if (document.getElementById('customer-contracts-tab').classList.contains('active')) loadCustomerVisibility();
 
         // --- Left panel preference ------------------------------------
         // Same pattern as knowledge / process-mapper: 'always' vs 'hover',

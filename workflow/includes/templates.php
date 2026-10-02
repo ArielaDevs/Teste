@@ -364,7 +364,7 @@ class WorkflowTemplates
                         'type' => 'create_ticket',
                         'args' => [
                             'subject' => 'Contract renewal due: {{contract.title}} ({{contract.number}})',
-                            'body'    => "This contract ends on {{contract.end_date}} — {{contract.days_remaining}} days away.\n\nSupplier: {{contract.supplier_name}}\n\nDecide whether to renew, renegotiate or let it lapse, and action it before the end date.",
+                            'body'    => "This contract ends on {{contract.end_date}} — {{contract.days_remaining}} days away.\n\nWith: {{contract.party_name}}\n\nDecide whether to renew, renegotiate or let it lapse, and action it before the end date.",
                         ],
                     ],
                 ],

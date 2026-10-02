@@ -543,6 +543,7 @@ return [
         'held_by_many'       => '{name} and {n} other(s)',
         'warranty'           => 'Warranty',
         'supplier'           => 'Supplier',
+        'customer'           => 'Customer',
         'renewal'            => 'Renews',
         'notice'             => 'Notice by',
         'expires'            => 'Expires',

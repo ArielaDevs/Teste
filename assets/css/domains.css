@@ -169,6 +169,15 @@ body { --accent: var(--dom-accent, #4d7c0f); --accent-hover: var(--dom-accent-ho
 .dom-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 .dom-form-grid .full { grid-column: 1 / -1; }
 .dom-hint { font-size: 12px; color: var(--text-dim, #888); margin-top: 4px; }
+/* Customer person picker (#153) */
+.dom-person { position: relative; }
+.dom-person input[type=text] { width: 100%; box-sizing: border-box; padding-right: 30px; }
+.dom-person-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: none; font-size: 18px; line-height: 1; color: var(--text-dim, #888); cursor: pointer; }
+.dom-person-results { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.12); max-height: 220px; overflow-y: auto; }
+.dom-person-results li { padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text, #333); }
+.dom-person-results li small { display: block; color: var(--text-dim, #888); font-size: 11.5px; }
+.dom-person-results li[aria-selected="true"], .dom-person-results li:hover { background: var(--surface-hover, #f3f4f6); }
+.dom-person-results li[aria-disabled="true"] { cursor: default; color: var(--text-dim, #888); }
 .dom-progress { height: 8px; border-radius: 4px; background: var(--surface-2, #eee); overflow: hidden; margin: 10px 0 6px; }
 .dom-progress > div { height: 100%; background: var(--dom-accent, #4d7c0f); width: 0; transition: width .25s; }
 .dom-skip-list { max-height: 180px; overflow-y: auto; font-size: 12px; border: 1px solid var(--border-soft, #eee); border-radius: 6px; padding: 8px 10px; }

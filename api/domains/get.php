@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../includes/domains/read.php';
 domainApiRun(function () use ($conn, $analystId) {
     $id = (int)($_GET['id'] ?? 0);
     if ($id <= 0 || !analystCanAccessDomain($conn, $analystId, $id)) domainApiFail('Domain not found.');
-    $d = domainDetail($conn, $id);
+    $d = domainDetail($conn, $id, $analystId);
     if (!$d) domainApiFail('Domain not found.');
 
     $hist = $conn->prepare(

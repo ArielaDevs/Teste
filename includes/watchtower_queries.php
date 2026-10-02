@@ -472,22 +472,21 @@ function getWatchtowerData($conn, $analystId = 0, $scope = WT_SCOPE_ALL) {
     ];
 
     // -- Contracts --
+    // Customer contracts outside the viewer's companies are not counted (#153).
+    require_once __DIR__ . '/contract_party.php';
+    [$ctVis, $ctArgs] = contractVisibilitySql($conn, (int)$analystId, 'k');
+    $ctCount = function (string $where) use ($conn, $ctVis, $ctArgs): int {
+        $s = $conn->prepare("SELECT COUNT(*) FROM contracts k WHERE $where$ctVis");
+        $s->execute($ctArgs);
+        return (int)$s->fetchColumn();
+    };
 
-    $ctExp30 = (int)$conn->query(
-        "SELECT COUNT(*) FROM contracts
-         WHERE is_active = 1 AND contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)"
-    )->fetchColumn();
+    $ctExp30 = $ctCount("k.is_active = 1 AND k.contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)");
 
-    $ctExp90 = (int)$conn->query(
-        "SELECT COUNT(*) FROM contracts
-         WHERE is_active = 1 AND contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 90 DAY)"
-    )->fetchColumn();
+    $ctExp90 = $ctCount("k.is_active = 1 AND k.contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 90 DAY)");
 
-    $ctNotice = (int)$conn->query(
-        "SELECT COUNT(*) FROM contracts
-         WHERE is_active = 1 AND notice_date IS NOT NULL
-           AND notice_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)"
-    )->fetchColumn();
+    $ctNotice = $ctCount("k.is_active = 1 AND k.notice_date IS NOT NULL
+           AND k.notice_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)");
 
     $contracts = [
         'expiring_30d'       => $ctExp30,

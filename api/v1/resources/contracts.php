@@ -22,7 +22,9 @@
  * filters mirror the Watchtower/dashboard SQL shapes (expiring_within_days,
  * notice_within_days, expired).
  *
- * Contracts are install-wide (no tenant_id — matches the UI). No audit trail
+ * Contracts are install-wide (no tenant_id — matches the UI), EXCEPT a contract
+ * with a CUSTOMER (#153): that belongs to its customer's company and is hidden
+ * from a key whose company scope does not reach it, as in the UI. No audit trail
  * exists in the product and none is invented here.
  *
  * Contract / supplier / term WRITES are delegated to ContractsService
@@ -32,23 +34,32 @@
 
 require_once dirname(__DIR__, 3) . '/includes/service_context.php';
 require_once dirname(__DIR__, 3) . '/includes/services/contracts.php';
+require_once dirname(__DIR__, 3) . '/includes/contract_party.php';
 require_once dirname(__DIR__, 3) . '/includes/timezone.php';   // naive_today_sql() — contract_end/notice_date are bare dates (GH #126)
 
 // ---------------------------------------------------------------------------
 // Serializers + loaders
 // ---------------------------------------------------------------------------
 
-function apiContractSelect(): string {
+function apiContractSelect(PDO $conn): string {
+    [$partyCols, $partyJoins] = contractPartySql($conn, 'c');
     return "SELECT c.*,
                    COALESCE(NULLIF(TRIM(s.trading_name), ''), s.legal_name) AS supplier_name,
                    a.full_name AS owner_name,
                    cs.name AS status_name,
                    ps.name AS payment_schedule_name
+                   $partyCols
             FROM contracts c
             LEFT JOIN suppliers s ON s.id = c.supplier_id
             LEFT JOIN analysts a ON a.id = c.contract_owner_id
             LEFT JOIN contract_statuses cs ON cs.id = c.contract_status_id
-            LEFT JOIN payment_schedules ps ON ps.id = c.payment_schedule_id";
+            LEFT JOIN payment_schedules ps ON ps.id = c.payment_schedule_id
+            $partyJoins";
+}
+
+/** The key's view of customer contracts (#153): " AND (...)" + its args. */
+function apiContractVisibility(PDO $conn, array $apiKey): array {
+    return contractVisibilitySqlForScope($conn, $apiKey['company_scope'] ?? null, 'c');
 }
 
 function apiSerializeContract(array $r): array {
@@ -60,7 +71,14 @@ function apiSerializeContract(array $r): array {
         'contract_number' => $r['contract_number'],
         'title'           => $r['title'],
         'description'     => $r['description'],
+        'party_type'      => $r['party_type'] ?? 'supplier',
         'supplier'        => $rel($r['supplier_id'], $r['supplier_name']),
+        'customer'        => ($r['party_type'] ?? 'supplier') === 'customer' ? [
+            'company' => $rel($r['customer_tenant_id'] ?? null, $r['customer_company_name'] ?? null),
+            'person'  => ($r['customer_user_id'] ?? null) === null ? null : [
+                'id' => (int)$r['customer_user_id'], 'name' => $r['customer_person_name'] ?? null, 'email' => $r['customer_person_email'] ?? null,
+            ],
+        ] : null,
         'owner'           => $rel($r['contract_owner_id'], $r['owner_name']),
         'status'          => $rel($r['contract_status_id'], $r['status_name']),
         'payment_schedule' => $rel($r['payment_schedule_id'], $r['payment_schedule_name']),
@@ -88,9 +106,10 @@ function apiSerializeContract(array $r): array {
     ];
 }
 
-function apiLoadContract(PDO $conn, int $contractId): array {
-    $stmt = $conn->prepare(apiContractSelect() . " WHERE c.id = ?");
-    $stmt->execute([$contractId]);
+function apiLoadContract(PDO $conn, int $contractId, array $apiKey): array {
+    [$vis, $visArgs] = apiContractVisibility($conn, $apiKey);
+    $stmt = $conn->prepare(apiContractSelect($conn) . " WHERE c.id = ?$vis");
+    $stmt->execute(array_merge([$contractId], $visArgs));
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         apiError(404, 'not_found', 'Contract not found.');
@@ -175,11 +194,34 @@ function apiContractsList(PDO $conn, array $apiKey, array $params, array $body):
         $where[] = 'c.is_active = ?';
         $args[]  = $_GET['is_active'] === 'true' ? 1 : 0;
     }
+    $partyReady = contractPartyReady($conn);
+    if (isset($_GET['party_type']) && $_GET['party_type'] !== '') {
+        if (!in_array($_GET['party_type'], ['supplier', 'customer'], true)) {
+            apiError(400, 'invalid_parameter', "party_type must be 'supplier' or 'customer'.");
+        }
+        if ($partyReady) {
+            $where[] = 'c.party_type = ?';
+            $args[]  = $_GET['party_type'];
+        } elseif ($_GET['party_type'] === 'customer') {
+            $where[] = '1=0';   // no customer contracts before Database Verification
+        }
+    }
+    foreach (['customer_company_id' => 'c.customer_tenant_id', 'customer_user_id' => 'c.customer_user_id'] as $param => $col) {
+        if (isset($_GET[$param]) && $_GET[$param] !== '') {
+            $where[] = $partyReady ? "$col = ?" : '1=0';
+            if ($partyReady) $args[] = (int)$_GET[$param];
+        }
+    }
     if (isset($_GET['q']) && trim($_GET['q']) !== '') {
-        // Mirrors get_contracts.php: number, title and supplier legal name.
-        $where[] = '(c.contract_number LIKE ? OR c.title LIKE ? OR s.legal_name LIKE ?)';
+        // Mirrors get_contracts.php: number, title, supplier and customer names.
         $like = '%' . trim($_GET['q']) . '%';
-        array_push($args, $like, $like, $like);
+        if ($partyReady) {
+            $where[] = '(c.contract_number LIKE ? OR c.title LIKE ? OR s.legal_name LIKE ? OR s.trading_name LIKE ? OR cpt.name LIKE ? OR cpu.display_name LIKE ? OR cpu.email LIKE ?)';
+            array_push($args, $like, $like, $like, $like, $like, $like, $like);
+        } else {
+            $where[] = '(c.contract_number LIKE ? OR c.title LIKE ? OR s.legal_name LIKE ?)';
+            array_push($args, $like, $like, $like);
+        }
     }
     // Renewal shapes — the Watchtower/dashboard windows as parameters.
     // ⚠️ naive_today_sql(), not CURDATE(): contract_end and notice_date are BARE
@@ -219,13 +261,16 @@ function apiContractsList(PDO $conn, array $apiKey, array $params, array $body):
     $orderSql = $sortable[$sortKey] . ($desc ? ' DESC' : ' ASC');
 
     [$page, $perPage, $offset] = apiPagination();
-    $whereSql = implode(' AND ', $where);
+    [$vis, $visArgs] = apiContractVisibility($conn, $apiKey);
+    $whereSql = implode(' AND ', $where) . $vis;
+    $args = array_merge($args, $visArgs);
+    [, $partyJoins] = contractPartySql($conn, 'c');
 
-    $countStmt = $conn->prepare("SELECT COUNT(*) FROM contracts c LEFT JOIN suppliers s ON s.id = c.supplier_id WHERE $whereSql");
+    $countStmt = $conn->prepare("SELECT COUNT(*) FROM contracts c LEFT JOIN suppliers s ON s.id = c.supplier_id $partyJoins WHERE $whereSql");
     $countStmt->execute($args);
     $total = (int)$countStmt->fetchColumn();
 
-    $stmt = $conn->prepare(apiContractSelect() . " WHERE $whereSql ORDER BY $orderSql LIMIT $perPage OFFSET $offset");
+    $stmt = $conn->prepare(apiContractSelect($conn) . " WHERE $whereSql ORDER BY $orderSql LIMIT $perPage OFFSET $offset");
     $stmt->execute($args);
     apiRespond(array_map('apiSerializeContract', $stmt->fetchAll(PDO::FETCH_ASSOC)), 200, [
         'page'        => $page,
@@ -236,7 +281,7 @@ function apiContractsList(PDO $conn, array $apiKey, array $params, array $body):
 }
 
 function apiContractsGet(PDO $conn, array $apiKey, array $params, array $body): void {
-    apiRespond(apiSerializeContract(apiLoadContract($conn, $params[0])));
+    apiRespond(apiSerializeContract(apiLoadContract($conn, $params[0], $apiKey)));
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +290,7 @@ function apiContractsGet(PDO $conn, array $apiKey, array $params, array $body): 
 function apiContractsCreate(PDO $conn, array $apiKey, array $params, array $body): void {
     try {
         $res = ContractsService::saveContract($conn, ActorContext::fromApiKey($apiKey), $body);
-        apiRespond(apiSerializeContract(apiLoadContract($conn, $res['id'])), 201);
+        apiRespond(apiSerializeContract(apiLoadContract($conn, $res['id'], $apiKey)), 201);
     } catch (ServiceError $e) { apiFailFromService($e); }
 }
 
@@ -255,7 +300,7 @@ function apiContractsCreate(PDO $conn, array $apiKey, array $params, array $body
 function apiContractsUpdate(PDO $conn, array $apiKey, array $params, array $body): void {
     try {
         $res = ContractsService::saveContract($conn, ActorContext::fromApiKey($apiKey), array_merge($body, ['id' => (int)$params[0]]));
-        apiRespond(apiSerializeContract(apiLoadContract($conn, $res['id'])));
+        apiRespond(apiSerializeContract(apiLoadContract($conn, $res['id'], $apiKey)));
     } catch (ServiceError $e) { apiFailFromService($e); }
 }
 
@@ -273,7 +318,7 @@ function apiContractsDelete(PDO $conn, array $apiKey, array $params, array $body
 // Contract terms — GET + bulk upsert (mirrors save_contract_terms.php)
 // ---------------------------------------------------------------------------
 function apiContractTermsGet(PDO $conn, array $apiKey, array $params, array $body): void {
-    apiLoadContract($conn, $params[0]);
+    apiLoadContract($conn, $params[0], $apiKey);
     $stmt = $conn->prepare(
         "SELECT t.id AS term_tab_id, t.name, v.content, v.updated_datetime
          FROM contract_term_tabs t

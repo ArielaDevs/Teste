@@ -4746,12 +4746,24 @@
                     "p": "\/contracts",
                     "perm": "contracts.read",
                     "s": "List \/ search contracts",
-                    "d": "Contracts with supplier\/owner\/status names. Renewal filters mirror the dashboard and Watchtower windows. Install-wide (the RFP Builder is not exposed — it's internal-only by design).",
+                    "d": "Contracts with supplier\/owner\/status names. Renewal filters mirror the dashboard and Watchtower windows. A contract is with a supplier (you buy) or a customer (you sell); supplier contracts are install-wide, and a customer contract is hidden from a key whose company scope does not include its customer's company. The RFP Builder is not exposed — it's internal-only by design.",
                     "params": [
                         {
                             "name": "q",
                             "in": "query",
-                            "desc": "Search contract number, title and supplier legal name",
+                            "desc": "Search contract number, title, supplier names and customer company \/ person",
+                            "req": false
+                        },
+                        {
+                            "name": "party_type",
+                            "in": "query",
+                            "desc": "supplier \/ customer",
+                            "req": false
+                        },
+                        {
+                            "name": "customer_company_id \/ customer_user_id",
+                            "in": "query",
+                            "desc": "Customer contracts for one company or one person",
                             "req": false
                         },
                         {
@@ -4866,6 +4878,18 @@
                             "name": "supplier_id \/ contract_owner_id \/ contract_status_id \/ payment_schedule_id",
                             "in": "body",
                             "desc": "Lookups",
+                            "req": false
+                        },
+                        {
+                            "name": "party_type",
+                            "in": "body",
+                            "desc": "supplier (default) or customer. A customer contract takes customer_tenant_id (a company), customer_user_id (a person), or both, and no supplier_id",
+                            "req": false
+                        },
+                        {
+                            "name": "customer_tenant_id \/ customer_user_id",
+                            "in": "body",
+                            "desc": "The customer: a company the key's analyst can access, and \/ or a person in it",
                             "req": false
                         },
                         {
@@ -5851,9 +5875,9 @@
                             "req": false
                         },
                         {
-                            "name": "status_id \/ owner_analyst_id \/ registrar_supplier_id \/ registrar_account_id \/ tech_contact_id \/ contract_id",
+                            "name": "status_id \/ owner_analyst_id \/ registrar_supplier_id \/ registrar_account_id \/ tech_contact_id \/ contract_id \/ customer_user_id",
                             "in": "body",
-                            "desc": "Lookups, validated (422 on an unknown id)",
+                            "desc": "Lookups, validated (422 on an unknown id). customer_user_id is the customer: a user in the domain's own company",
                             "req": false
                         },
                         {

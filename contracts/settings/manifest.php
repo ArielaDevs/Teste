@@ -75,6 +75,17 @@ return [
             'sensitive' => true,
         ],
         [
+            // Who may see a CUSTOMER contract (#153): only analysts who can see that
+            // customer's company (the default), or everyone with Contracts. Opening it
+            // up lets one customer's analysts read another customer's contracts and
+            // values, so it is its own sensitive grant - never part of a lookup list.
+            'id'        => 'customer-contracts',
+            'cap'       => Cap::CONTRACTS_CUSTOMER_VISIBILITY,
+            'label_key' => 'contracts.settings.tab_customer_contracts',
+            'grant'     => 'Choose who can see customer contracts (it can open them across companies)',
+            'sensitive' => true,
+        ],
+        [
             // A per-analyst display preference. Not administration; nothing to grant.
             'id'        => 'left-panel',
             'cap'       => null,

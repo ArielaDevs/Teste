@@ -43,7 +43,7 @@ try {
     echo json_encode([
         'success'   => true,
         'permitted' => $permitted,
-        'contracts' => $permitted ? contractsForAsset($conn, $assetId) : [],
+        'contracts' => $permitted ? contractsForAsset($conn, $assetId, (int)$_SESSION['analyst_id']) : [],
     ]);
 } catch (Throwable $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);

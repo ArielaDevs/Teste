@@ -3981,6 +3981,13 @@ return [
         'title'                     => 'VARCHAR(255) NOT NULL',
         'description'               => 'LONGTEXT NULL',
         'supplier_id'               => 'INT NULL',
+        // Who the contract is WITH (#153). 'supplier' = we buy (supplier_id), as every
+        // contract was before; 'customer' = we sell, to a company and/or a person.
+        // Customer contracts can be limited to analysts who can see that company
+        // (contracts_customer_visibility) - see includes/contract_party.php.
+        'party_type'                => "VARCHAR(10) NOT NULL DEFAULT 'supplier'",
+        'customer_tenant_id'        => 'INT NULL',
+        'customer_user_id'          => 'INT NULL',
         'contract_owner_id'         => 'INT NULL',
         'contract_status_id'        => 'INT NULL',
         'contract_start'            => 'DATE NULL',
@@ -4779,6 +4786,10 @@ return [
         'registrant_name'       => 'VARCHAR(255) NULL',
         'owner_analyst_id'      => 'INT NULL',
         'tech_contact_id'       => 'INT NULL',
+        // The person at the customer this domain is for (#153/#154). The domain's own
+        // company (tenant_id) stays its company - there is deliberately no second
+        // "customer company" column beside it.
+        'customer_user_id'      => 'INT NULL',
         'nameservers'           => 'TEXT NULL',
         'dns_provider'          => 'VARCHAR(255) NULL',
         'hosting_provider'      => 'VARCHAR(255) NULL',

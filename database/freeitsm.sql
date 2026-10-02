@@ -5319,6 +5319,9 @@ CREATE TABLE IF NOT EXISTS `contracts` (
     `title`                     VARCHAR(255) NOT NULL,
     `description`               LONGTEXT NULL,
     `supplier_id`               INT NULL,
+    `party_type`                VARCHAR(10) NOT NULL DEFAULT 'supplier',
+    `customer_tenant_id`        INT NULL,
+    `customer_user_id`          INT NULL,
     `contract_owner_id`         INT NULL,
     `contract_status_id`        INT NULL,
     `contract_start`            DATE NULL,
@@ -5340,8 +5343,12 @@ CREATE TABLE IF NOT EXISTS `contracts` (
     `is_demo`           TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)
     PRIMARY KEY (`id`),
     KEY `ix_contracts_supplier_id` (`supplier_id`),
+    KEY `ix_contracts_customer_tenant` (`customer_tenant_id`),
+    KEY `ix_contracts_customer_user` (`customer_user_id`),
     KEY `ix_contracts_contract_end` (`contract_end`),
     CONSTRAINT `fk_contracts_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_contracts_customer_tenant` FOREIGN KEY (`customer_tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_contracts_customer_user` FOREIGN KEY (`customer_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_contracts_owner` FOREIGN KEY (`contract_owner_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_contracts_status` FOREIGN KEY (`contract_status_id`) REFERENCES `contract_statuses` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_contracts_payment_schedule` FOREIGN KEY (`payment_schedule_id`) REFERENCES `payment_schedules` (`id`) ON DELETE SET NULL
@@ -7214,6 +7221,7 @@ CREATE TABLE IF NOT EXISTS `domains` (
     `registrant_name`        VARCHAR(255) NULL,
     `owner_analyst_id`       INT NULL,
     `tech_contact_id`        INT NULL,               -- a Contracts contact (the agency, the host)
+    `customer_user_id`       INT NULL,               -- the person at the customer this domain is for
     `nameservers`            TEXT NULL,              -- one per line
     `dns_provider`           VARCHAR(255) NULL,
     `hosting_provider`       VARCHAR(255) NULL,
@@ -7246,11 +7254,13 @@ CREATE TABLE IF NOT EXISTS `domains` (
     KEY `idx_domains_name` (`domain_name`),
     KEY `idx_domains_expiry` (`expiry_date`),
     KEY `idx_domains_status` (`status_id`),
+    KEY `idx_domains_customer_user` (`customer_user_id`),
     CONSTRAINT `fk_domains_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_status` FOREIGN KEY (`status_id`) REFERENCES `domain_statuses` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_registrar` FOREIGN KEY (`registrar_supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_account` FOREIGN KEY (`registrar_account_id`) REFERENCES `domain_registrar_accounts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_owner` FOREIGN KEY (`owner_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_customer_user` FOREIGN KEY (`customer_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_tech_contact` FOREIGN KEY (`tech_contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
