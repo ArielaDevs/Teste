@@ -114,6 +114,19 @@ $translationNamespaces = ['common', 'reporting'];
             <p class="subtitle"><?php echo htmlspecialchars(t('reporting.landing.subtitle')); ?></p>
 
             <div class="report-cards">
+                <a href="packs/" class="report-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 3h9l4 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path>
+                        <path d="M3 7v13a2 2 0 0 0 2 2h11"></path>
+                        <line x1="10" y1="9" x2="15" y2="9"></line>
+                        <line x1="10" y1="17" x2="10" y2="13"></line>
+                        <line x1="13.5" y1="17" x2="13.5" y2="11"></line>
+                        <line x1="17" y1="17" x2="17" y2="14"></line>
+                    </svg>
+                    <h3><?php echo htmlspecialchars(t('reporting.landing.packs_title')); ?></h3>
+                    <p><?php echo htmlspecialchars(t('reporting.landing.packs_desc')); ?></p>
+                </a>
+
                 <a href="logs/" class="report-card">
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
