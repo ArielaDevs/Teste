@@ -10,6 +10,11 @@
 body { --accent: var(--dom-accent, #4d7c0f); --accent-hover: var(--dom-accent-hover, #3f6212); --on-accent: var(--dom-on-accent, #fff); }
 
 /* ---------- page shell ---------------------------------------------------- */
+/* The account, dashboard and domain pages' scrolling shell. These were inline
+   styles; as classes the phone layer (mobile.css LAYER 41) can aim at them
+   without !important. Same values, so the desktop is unchanged. */
+.dom-shell { height: calc(100vh - 62px); overflow-y: auto; background: var(--app-bg, #f5f5f5); }
+.dom-shell-pad { padding: 20px 26px 40px; }
 .dom-layout { display: flex; height: calc(100vh - 62px); background: var(--app-bg, #f5f5f5); }
 .dom-sidebar {
     width: 250px; flex-shrink: 0; overflow-y: auto; padding: 18px;

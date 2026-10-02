@@ -1968,7 +1968,19 @@
            is all the harvester needs, and is exactly why hiding a head is
            not the same as removing it. */
         { table: 'body[data-mobile-page="wiki-scan"] .history-table',
-          columns: [2, 3, 4, 5] }
+          columns: [2, 3, 4, 5] },
+
+        /* ---- Domains (LAYER 41) ----
+           Register: the name, status and grade speak for themselves; the
+           expiry countdown, renewal mode, registrar, protection, certificate
+           and owner do not. The table is in the markup and only its tbody is
+           replaced, so watching the table is enough. */
+        { table: 'body[data-mobile-page="domains-register"] #domTable',
+          columns: [3, 4, 5, 7, 8, 9] },
+        /* Accounts: everything after the account's own name - a reference, a
+           person, a bare domain count and a date mean nothing alone. */
+        { table: 'body[data-mobile-page="domains-accounts"] .dom-table',
+          columns: [1, 2, 3, 4, 5, 6] }
     ];
 
     function labelCardFeed(table, columns) {
@@ -4551,6 +4563,166 @@
             if (sheet) sheet.style.display = 'none';
             document.body.removeAttribute('data-chk-sheet');
             document.body.style.removeProperty('--chk-bar-h');
+        }
+    }
+    sync();
+    if (mq.addEventListener) { mq.addEventListener('change', sync); }
+    else if (mq.addListener) { mq.addListener(sync); }
+})();
+
+/* ==========================================================================
+   LAYER 41 - Domains: the register's sidebar as a sheet (Techniques §4)
+
+   Search, ten views and six filters stacked above the list on a phone, a
+   screen and a half before the first domain. The REAL `.dom-sidebar` node
+   moves into a full-screen sheet opened from a Filters bar at the bottom,
+   and moves home again when the viewport leaves mobile - so every listener
+   domains-register.js attached to it keeps working, and desktop never sees
+   the sheet or the bar.
+
+   🔑 The sheet closes when a VIEW is tapped - that is an arrival, and what
+   you chose is behind the sheet. It stays open for the search box and the
+   filter drop-downs, because you often set several (System Wiki's lesson:
+   closing on every tap can make the next choice unreachable).
+
+   The bar shows the current view beside "Filters", harvested from the
+   view's own button, so the list's state is visible without opening the
+   sheet and no string is invented.
+   ========================================================================== */
+(function () {
+    'use strict';
+
+    if (!document.body || document.body.getAttribute('data-mobile-page') !== 'domains-register') return;
+
+    var mq = window.matchMedia('(max-width: 768px)');
+    var sidebar = document.querySelector('.dom-sidebar');
+    if (!sidebar) return;
+
+    var home = { parent: sidebar.parentNode, next: sidebar.nextSibling };
+
+    function tr(key, fallback) {
+        if (typeof window.t !== 'function') return fallback;
+        var v = window.t(key);
+        return (!v || v === key) ? fallback : v;
+    }
+
+    var ICONS = {
+        filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18M7 12h10M10 19h4"/></svg>',
+        close:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+    };
+
+    var sheet = null, sheetBody = null, bar = null, viewLabel = null;
+
+    function build() {
+        if (sheet) return;
+
+        sheet = document.createElement('div');
+        sheet.className = 'dom-sheet';
+        sheet.setAttribute('role', 'dialog');
+        sheet.setAttribute('aria-modal', 'true');
+
+        var head = document.createElement('div');
+        head.className = 'dom-sheet-head';
+        var title = document.createElement('span');
+        title.className = 'dom-sheet-title';
+        title.textContent = tr('common.filter', 'Filters');
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'dom-sheet-close';
+        close.innerHTML = ICONS.close;
+        close.setAttribute('aria-label', tr('common.close', 'Close'));
+        close.addEventListener('click', function () { setOpen(false); });
+        head.appendChild(title);
+        head.appendChild(close);
+
+        sheetBody = document.createElement('div');
+        sheetBody.className = 'dom-sheet-body';
+        sheet.appendChild(head);
+        sheet.appendChild(sheetBody);
+        document.body.appendChild(sheet);
+
+        bar = document.createElement('div');
+        bar.className = 'dom-fbar';
+        var open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'dom-fbar-btn';
+        open.innerHTML = ICONS.filter + '<span>' + tr('common.filter', 'Filters') + '</span>';
+        viewLabel = document.createElement('span');
+        viewLabel.className = 'dom-fbar-view';
+        open.appendChild(viewLabel);
+        open.addEventListener('click', function () { setOpen(true); });
+        bar.appendChild(open);
+        document.body.appendChild(bar);
+
+        /* A view is an arrival; delegated, because the page redraws the views
+           on every render and a listener per button would miss the redraw.
+           🔴 CAPTURE phase: the page's own click handler re-renders #domViews,
+           so by the time a bubbling listener runs the tapped button has been
+           replaced and `closest('#domViews button')` finds nothing - the list
+           changed and the sheet stayed open over it. Capture runs first. */
+        sheetBody.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('#domViews button') : null;
+            if (btn) setOpen(false);
+        }, true);
+
+        /* Keep the bar's view label in step with the page's own redraws. */
+        var views = document.getElementById('domViews');
+        if (views && window.MutationObserver) {
+            new MutationObserver(showView).observe(views, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        }
+        showView();
+    }
+
+    function showView() {
+        if (!viewLabel) return;
+        var active = document.querySelector('#domViews button.active');
+        var text = '';
+        if (active) {
+            // The button holds the view's name and a count; take the text
+            // nodes and the first element only, so the count stays behind.
+            for (var i = 0; i < active.childNodes.length; i++) {
+                var n = active.childNodes[i];
+                if (n.nodeType === 3) text += n.nodeValue;
+                else if (n.nodeType === 1 && !n.classList.contains('count')) text += n.textContent;
+            }
+        }
+        text = text.replace(/\s+/g, ' ').trim();
+        viewLabel.textContent = text ? '· ' + text : '';
+        if (bar) bar.querySelector('.dom-fbar-btn').setAttribute('aria-label', tr('common.filter', 'Filters') + (text ? ' - ' + text : ''));
+    }
+
+    function setOpen(open) {
+        document.body.setAttribute('data-dom-sheet', open ? 'open' : 'closed');
+        if (open && sheetBody) sheetBody.scrollTop = 0;
+    }
+
+    function place(intoSheet) {
+        if (intoSheet) {
+            if (sheetBody && sidebar.parentNode !== sheetBody) sheetBody.appendChild(sidebar);
+        } else if (sidebar.parentNode !== home.parent) {
+            home.parent.insertBefore(sidebar, home.next);
+        }
+    }
+
+    function reserve() {
+        if (!bar) return;
+        document.body.style.setProperty('--dom-bar-h', Math.ceil(bar.getBoundingClientRect().height) + 'px');
+    }
+
+    function sync() {
+        if (mq.matches) {
+            build();
+            place(true);
+            bar.style.display = '';
+            sheet.style.display = '';
+            if (!document.body.getAttribute('data-dom-sheet')) setOpen(false);
+            reserve();
+        } else {
+            place(false);
+            if (bar) bar.style.display = 'none';
+            if (sheet) sheet.style.display = 'none';
+            document.body.removeAttribute('data-dom-sheet');
+            document.body.style.removeProperty('--dom-bar-h');
         }
     }
     sync();

@@ -49,14 +49,14 @@ $translationNamespaces = ['common', 'domains'];
     <script src="../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/domains.css?v=2">
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/domains.css?v=3">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=159">
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-view">
     <?php include 'includes/header.php'; ?>
 
-    <div style="height:calc(100vh - 62px);overflow-y:auto;background:var(--app-bg,#f5f5f5)">
-    <div style="padding:20px 26px 40px">
+    <div class="dom-shell">
+    <div class="dom-shell-pad">
         <div style="margin-bottom:10px"><a href="./" class="dom-sub" style="text-decoration:none">← <?php echo htmlspecialchars(t('domains.page.back')); ?></a></div>
 
         <?php if (!$exists): ?>
@@ -185,6 +185,6 @@ $translationNamespaces = ['common', 'domains'];
     <script src="../assets/js/domains.js?v=1"></script>
     <script src="../assets/js/domains-view.js?v=3"></script>
     <?php endif; ?>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=67"></script>
 </body>
 </html>

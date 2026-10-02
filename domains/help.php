@@ -70,9 +70,9 @@ $para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspec
             --on-accent:    var(--dom-on-accent, #fff);
         }
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=159">
 </head>
-<body>
+<body data-mobile-module="domains" data-mobile-page="domains-help">
     <?php include 'includes/header.php'; ?>
 
     <div class="help-container">
@@ -138,6 +138,6 @@ $para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspec
             });
         });
     </script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=67"></script>
 </body>
 </html>

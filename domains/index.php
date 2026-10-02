@@ -36,8 +36,8 @@ $translationNamespaces = ['common', 'domains'];
     <script src="../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/domains.css?v=1">
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/domains.css?v=3">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=159">
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-register">
     <?php include 'includes/header.php'; ?>
@@ -203,6 +203,6 @@ $translationNamespaces = ['common', 'domains'];
 
     <script src="../assets/js/domains.js?v=1"></script>
     <script src="../assets/js/domains-register.js?v=1"></script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=67"></script>
 </body>
 </html>

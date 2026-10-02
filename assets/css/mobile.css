@@ -13994,3 +13994,370 @@
     .ticket-context-menu.ctx-sheet > *,
     .ticket-context-menu.ctx-sheet .ctx-sheet-level2 { transition: none; }
 }
+
+@media (max-width: 768px) {
+    /* ====================================================================
+       LAYER 41 - Domains
+       --------------------------------------------------------------------
+       The module came after the rollout, so it was built with mobile.css
+       linked and markers on five of its seven pages - and its own
+       `@media (max-width: 900px)` block already stacks the register's
+       sidebar above the list. That stack is the main fault: search, ten
+       views and six filters, a screen and a half before the first domain.
+       What it needed, page by page (measured at 360x740 through an
+       explicit-width iframe, Techniques §8/§30):
+
+         register   sidebar -> a §4 sheet behind a Filters bar; the stats
+                    two-up (§10); the ten-column table -> a card feed with
+                    §21 labels; the main pane handed the scroller role (§28)
+         dashboard  stats two-up; the shell's 100vh replaced (see 41a)
+         domain     the tab strip wrapping to three rows -> one swipeable
+                    row; a card heading's link poking past the card
+         accounts   a seven-column table clipped after two -> a card feed
+         table      the shared .dt-* view (LAYER 15) already answers it
+         settings   the shared settings layer already answers it
+         help       the shared guide layer already answers it
+
+       ⚠️ Every focusable field in the module is 13px, which on an iPhone is
+       not cosmetic - §3: it zooms on focus, spills, and switches this whole
+       block off. 41b fixes it module-wide.
+       ==================================================================== */
+
+    /* ---- 41a. The scrolling shell ----------------------------------------
+       Three pages scroll inside `.dom-shell`, which was an inline
+       `height: calc(100vh - 62px)` until this round turned it into a class
+       (same values, so desktop is unchanged). On a phone the header is not
+       62px and 100vh runs under Safari's address bar, hiding the bottom of
+       the page. LAYER 2 already makes <body> a 100dvh flex column, so the
+       shell takes the remainder instead - and min-height: 0, or its content
+       becomes its floor and nothing scrolls (§28). */
+    body[data-mobile-module="domains"] .dom-shell {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    body[data-mobile-module="domains"] .dom-shell-pad {
+        padding: 12px 12px 24px;
+    }
+
+    /* ---- 41b. 16px on every field in this module (§3) -------------------
+       Excluding what must not change rather than listing what must, so a
+       field type added later is covered by default. */
+    body[data-mobile-module="domains"] input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+    body[data-mobile-module="domains"] select,
+    body[data-mobile-module="domains"] textarea {
+        font-size: 16px;
+    }
+
+    /* ---- 41c. The stat strip, two-up (§10) ------------------------------
+       `repeat(auto-fit, minmax(150px, 1fr))` needs 312px for two and the
+       padded pane has 308, so six figures stacked one per row. A grid that
+       is two-up by rule keeps them comparable and halves the scroll. */
+    body[data-mobile-module="domains"] .dom-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+    body[data-mobile-module="domains"] .dom-stat {
+        min-width: 0;
+        padding: 11px 12px;
+    }
+    body[data-mobile-module="domains"] .dom-stat .v { font-size: 22px; }
+    body[data-mobile-module="domains"] .dom-stat .l { overflow-wrap: anywhere; }
+
+    /* ---- 41d. The register: the list gets the screen -------------------
+       The sidebar goes into a sheet (mobile.js moves the REAL node, so the
+       page's own listeners keep working); the main pane is the scroller and
+       keeps clear of the Filters bar by its measured height. */
+    body[data-mobile-page="domains-register"] .dom-layout {
+        flex: 1 1 auto;
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+    }
+    body[data-mobile-page="domains-register"] .dom-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 12px calc(var(--dom-bar-h, 64px) + 12px);
+    }
+    body[data-mobile-page="domains-register"] .dom-fbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1200;
+        display: flex;
+        padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+        background: var(--surface, #fff);
+        border-top: 1px solid var(--border, #ddd);
+    }
+    body[data-mobile-page="domains-register"] .dom-fbar-btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 46px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--border, #ddd);
+        border-radius: 8px;
+        background: var(--surface, #fff);
+        color: var(--text, #1e293b);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    body[data-mobile-page="domains-register"] .dom-fbar-btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+    /* The current view rides on the button, so you can see what the list is
+       showing without opening the sheet - harvested from the view's own
+       button, so no new string. */
+    body[data-mobile-page="domains-register"] .dom-fbar-view {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+        color: var(--dom-accent, #4d7c0f);
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet {
+        position: fixed;
+        inset: 0;
+        z-index: 1300;          /* over the bar that opens it */
+        display: none;
+        flex-direction: column;
+        background: var(--surface, #fff);
+    }
+    body[data-mobile-page="domains-register"][data-dom-sheet="open"] .dom-sheet { display: flex; }
+    body[data-mobile-page="domains-register"] .dom-sheet-head {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px;
+        padding-top: calc(12px + env(safe-area-inset-top));
+        border-bottom: 1px solid var(--border-soft, #e2e8f0);
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text, #1e293b);
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet-close {
+        width: 44px;
+        height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text, #1e293b);
+        cursor: pointer;
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet-close svg { width: 22px; height: 22px; }
+    body[data-mobile-page="domains-register"] .dom-sheet-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    /* The relocated sidebar, inside the sheet: full width, no rail chrome,
+       and the sheet does the scrolling. */
+    body[data-mobile-page="domains-register"] .dom-sheet .dom-sidebar {
+        width: auto;
+        border: 0;
+        padding: 12px;
+        overflow: visible;
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet .dom-quick button {
+        min-height: 44px;
+        font-size: 15px;
+    }
+
+    /* ---- 41e. The register table -> a card feed (§11, §21, §23) ---------
+       Ten known columns, read one domain at a time: a feed. Each card leads
+       with the checkbox, the name and the security grade; then status and
+       the expiry countdown on one line; then the facts that cannot speak for
+       themselves, each with its own column heading (mobile.js harvests
+       them from the hidden <thead>, so they are right in every language).
+       Columns: 1 checkbox · 2 domain · 3 status · 4 expires · 5 renewal ·
+       6 registrar · 7 grade · 8 protection · 9 certificate · 10 owner. */
+    body[data-mobile-page="domains-register"] #domTable,
+    body[data-mobile-page="domains-register"] #domTable tbody {
+        display: block;
+        width: 100%;
+    }
+    body[data-mobile-page="domains-register"] #domTable thead { display: none; }
+    /* The checkbox sits in the card's corner and the whole card is indented
+       past it, so no cell needs its own offset - the first version gave every
+       cell padding-left and every fact a whole line, and a screenshot showed
+       seven-line cards reading like a spreadsheet. */
+    body[data-mobile-page="domains-register"] #domTable tbody tr {
+        position: relative;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+        padding: 12px 14px 12px 44px;
+        border-bottom: 1px solid var(--border-soft, #f0f0f0);
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td {
+        display: block;
+        flex: 1 1 100%;
+        min-width: 0;              /* §14 */
+        padding: 0;
+        border: 0;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+        box-sizing: border-box;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td.cb {
+        position: absolute;
+        left: 14px;
+        top: 14px;
+        width: 20px;
+        padding: 0;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td.cb input { width: 18px; height: 18px; margin: 0; }
+    /* §23, met in the data: with a middle basis a SHORT name let the status
+       climb onto the first line and a long one did not, so cards in the same
+       list had two shapes. Name + grade now fill the line exactly (the grade
+       badge is ~28px, plus the 12px gap), so the status always starts the
+       second line whatever the name's length. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(2) {
+        flex: 1 1 calc(100% - 44px);
+        padding: 0;
+        order: 1;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(7) {
+        flex: 0 0 auto;
+        padding: 0;
+        order: 2;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(3) {
+        flex: 0 0 auto;
+        order: 3;
+    }
+    /* The expiry GROWS to end the status line, so the facts below always
+       start a fresh line at the left - a growing item anywhere else pushed
+       "Renewal" to the right edge on some cards and not others. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(4) {
+        flex: 1 1 auto;
+        order: 4;
+    }
+    /* A forced line break between the status line and the facts line: a
+       zero-height full-width flex item placed by `order`. Without it, a long
+       status ("Letting lapse") wrapped the expiry and the icons rode up
+       beside it on the right - two card shapes from one rule (§23). */
+    body[data-mobile-page="domains-register"] #domTable tbody tr::after {
+        content: "";
+        order: 5;
+        flex: 0 0 100%;
+        height: 0;
+    }
+    /* The lock / registry-lock / DNSSEC icons have no text to label, so they
+       lead the facts line as a set of badges. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(8) {
+        flex: 0 0 auto;
+        order: 6;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(4) .dom-sub {
+        display: inline;
+        margin-left: 6px;
+    }
+    /* The labelled facts flow as one wrapping line rather than a line each. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(n+5):not(:nth-child(7)):not(:nth-child(8)) {
+        flex: 0 1 auto;
+        order: 7;
+        color: var(--text-dim, #888);
+        font-size: 12.5px;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(n+5):not(:nth-child(7)) .dom-sub { display: inline; margin-left: 6px; }
+    /* §11: the empty state is one colspan cell - first AND last child - so
+       nothing positional may swallow it. */
+    body[data-mobile-page="domains-register"] #domTable tbody td[colspan] {
+        flex: 1 1 100%;
+        padding: 0;
+        text-align: center;
+        order: 0;
+    }
+    /* §21: never label an empty cell, and leave no gap where one was. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:empty { display: none; }
+
+    /* ---- 41f. Registrar accounts -> a card feed ------------------------
+       Seven columns clipped after two. The account name (and its sign-in
+       link) heads the card; the six facts below it are labelled, because a
+       reference, a person's name and a bare domain count mean nothing alone. */
+    body[data-mobile-page="domains-accounts"] .dom-table,
+    body[data-mobile-page="domains-accounts"] .dom-table tbody {
+        display: block;
+        width: 100%;
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table thead { display: none; }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody tr {
+        display: block;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border-soft, #f0f0f0);
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td {
+        display: block;
+        padding: 2px 0;
+        border: 0;
+        font-size: 13px;
+        color: var(--text-dim, #888);
+        overflow-wrap: anywhere;
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td:first-child {
+        padding-bottom: 6px;
+        color: var(--text, #333);
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td:first-child a {
+        display: inline-block;
+        min-height: 32px;
+        line-height: 32px;
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td[colspan] { text-align: center; }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td:empty { display: none; }
+    body[data-mobile-page="domains-accounts"] .dom-toolbar { flex-wrap: wrap; }
+
+    /* ---- 41g. A domain's page -------------------------------------------
+       Six tabs wrapped into three ragged rows above the content: one row
+       that swipes, as the settings tabs and .detail-tabs do. */
+    body[data-mobile-page="domains-view"] #domTabs {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+    body[data-mobile-page="domains-view"] #domTabs::-webkit-scrollbar { display: none; }
+    body[data-mobile-page="domains-view"] #domTabs .tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        min-height: 42px;
+    }
+    body[data-mobile-page="domains-view"] .dom-fields { grid-template-columns: 112px minmax(0, 1fr); }
+    body[data-mobile-page="domains-view"] .dom-actions { gap: 8px; }
+
+    /* ---- 41h. Card headings that carry a link -----------------------------
+       "All checks" / "See all" sat beside the heading with no room to wrap,
+       and ran 14px past the card's edge. Let the heading row wrap. */
+    body[data-mobile-module="domains"] .dom-card-h {
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        padding: 12px 14px;
+    }
+    body[data-mobile-module="domains"] .dom-card-h > * { min-width: 0; }
+    body[data-mobile-module="domains"] .dom-card-b { padding: 12px 14px; }
+}
