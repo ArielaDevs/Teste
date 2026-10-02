@@ -21,7 +21,13 @@ requireModuleAccess('lms');
 // typing the URL — the AI provider settings for the authoring helpers. Managing the LMS
 // is what this page is for. (Found while deriving the registry from the manifests.)
 require_once __DIR__ . '/../../includes/rbac.php';
-requireCapability(Cap::LMS_MANAGE);
+// Two grants open this page, each to its own tabs: LMS_MANAGE (AI, reminders)
+// and LMS_TESTS (competency tests) - a recruiter may hold only the second.
+$lmsSetConn   = connectToDatabase();
+$lmsSetManage = analystHasCapability($lmsSetConn, (int)$_SESSION['analyst_id'], Cap::LMS_MANAGE);
+$lmsSetTests  = analystHasCapability($lmsSetConn, (int)$_SESSION['analyst_id'], Cap::LMS_TESTS);
+if (!$lmsSetManage && !$lmsSetTests) requireCapability(Cap::LMS_MANAGE, $lmsSetConn);   // bounces
+$lmsFirstTab = $lmsSetManage ? 'ai' : 'tests';
 
 $current_page = 'settings';
 $path_prefix  = '../../';
@@ -98,10 +104,16 @@ $translationNamespaces = ['common', 'lms'];
         <h1><?php echo htmlspecialchars(t('lms.settings.heading')); ?></h1>
 
         <div class="tabs">
+            <?php if ($lmsSetManage): ?>
             <button class="tab active" data-tab="ai" onclick="lmsSettingsTab('ai')"><?php echo htmlspecialchars(t('lms.settings.tab_ai')); ?></button>
             <button class="tab" data-tab="reminders" onclick="lmsSettingsTab('reminders')"><?php echo htmlspecialchars(t('lms.settings.tab_reminders')); ?></button>
+            <?php endif; ?>
+            <?php if ($lmsSetTests): ?>
+            <button class="tab<?php echo $lmsFirstTab === 'tests' ? ' active' : ''; ?>" data-tab="tests" onclick="lmsSettingsTab('tests')"><?php echo htmlspecialchars(t('lms.settings.tab_tests')); ?></button>
+            <?php endif; ?>
         </div>
 
+        <?php if ($lmsSetManage): ?>
         <div class="tab-content active" id="tab-ai">
             <h2 style="margin-top:0;"><?php echo htmlspecialchars(t('lms.settings.tab_ai')); ?></h2>
             <p style="color: var(--text-muted, #555);"><?php echo htmlspecialchars(t('lms.settings.ai_intro')); ?></p>
@@ -166,6 +178,39 @@ $translationNamespaces = ['common', 'lms'];
                 <span id="remLastRun" style="color: var(--text-muted, #666); font-size: 13px;"></span>
             </div>
         </div>
+        <?php endif; ?>
+
+        <?php if ($lmsSetTests): ?>
+        <div class="tab-content<?php echo $lmsFirstTab === 'tests' ? ' active' : ''; ?>" id="tab-tests"<?php echo $lmsFirstTab === 'tests' ? '' : ' style="display:none;"'; ?>>
+            <h2 style="margin-top:0;"><?php echo htmlspecialchars(t('lms.settings.tab_tests')); ?></h2>
+            <p style="color: var(--text-muted, #555);"><?php echo htmlspecialchars(t('lms.settings.tests_intro')); ?></p>
+            <div class="rem-row">
+                <label for="ctLinkDays"><strong><?php echo htmlspecialchars(t('lms.settings.tests_link_days')); ?></strong></label>
+                <input type="number" id="ctLinkDays" min="1" max="90" style="width: 110px;">
+                <small><?php echo htmlspecialchars(t('lms.settings.tests_link_days_help')); ?></small>
+            </div>
+            <div class="rem-row">
+                <label for="ctTimeLimit"><strong><?php echo htmlspecialchars(t('lms.settings.tests_time_limit')); ?></strong></label>
+                <input type="number" id="ctTimeLimit" min="0" max="600" style="width: 110px;">
+                <small><?php echo htmlspecialchars(t('lms.settings.tests_time_limit_help')); ?></small>
+            </div>
+            <div class="rem-row">
+                <label for="ctMarks"><strong><?php echo htmlspecialchars(t('lms.settings.tests_marks')); ?></strong></label>
+                <input type="text" id="ctMarks" style="width: 160px;">
+                <small><?php echo htmlspecialchars(t('lms.settings.tests_marks_help')); ?></small>
+            </div>
+            <div class="rem-row">
+                <label for="ctRetention"><strong><?php echo htmlspecialchars(t('lms.settings.tests_retention')); ?></strong></label>
+                <input type="number" id="ctRetention" min="0" max="3650" style="width: 110px;">
+                <small><?php echo htmlspecialchars(t('lms.settings.tests_retention_help')); ?></small>
+            </div>
+            <div class="rem-row">
+                <label class="rem-check"><input type="checkbox" id="ctShowScore"> <span><strong><?php echo htmlspecialchars(t('lms.settings.tests_show_score')); ?></strong></span></label>
+                <small><?php echo htmlspecialchars(t('lms.settings.tests_show_score_help')); ?></small>
+            </div>
+            <button class="btn btn-primary" onclick="lmsSaveTests()"><?php echo htmlspecialchars(t('common.save')); ?></button>
+        </div>
+        <?php endif; ?>
     </div>
     </div><!-- /.settings-shell -->
 
@@ -182,6 +227,27 @@ $translationNamespaces = ['common', 'lms'];
             p.style.display = on ? '' : 'none';
         });
         if (name === 'reminders') lmsLoadReminders();
+        if (name === 'tests') lmsLoadTests();
+    }
+
+    async function lmsLoadTests() {
+        const d = await (await fetch('../../api/lms/tests.php?action=settings')).json();
+        if (!d.success) { showToast(d.error, 'error'); return; }
+        remEl('ctLinkDays').value  = d.settings.link_days;
+        remEl('ctTimeLimit').value = d.settings.time_limit;
+        remEl('ctMarks').value     = d.settings.graded_marks;
+        remEl('ctRetention').value = d.settings.retention_days;
+        remEl('ctShowScore').checked = d.settings.show_score;
+    }
+
+    async function lmsSaveTests() {
+        const d = await (await fetch('../../api/lms/tests.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+            action: 'save_settings', link_days: remEl('ctLinkDays').value, time_limit: remEl('ctTimeLimit').value,
+            graded_marks: remEl('ctMarks').value, retention_days: remEl('ctRetention').value, show_score: remEl('ctShowScore').checked
+        }) })).json();
+        if (!d.success) { showToast(d.error, 'error'); return; }
+        remEl('ctMarks').value = d.graded_marks;
+        showToast(window.t('lms.settings.tests_saved'), 'success');
     }
 
     const REM_API = '<?php echo BASE_URL; ?>api/lms/reminder_settings.php';
@@ -282,6 +348,12 @@ $translationNamespaces = ['common', 'lms'];
             showToast(window.t('lms.settings.reminders_ran', { count: d.result.sent }), 'success');
             lmsLoadReminders();
         } catch (e) { showToast(window.t('lms.toast.failed'), 'error'); }
+    }
+
+    // #tests opens the Competency tests tab (Feature Bingo and the guide link
+    // there); an analyst who holds only that grant lands on it anyway.
+    if (document.querySelector('.tab[data-tab="tests"]') && (location.hash === '#tests' || <?php echo json_encode($lmsFirstTab === 'tests'); ?>)) {
+        lmsSettingsTab('tests');
     }
     </script>
     <script src="<?php echo BASE_URL; ?>assets/js/mobile.js?v=70"></script>

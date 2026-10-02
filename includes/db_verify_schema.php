@@ -2924,6 +2924,76 @@ return [
         'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',   // set by the demo data importer (#1297)
     ],
 
+    // ---- LMS competency tests (3.0.0) ----
+    // The question bank. answers_json is [{"text":..., "marks":n}] - a choice
+    // question has one answer worth 1, a graded one four worth e.g. 5/3/1/0.
+    // status: draft (written, not yet checked) | approved | hidden.
+    'lms_ct_questions' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'skill'                 => 'VARCHAR(120) NOT NULL',
+        'difficulty'            => 'VARCHAR(20) NOT NULL',
+        'format'                => 'VARCHAR(20) NOT NULL',
+        'question_text'         => 'TEXT NOT NULL',
+        'answers_json'          => 'TEXT NOT NULL',
+        'explanation'           => 'TEXT NULL',
+        'status'                => "VARCHAR(20) NOT NULL DEFAULT 'draft'",
+        'source'                => "VARCHAR(20) NOT NULL DEFAULT 'ai'",
+        'role_context'          => 'VARCHAR(255) NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime'      => 'DATETIME NULL',
+    ],
+    'lms_ct_tests' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'title'                 => 'VARCHAR(200) NOT NULL',
+        'role_description'      => 'TEXT NULL',
+        'time_limit_minutes'    => 'INT NULL',
+        'pass_mark'             => 'INT NULL',
+        'is_archived'           => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime'      => 'DATETIME NULL',
+    ],
+    'lms_ct_test_skills' => [
+        'id'             => 'INT NOT NULL AUTO_INCREMENT',
+        'test_id'        => 'INT NOT NULL',
+        'skill'          => 'VARCHAR(120) NOT NULL',
+        'difficulty'     => 'VARCHAR(20) NOT NULL',
+        'format'         => 'VARCHAR(20) NOT NULL',
+        'question_count' => 'INT NOT NULL DEFAULT 5',
+        'sort_order'     => 'INT NOT NULL DEFAULT 0',
+    ],
+    'lms_ct_test_questions' => [
+        'id'          => 'INT NOT NULL AUTO_INCREMENT',
+        'test_id'     => 'INT NOT NULL',
+        'question_id' => 'INT NOT NULL',
+        'sort_order'  => 'INT NOT NULL DEFAULT 0',
+    ],
+    // One candidate's attempt. snapshot_json freezes exactly what they were
+    // shown (questions, answers in their shuffled order, marks), so editing or
+    // hiding a bank question later never changes a result. The link's token is
+    // stored only as a SHA-256 hash.
+    'lms_ct_sittings' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'test_id'               => 'INT NULL',
+        'candidate_name'        => 'VARCHAR(200) NOT NULL',
+        'candidate_email'       => 'VARCHAR(255) NULL',
+        'token_hash'            => 'CHAR(64) NOT NULL',
+        'snapshot_json'         => 'LONGTEXT NOT NULL',
+        'responses_json'        => 'TEXT NULL',
+        'time_limit_minutes'    => 'INT NULL',
+        'expires_datetime'      => 'DATETIME NOT NULL',
+        'started_datetime'      => 'DATETIME NULL',
+        'submitted_datetime'    => 'DATETIME NULL',
+        'finish_reason'         => 'VARCHAR(20) NULL',
+        'score_percent'         => 'DECIMAL(5,1) NULL',
+        'skills_json'           => 'TEXT NULL',
+        'notes'                 => 'TEXT NULL',
+        'is_cancelled'          => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+
     'processes' => [
         'id'                => 'INT NOT NULL AUTO_INCREMENT',
         'title'             => 'VARCHAR(255) NOT NULL',

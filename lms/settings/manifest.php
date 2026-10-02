@@ -50,5 +50,15 @@ return [
             'label_key' => 'lms.settings.tab_reminders',
             'grant'     => 'Manage courses, learning groups and assignments, and view everyone\'s progress',
         ],
+        [
+            // Competency tests: the whole feature (LMS -> Tests) and this tab sit
+            // behind one grant. Sensitive because it reads candidates' details and
+            // scores. Own endpoint (api/lms/tests.php), so no 'setting_keys'.
+            'id'        => 'tests',
+            'cap'       => Cap::LMS_TESTS,
+            'label_key' => 'lms.settings.tab_tests',
+            'grant'     => 'Build competency tests, send them to candidates and read their results',
+            'sensitive' => true,
+        ],
     ],
 ];

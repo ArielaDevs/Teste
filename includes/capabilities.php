@@ -63,6 +63,9 @@ final class Cap
 {
     // ---- LMS ---------------------------------------------------------------
     const LMS_MANAGE = 'lms.manage';
+    // Competency tests hold candidates' names, emails and scores - people who
+    // are not staff - so they are their own, sensitive grant, not part of LMS_MANAGE.
+    const LMS_TESTS  = 'lms.competency_tests';
 
     // ---- Asset Management --------------------------------------------------
     // One per settings tab. The point of the split is visible here: VCENTER and

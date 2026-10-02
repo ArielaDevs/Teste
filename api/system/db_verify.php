@@ -805,6 +805,20 @@ try {
         }
     }
 
+    // Competency tests (3.0.0). A sitting outlives its test (SET NULL): its
+    // snapshot holds everything the result needs, so deleting a test never
+    // deletes a candidate's result - retention does that, on its own clock.
+    $ctFks = [
+        ['lms_ct_test_skills',    'fk_lcts_test',     "ALTER TABLE lms_ct_test_skills ADD CONSTRAINT fk_lcts_test FOREIGN KEY (test_id) REFERENCES lms_ct_tests (id) ON DELETE CASCADE"],
+        ['lms_ct_test_questions', 'fk_lcttq_test',    "ALTER TABLE lms_ct_test_questions ADD CONSTRAINT fk_lcttq_test FOREIGN KEY (test_id) REFERENCES lms_ct_tests (id) ON DELETE CASCADE"],
+        ['lms_ct_test_questions', 'fk_lcttq_question',"ALTER TABLE lms_ct_test_questions ADD CONSTRAINT fk_lcttq_question FOREIGN KEY (question_id) REFERENCES lms_ct_questions (id) ON DELETE CASCADE"],
+        ['lms_ct_sittings',       'fk_lcs_test',      "ALTER TABLE lms_ct_sittings ADD CONSTRAINT fk_lcs_test FOREIGN KEY (test_id) REFERENCES lms_ct_tests (id) ON DELETE SET NULL"],
+    ];
+    foreach ($ctFks as [$tbl, $name, $sql]) {
+        if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;
+        try { $conn->exec($sql); } catch (Exception $e) {}
+    }
+
     // Documents. Deleting the document takes its links with it. Note the cascade
     // runs ONE way only, deliberately: removing a link must never remove the
     // document, because something else may still be using the same file.

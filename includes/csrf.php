@@ -55,6 +55,7 @@ const CSRF_EXEMPT_PATHS = [
     'api/webchat/escalate.php',
     'api/webchat/config.php',
     'api/webchat/poll.php',
+    'api/lms/test_public.php',         // a candidate's competency test: the link's token is the credential
     'cron/',                           // scheduled jobs over HTTP: ?token=
 ];
 

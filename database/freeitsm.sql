@@ -5813,6 +5813,90 @@ CREATE TABLE IF NOT EXISTS `lms_cmi_data` (
     UNIQUE KEY `uq_lcd_progress_element` (`progress_id`, `element`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Competency tests (3.0.0): a question bank, tests built from it, and one
+-- sitting per candidate with a frozen snapshot of what they were shown.
+CREATE TABLE IF NOT EXISTS `lms_ct_questions` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `skill`                 VARCHAR(120) NOT NULL,
+    `difficulty`            VARCHAR(20) NOT NULL,
+    `format`                VARCHAR(20) NOT NULL,
+    `question_text`         TEXT NOT NULL,
+    `answers_json`          TEXT NOT NULL,
+    `explanation`           TEXT NULL,
+    `status`                VARCHAR(20) NOT NULL DEFAULT 'draft',
+    `source`                VARCHAR(20) NOT NULL DEFAULT 'ai',
+    `role_context`          VARCHAR(255) NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime`      DATETIME NULL,
+    PRIMARY KEY (`id`),
+    KEY `ix_lctq_skill` (`skill`, `difficulty`, `format`),
+    KEY `ix_lctq_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_tests` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `title`                 VARCHAR(200) NOT NULL,
+    `role_description`      TEXT NULL,
+    `time_limit_minutes`    INT NULL,
+    `pass_mark`             INT NULL,
+    `is_archived`           TINYINT(1) NOT NULL DEFAULT 0,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime`      DATETIME NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_test_skills` (
+    `id`             INT NOT NULL AUTO_INCREMENT,
+    `test_id`        INT NOT NULL,
+    `skill`          VARCHAR(120) NOT NULL,
+    `difficulty`     VARCHAR(20) NOT NULL,
+    `format`         VARCHAR(20) NOT NULL,
+    `question_count` INT NOT NULL DEFAULT 5,
+    `sort_order`     INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `ix_lcts_test` (`test_id`),
+    CONSTRAINT `fk_lcts_test` FOREIGN KEY (`test_id`) REFERENCES `lms_ct_tests` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_test_questions` (
+    `id`          INT NOT NULL AUTO_INCREMENT,
+    `test_id`     INT NOT NULL,
+    `question_id` INT NOT NULL,
+    `sort_order`  INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_lcttq_test_question` (`test_id`, `question_id`),
+    KEY `ix_lcttq_question` (`question_id`),
+    CONSTRAINT `fk_lcttq_test` FOREIGN KEY (`test_id`) REFERENCES `lms_ct_tests` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_lcttq_question` FOREIGN KEY (`question_id`) REFERENCES `lms_ct_questions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_sittings` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `test_id`               INT NULL,
+    `candidate_name`        VARCHAR(200) NOT NULL,
+    `candidate_email`       VARCHAR(255) NULL,
+    `token_hash`            CHAR(64) NOT NULL,
+    `snapshot_json`         LONGTEXT NOT NULL,
+    `responses_json`        TEXT NULL,
+    `time_limit_minutes`    INT NULL,
+    `expires_datetime`      DATETIME NOT NULL,
+    `started_datetime`      DATETIME NULL,
+    `submitted_datetime`    DATETIME NULL,
+    `finish_reason`         VARCHAR(20) NULL,
+    `score_percent`         DECIMAL(5,1) NULL,
+    `skills_json`           TEXT NULL,
+    `notes`                 TEXT NULL,
+    `is_cancelled`          TINYINT(1) NOT NULL DEFAULT 0,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_lcs_token` (`token_hash`),
+    KEY `ix_lcs_test` (`test_id`),
+    CONSTRAINT `fk_lcs_test` FOREIGN KEY (`test_id`) REFERENCES `lms_ct_tests` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ----------------------------------------------------------
 -- Process Mapper
 -- ----------------------------------------------------------
