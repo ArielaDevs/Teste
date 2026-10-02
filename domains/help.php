@@ -29,11 +29,11 @@ $multi = isMultiTenant(connectToDatabase());
 // id => number of paragraphs (help.<id>.p1 … pN). The company section only
 // appears where there is more than one company, like every other help page.
 $sections = [
-    'overview'   => 3,
+    'overview'   => 4,
     'adding'     => 5,
     'grade'      => 4,
     'email'      => 5,
-    'certs'      => 4,
+    'certs'      => 5,
     'lookalikes' => 3,
     'changes'    => 3,
     'alerts'     => 7,
@@ -42,8 +42,8 @@ $sections = [
     'rightclick' => 1,
     'accounts'   => 4,
     'schedule'   => 5,
-    'companies'  => 3,
-    'api'        => 3,
+    'companies'  => 4,
+    'api'        => 4,
 ];
 if (!$multi) unset($sections['companies']);
 $h = fn(string $k, array $p = []) => htmlspecialchars(t('domains.help.' . $k, $p));

@@ -223,6 +223,12 @@ class DomainsService
             foreach (['domain_audit', 'domain_alerts_sent', 'domain_lookalikes', 'domain_certificates'] as $t) {
                 $conn->prepare("DELETE FROM `$t` WHERE domain_id = ?")->execute([$id]);
             }
+            // The 3.0.0 links, by the same rule - each on its own, because before
+            // Database Verification the tables are not there, and a missing table
+            // must never stop a domain being deleted.
+            foreach (['domain_cmdb_objects', 'domain_status_services', 'ticket_domains', 'domain_knowledge_articles', 'domain_status_incidents'] as $t) {
+                try { $conn->prepare("DELETE FROM `$t` WHERE domain_id = ?")->execute([$id]); } catch (Throwable $e) { /* not created yet */ }
+            }
             $conn->prepare("DELETE FROM domains WHERE id = ?")->execute([$id]);
             $conn->commit();
         } catch (Throwable $e) {

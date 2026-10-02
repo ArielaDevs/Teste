@@ -820,6 +820,7 @@ return [
             'p1'    => 'Add a domain and FreeITSM asks its registry for the registration and expiry dates, the registrar, the name servers and whether it is locked against transfer. It then checks its DNS, its email security and the certificates on its website, and gives it a security grade from A+ to F with advice on what to fix.',
             'p2'    => 'From then on it keeps watching: registry details refresh on a schedule, the checks run daily, and anything important that changes - the name servers, the registrar, a lock being removed - is recorded and, if you choose, emailed at once.',
             'p3'    => 'Expiry and certificate alerts go to each domain\'s owner (or a list), as one digest per person rather than one email per domain. They also reach the notification bell and workflows, so a lapsing domain can raise a ticket, create a task, or post to a chat channel.',
+            'p4'    => 'A domain is also joined to the rest of FreeITSM: the CMDB items that depend on it, the tickets about it, its runbooks in Knowledge, its contract, and the Service Status services that run on it - which can be flagged, or have an incident raised, when it lapses. See **Connections** and **Service Status** below.',
         ],
         'adding' => [
             'nav'   => 'Adding domains',
@@ -858,6 +859,7 @@ return [
             'p2'    => 'Extra hosts must be the domain itself or one of its sub-domains (mail.example.com, shop.example.com). Anything else is ignored, so the checks can never be pointed at somebody else\'s server or at an internal address.',
             'p3'    => 'Certificate Transparency: every publicly trusted certificate is published in open logs. With the watch switched on (Settings → Monitoring), FreeITSM asks crt.sh weekly for every certificate issued for each domain and flags the new ones. A certificate you did not ask for is often the first sign of a phishing site being prepared.',
             'p4'    => 'The first look at a domain records what already exists as seen, so switching the watch on does not bury you in years-old certificates.',
+            'p5'    => 'Certificate renewals can appear on the Watchtower card and in the Calendar, set separately from domain renewals in Settings → Alerts → Where certificate renewals are shown. And a certificate that expires on a domain linked to Service Status services flags those services as at risk - see **Service Status** below.',
         ],
         'lookalikes' => [
             'nav'   => 'Look-alikes',
@@ -925,7 +927,7 @@ return [
             'intro' => 'Keeping everything fresh without anybody pressing a button.',
             'p1'    => 'One script does it all: cron/domains.php. Schedule it hourly. Each run works for up to four minutes on the domains that most need it - never looked up first, then the oldest - so a large register is covered across a few runs.',
             'p2'    => 'Registry details refresh every 7 days by default, and daily for anything expiring within 45 days. The DNS, email and certificate checks run daily. Certificate Transparency and look-alike scans, when switched on, run weekly per domain.',
-            'p3'    => 'Alerts are sent at the end of each run. They are recorded once sent, so running the script more often never emails anybody twice.',
+            'p3'    => 'At the end of each run alerts are sent, the Calendar is brought up to date (domain and certificate renewals), and - as Settings → Service Status decides - incidents are raised for linked services whose domain is in trouble, and resolved for those that have recovered. Each is recorded once done, so running the script more often never emails anybody, or raises anything, twice.',
             'p4'    => 'With no cron, opening Domains runs a short batch at most once an hour. That keeps a small register current, but if nobody opens Domains, nothing runs - schedule the cron for anything that matters.',
             'p5'    => 'Settings → Monitoring shows the command to schedule, the web address to call instead if you prefer, and a Run now button.',
         ],
@@ -935,7 +937,8 @@ return [
             'intro' => 'Each domain belongs to one company.',
             'p1'    => 'A domain belongs to the company that was active when it was added (or the one chosen on the form). Analysts see the domains of the company they are working in, or of every company they can reach in the "All companies" view. The same applies to registrar accounts, and the REST API follows the company scope of the API key.',
             'p2'    => 'The same domain name can be recorded under two companies - useful for an MSP managing names for clients.',
-            'p3'    => 'Calendar entries have no company, so expiry dates put in the Calendar are visible to everybody who can open it, as contract and warranty dates already are.',
+            'p3'    => 'Calendar entries have no company, so domain and certificate dates put in the Calendar are visible to everybody who can open it, as contract and warranty dates already are.',
+            'p4'    => 'Connections keep to the company too: a CMDB item or a ticket can only be linked to a domain in the same company. Service Status services and knowledge articles are not company records, so a domain links to them under their own permissions.',
         ],
         'api' => [
             'nav'   => 'REST API',
@@ -944,6 +947,7 @@ return [
             'p1'    => 'The REST API has endpoints to list, read, add, update and delete domains, to refresh a registry lookup or run the checks, and to read statuses and registrar accounts. Give an API key the domains permissions in System → API.',
             'p2'    => 'Every write goes through the same rules as the screens: the same validation, the same history, the same workflow events.',
             'p3'    => 'Auth codes are never returned by the API.',
+            'p4'    => 'Connections (CMDB items, tickets, runbooks, Service Status services) are not in the REST API yet - they are made and read on the screens.',
         ],
     ],
 ];
