@@ -311,7 +311,13 @@ function gmailGetMessage(string $accessToken, string $messageId): ?array {
 
     // Parse date
     $dateStr = $headers['date'] ?? '';
-    $receivedDateTime = $dateStr ? date('Y-m-d\TH:i:s\Z', strtotime($dateStr)) : date('Y-m-d\TH:i:s\Z');
+    // gmdate, not date: the value is labelled Z (UTC), so it must BE UTC. date()
+    // wrote the server's local clock under that label, and the importer trusts
+    // the label - so every Gmail email was stored ahead by the server's offset
+    // (an hour in a UK summer, nothing on a UTC server, which is why it hid).
+    $receivedDateTime = $dateStr && strtotime($dateStr) !== false
+        ? gmdate('Y-m-d\TH:i:s\Z', strtotime($dateStr))
+        : gmdate('Y-m-d\TH:i:s\Z');
 
     // Pull attachments now (in Graph shape) and pass them along inline — the importer
     // stores whatever a message carries in 'attachments_inline' rather than making a
