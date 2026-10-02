@@ -6533,6 +6533,33 @@ CREATE TABLE IF NOT EXISTS `table_views` (
     CONSTRAINT `fk_tv_owner` FOREIGN KEY (`owner_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_tv_team`  FOREIGN KEY (`team_id`)  REFERENCES `teams` (`id`)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `report_packs` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `name`             VARCHAR(200) NOT NULL,
+    `description`      VARCHAR(500) NULL,
+    `owner_id`         INT NULL,
+    `design`           LONGTEXT NOT NULL,
+    `created_datetime` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime` DATETIME NULL,
+    `updated_by`       INT NULL,
+    PRIMARY KEY (`id`),
+    KEY `ix_rp_owner` (`owner_id`),
+    CONSTRAINT `fk_rp_owner`   FOREIGN KEY (`owner_id`)   REFERENCES `analysts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_rp_updater` FOREIGN KEY (`updated_by`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `report_pack_shares` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `pack_id`          INT NOT NULL,
+    `target_type`      VARCHAR(20) NOT NULL,
+    `target_id`        INT NULL,
+    `target_value`     VARCHAR(255) NULL,
+    `can_edit`         TINYINT(1) NOT NULL DEFAULT 0,
+    `created_datetime` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `ix_rps_pack` (`pack_id`),
+    KEY `ix_rps_target` (`target_type`, `target_id`),
+    CONSTRAINT `fk_rps_pack` FOREIGN KEY (`pack_id`) REFERENCES `report_packs` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_assets` (
     `id`                    INT NOT NULL AUTO_INCREMENT,
     `ticket_id`             INT NOT NULL,

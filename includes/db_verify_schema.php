@@ -4382,6 +4382,33 @@ return [
         'updated_datetime'   => 'DATETIME NULL',
         'last_used_datetime' => 'DATETIME NULL',
     ],
+    // Report Packs: a multi-page report designed in Reporting and exported as a PDF.
+    // The whole design (page setup, theme, header/footer/cover, criteria and every
+    // block with its options) is ONE JSON document, read and written whole by the
+    // designer - see includes/report_packs/. NULL never occurs: a new pack is saved
+    // with a starter design.
+    'report_packs' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'name'             => 'VARCHAR(200) NOT NULL',
+        'description'      => 'VARCHAR(500) NULL',
+        'owner_id'         => 'INT NULL',
+        'design'           => 'LONGTEXT NOT NULL',
+        'created_datetime' => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime' => 'DATETIME NULL',
+        'updated_by'       => 'INT NULL',
+    ],
+    // Who else may open a pack. target_type is 'analyst' / 'team' (target_id) or
+    // 'department' (target_value = the free-text analysts.department, which has no
+    // table of its own). can_edit 0 = open and export, 1 = also change it.
+    'report_pack_shares' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'pack_id'          => 'INT NOT NULL',
+        'target_type'      => 'VARCHAR(20) NOT NULL',
+        'target_id'        => 'INT NULL',
+        'target_value'     => 'VARCHAR(255) NULL',
+        'can_edit'         => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'created_datetime' => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
     'ticket_assets' => [
         'id'                    => 'INT NOT NULL AUTO_INCREMENT',
         'ticket_id'             => 'INT NOT NULL',

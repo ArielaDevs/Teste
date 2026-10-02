@@ -2637,6 +2637,10 @@ try {
         // Tickets ↔ assets (#57)
         ['table_views',                 'fk_tv_owner',             "ALTER TABLE table_views ADD CONSTRAINT fk_tv_owner FOREIGN KEY (owner_id) REFERENCES analysts (id) ON DELETE SET NULL"],
         ['table_views',                 'fk_tv_team',              "ALTER TABLE table_views ADD CONSTRAINT fk_tv_team FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE SET NULL"],
+        // Report Packs
+        ['report_packs',                'fk_rp_owner',             "ALTER TABLE report_packs ADD CONSTRAINT fk_rp_owner FOREIGN KEY (owner_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['report_packs',                'fk_rp_updater',           "ALTER TABLE report_packs ADD CONSTRAINT fk_rp_updater FOREIGN KEY (updated_by) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['report_pack_shares',          'fk_rps_pack',             "ALTER TABLE report_pack_shares ADD CONSTRAINT fk_rps_pack FOREIGN KEY (pack_id) REFERENCES report_packs (id) ON DELETE CASCADE"],
         ['contract_assets',             'fk_ca_contract',          "ALTER TABLE contract_assets ADD CONSTRAINT fk_ca_contract FOREIGN KEY (contract_id) REFERENCES contracts (id) ON DELETE CASCADE"],
         ['contract_assets',             'fk_ca_asset',             "ALTER TABLE contract_assets ADD CONSTRAINT fk_ca_asset FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE"],
         ['contract_assets',             'fk_ca_analyst',           "ALTER TABLE contract_assets ADD CONSTRAINT fk_ca_analyst FOREIGN KEY (linked_by_id) REFERENCES analysts (id) ON DELETE SET NULL"],
