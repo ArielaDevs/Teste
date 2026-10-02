@@ -594,7 +594,9 @@
         design.blocks.forEach((b, i) => {
             const span = blockSpan(b);
             const solo = b.type !== 'data' && b.type !== 'text' && !(b.type === 'spacer' && span < 12);
-            if (!row || solo || row.solo || row.used + span > 12) {
+            // `newRow` is how "drop it BELOW" survives a flow layout: without it a
+            // half-width block dropped under another would slide up beside it.
+            if (!row || solo || row.solo || row.used + span > 12 || b.newRow) {
                 row = { items: [], used: 0, solo };
                 rows.push(row);
             }

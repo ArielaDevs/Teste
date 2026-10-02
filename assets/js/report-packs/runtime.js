@@ -43,7 +43,7 @@
                         running--;
                         job.resolve();
                         pump();
-                        if (rt.onChange) rt.onChange('data');
+                        if (rt.onChange && !job.quiet) rt.onChange('data');
                     });
             }
         }
@@ -65,6 +65,20 @@
             });
             pump();
             return Promise.all(waits);
+        };
+
+        /** One block's data, through the same cache and queue (toolbox previews). */
+        rt.fetchBlock = function (b) {
+            const key = keyFor(b);
+            const have = rt.data.get(key);
+            if (have && !have.pending) return Promise.resolve(have);
+            if (have && have.pending) return have.pending.then(() => rt.data.get(key));
+            let resolve;
+            const pending = new Promise(r => { resolve = r; });
+            rt.data.set(key, { pending });
+            queue.push({ b, key, resolve, quiet: true });
+            pump();
+            return pending.then(() => rt.data.get(key));
         };
 
         /** Forget cached data (the Refresh button, or new criteria). */

@@ -92,6 +92,8 @@ function rpStr($v, int $max): string
     $s = is_string($v) ? $v : (is_numeric($v) ? (string)$v : '');
     // Control characters other than tab and newline have no business in a report.
     $s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s) ?? '';
+    // Zero-width characters an editor leaves behind: invisible, and not in the PDF fonts.
+    $s = preg_replace('/[\x{200B}\x{FEFF}]/u', '', $s) ?? '';
     return mb_substr($s, 0, $max);
 }
 function rpPick($v, array $allowed, string $default): string
@@ -205,6 +207,7 @@ function rpCleanDesign($d, string $name): array
         $type = rpPick($b['type'] ?? '', ['text', 'heading', 'pagebreak', 'spacer', 'divider', 'data'], '');
         if ($type === '') continue;
         $blk = ['id' => $id, 'type' => $type, 'span' => (int)rpNum($b['span'] ?? 12, 1, 12, 12)];
+        if (!empty($b['newRow'])) $blk['newRow'] = true;   // start a new row even if this one has room
         switch ($type) {
             case 'text':
                 $blk['doc'] = rpCleanDoc($b['doc'] ?? [], $budget);

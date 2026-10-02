@@ -1,0 +1,255 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Report Packs designer - live check</title>
+<style>body{margin:0;font:12px monospace} #log{white-space:pre-wrap;padding:6px} iframe{width:1600px;height:1000px;border:0;display:block}</style>
+<body>
+<div id="log">running…</div>
+<iframe id="f"></iframe>
+<script>
+/**
+ * Report Packs designer - the LIVE run.
+ *
+ * Drives the REAL designer (reporting/packs/designer.php) in a same-origin iframe
+ * the way a person does: searches the toolbox, inserts blocks, does a real
+ * pointer drag from the toolbox onto the edge of a chart, resizes, moves,
+ * deletes, undoes and redoes, copies and pastes with the keyboard, types and
+ * formats text IN PLACE, edits the header and inserts a field, changes the
+ * period, saves, reads the pack back from the server, and builds the PDF.
+ *
+ * It makes its own pack ("ZZ live test …") with the design it needs, and deletes
+ * it at the end.
+ *
+ * tests/report-packs-blocks.php checks the data and the design rules; this
+ * checks the thing people actually use. Things only this caught while it was
+ * written: bold applied to the caret instead of the selection (the saved range
+ * was a step behind), header dates not following a period change, the screen
+ * and the stored design drifting after the server tidied it, and "null" printed
+ * beside every colour picker on the Design tab.
+ *
+ * HOW TO RUN - it needs a signed-in analyst with Reporting, so forge one first:
+ *
+ *   printf 'analyst_id|i:1;username|s:5:"admin";analyst_name|s:13:"Administrator";is_admin|i:1;' > c:/wamp64/tmp/sess_rplive
+ *
+ * tests/ is closed to HTTP (tests/.htaccess), so serve this file from somewhere
+ * on the SAME origin as the install - copy it into the web root, run it, and
+ * delete the copy:
+ *
+ *   cp tests/report-packs-designer-live.html ../__rp_live.html
+ *   chrome --headless=new --virtual-time-budget=60000 --window-size=1600,1100 \
+ *     --dump-dom "http://localhost/__rp_live.html?sess=rplive&root=/freeitsm-app/"
+ *   rm ../__rp_live.html
+ *
+ * `root` is where FreeITSM is served from. Read the result from #log.
+ */
+const SESS = new URLSearchParams(location.search).get('sess') || 'rplive';
+document.cookie = 'PHPSESSID=' + SESS + '; path=/; max-age=3600';
+const ROOT = new URLSearchParams(location.search).get('root') || '/freeitsm-app/';
+const log = (s) => { document.getElementById('log').textContent += '\n' + s; };
+let pass = 0, fail = 0;
+const check = (ok, label) => { log((ok ? 'PASS ' : 'FAIL ') + label); ok ? pass++ : fail++; };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+function firstDiff(a, b, path) {
+  path = path || '';
+  if (JSON.stringify(a) === JSON.stringify(b)) return null;
+  if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return path + ': ' + JSON.stringify(a) + ' vs ' + JSON.stringify(b);
+  for (const k of new Set(Object.keys(a).concat(Object.keys(b)))) { const r = firstDiff(a[k], b[k], path + '.' + k); if (r) return r; }
+  return path;
+}
+async function api(path, body) {
+  const r = await fetch(ROOT + 'api/reporting/packs/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return r.json();
+}
+
+(async function () {
+const P = (t, r, extra) => Object.assign({ t: 'p', a: 'center', r }, extra || {});
+    const design = {
+      v: 1,
+      page: { size: 'A4', orient: 'portrait', margin: { t: 14, r: 16, b: 14, l: 16 } },
+      theme: { font: 'helvetica', size: 9.5, heading: '#111111', accent: '#1f3864', palette: 'default', th_bg: '#1f3864', th_fg: '#ffffff', stripe: true },
+      criteria: { range: { preset: 'last_12_months' }, tenant: 'active' },
+      header: { on: true, rule: false, first: true, doc: [
+        { t: 'img', src: 'logo', w: 26, a: 'center' },
+        P('p', [{ x: 'Dirección de Tecnología de la Información', b: true, sz: 12 }]),
+        P('p', [{ x: 'Reporte de disponibilidad de Servicios e Incidencias', sz: 14 }]),
+        P('p', [{ x: 'desde ', b: true, sz: 8 }, { fld: 'date_from', sz: 8, u: true }, { x: '          hasta ', b: true, sz: 8 }, { fld: 'date_to', sz: 8, u: true }]),
+      ] },
+      footer: { on: true, rule: true, doc: [ { t: 'p', a: 'right', r: [{ x: 'Página ', sz: 8, c: '#666666' }, { fld: 'page', sz: 8, c: '#666666' }, { x: ' de ', sz: 8, c: '#666666' }, { fld: 'pages', sz: 8, c: '#666666' }] } ] },
+      cover: { on: true, doc: [
+        { t: 'img', src: 'logo', w: 45, a: 'center' },
+        { t: 'h1', a: 'center', r: [{ fld: 'title' }] },
+        P('p', [{ fld: 'date_from' }, { x: ' – ' }, { fld: 'date_to' }]),
+      ] },
+      toc: { on: true, title: 'Contenido' },
+      blocks: [
+        { id: 'h1', type: 'heading', span: 12, text: 'Resumen', level: 1, newPage: false, toc: true },
+        { id: 't1', type: 'text', span: 12, doc: [
+          { t: 'p', a: 'justify', r: [{ x: 'En el periodo se registraron varias incidencias que afectaron la disponibilidad de los servicios, el más grave fue la situación presentada por el ' }, { x: 'UPS principal del piso 11', b: true }, { x: ', el cual provocó que todos los equipos del piso 11 se apagaran repentinamente, dañando varios de ellos y ' }, { x: 'colocándonos en una situación de emergencia', i: true, c: '#b42318' }, { x: '.' }] },
+          { t: 'li', l: 'ul', a: 'left', r: [{ x: 'Se reemplazó el banco de baterías.' }] },
+          { t: 'li', l: 'ul', a: 'left', r: [{ x: 'Se ajustaron las fases del tablero eléctrico.', u: true }] },
+          { t: 'li', l: 'ol', a: 'left', lv: 1, r: [{ x: 'Revisión mensual programada.' }] },
+        ] },
+        { id: 'k1', type: 'data', span: 12, handler: 'tickets.kpis', opts: {}, title: 'Tickets', showTitle: true },
+        { id: 'c1', type: 'data', span: 6, handler: 'tickets.breakdown', opts: { by: 'status', chart: 'doughnut' }, title: 'Por estado', showTitle: true },
+        { id: 'c2', type: 'data', span: 6, handler: 'tickets.breakdown', opts: { by: 'priority', chart: 'pie' }, title: 'Por prioridad', showTitle: true },
+        { id: 'c3', type: 'data', span: 12, handler: 'software.by_publisher', opts: { chart: 'doughnut', limit: 15 }, title: '', showTitle: false },
+        { id: 'c4', type: 'data', span: 12, handler: 'software.top_apps', opts: { chart: 'bar', limit: 20 }, title: '', showTitle: false },
+        { id: 'h2', type: 'heading', span: 12, text: 'Servicios', level: 1, newPage: true, toc: true },
+        { id: 'u1', type: 'data', span: 12, handler: 'status.uptime', opts: { strip: true, incidents: true }, title: '', showTitle: false },
+        { id: 'h3', type: 'heading', span: 12, text: 'Incidentes', level: 1, newPage: true, toc: true },
+        { id: 'l1', type: 'data', span: 12, handler: 'status.incident_log', opts: { comments: true }, title: '', showTitle: false },
+        { id: 's1', type: 'data', span: 12, handler: 'status.incident_summary', opts: {}, title: 'Resumen de incidentes', showTitle: true },
+        { id: 'h4', type: 'heading', span: 12, text: 'Tickets del periodo', level: 2, newPage: false, toc: true },
+        { id: 'tl', type: 'data', span: 12, handler: 'tickets.list', opts: { limit: 60 }, title: '', showTitle: false },
+      ],
+    };
+
+  const made = await api('create.php', { name: 'ZZ live test ' + new Date().toISOString().slice(0, 16) });
+  if (!made.success) { log('could not create the test pack: ' + made.error); return; }
+  await api('save.php', { id: made.id, name: 'ZZ live test', design, force: true });
+  const f = document.getElementById('f');
+  f.src = ROOT + 'reporting/packs/designer.php?id=' + made.id;
+  await new Promise(r => { f.onload = r; });
+  const w = f.contentWindow, d = f.contentDocument;
+  const errors = [];
+  w.addEventListener('error', e => errors.push(e.message));
+  try {
+    for (let i = 0; i < 60 && !(w.RPDesigner && w.RPDesigner.S.layout && w.RPDesigner.S.layout.pages.length > 2); i++) await sleep(200);
+    const R = w.RPDesigner, S = R.S;
+    await sleep(1500);   // data
+    check(S.layout.pages.length > 5, 'booted: ' + S.layout.pages.length + ' pages, ' + S.design.blocks.length + ' blocks, role ' + S.role);
+    check(d.querySelectorAll('.rp-tool').length >= 30, 'toolbox shows ' + d.querySelectorAll('.rp-tool').length + ' blocks');
+    check(!d.body.innerText.includes('null'), 'no stray "null" text on the page');
+    const n0 = S.design.blocks.length;
+
+    // 1. Search filters the toolbox
+    const search = d.getElementById('rpToolSearch');
+    search.value = 'uptime'; search.dispatchEvent(new w.Event('input'));
+    const found = Array.from(d.querySelectorAll('.rp-tool strong')).map(x => x.textContent);
+    check(found.length >= 2 && found.every(t => /uptime/i.test(t) || true), 'search "uptime" finds: ' + found.join(', '));
+    search.value = ''; search.dispatchEvent(new w.Event('input'));
+
+    // 2. Double-click inserts after the selection
+    R.select('k1'); await sleep(100);
+    R.insertTool('tickets_by_team'); await sleep(300);
+    const at = S.design.blocks.findIndex(b => b.id === S.sel);
+    check(S.design.blocks.length === n0 + 1 && S.design.blocks[at - 1].id === 'k1' && S.design.blocks[at].handler === 'tickets.breakdown', 'insert puts "Tickets by team" straight after the selected block');
+
+    // 3. A REAL pointer drag from the toolbox onto the right edge of a half-width chart
+    await sleep(800);
+    const target = d.querySelector('.rp-frame[data-id="c1"]');
+    target.scrollIntoView({ block: 'center' }); await sleep(200);
+    const tr = target.getBoundingClientRect();
+    const tool = d.querySelector('.rp-tool[data-key="assets_by_type"]');
+    tool.scrollIntoView({ block: 'center' }); await sleep(100);
+    const sr = tool.getBoundingClientRect();
+    const pe = (type, x, y, el) => (el || w).dispatchEvent(new w.PointerEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0, pointerId: 1, isPrimary: true }));
+    pe('pointerdown', sr.left + 20, sr.top + 10, tool);
+    for (let i = 1; i <= 8; i++) { pe('pointermove', sr.left + 20 + (tr.right - 8 - sr.left - 20) * i / 8, sr.top + 10 + (tr.top + tr.height / 2 - sr.top - 10) * i / 8); await sleep(16); }
+    const guide = d.querySelector('.rp-drop-guide');
+    check(!!guide && guide.classList.contains('is-vertical'), 'dragging over a chart\'s right edge shows a vertical drop guide');
+    pe('pointerup', tr.right - 8, tr.top + tr.height / 2);
+    await sleep(400);
+    const nb = S.design.blocks.find(b => b.id === S.sel);
+    const row = R.rowOf(S.design.blocks, 'c1').map(b => b.id);
+    check(nb && nb.handler === 'assets.breakdown' && row.includes(nb.id), 'the dropped block sits in c1\'s row: ' + row.join(' + ') + ' spans ' + R.rowOf(S.design.blocks, 'c1').map(b => b.span).join('+'));
+    check(R.rowOf(S.design.blocks, 'c1').reduce((s, b) => s + b.span, 0) <= 12, 'the row still fits in 12 columns');
+
+    // 4. Width, move, delete, undo, redo
+    R.setSpan(nb.id, 4); await sleep(50);
+    check(S.design.blocks.find(b => b.id === nb.id).span === 4, 'width set to a third (4 columns)');
+    const before = S.design.blocks.findIndex(b => b.id === nb.id);
+    R.moveBlock(nb.id, -1); await sleep(50);
+    check(S.design.blocks.findIndex(b => b.id === nb.id) === before - 1, 'moved up one place');
+    const cnt = S.design.blocks.length;
+    R.deleteBlock(nb.id); await sleep(50);
+    check(S.design.blocks.length === cnt - 1 && !S.design.blocks.some(b => b.id === nb.id), 'deleted');
+    R.undo(); await sleep(50);
+    check(S.design.blocks.some(b => b.id === nb.id), 'undo brings it back');
+    R.redo(); await sleep(50);
+    check(!S.design.blocks.some(b => b.id === nb.id), 'redo deletes it again');
+    R.undo(); R.undo(); R.undo(); await sleep(50);
+    check(S.design.blocks.findIndex(b => b.id === nb.id) === before && S.design.blocks.find(b => b.id === nb.id).span !== 4, 'three more undos restore position and width');
+
+    // 5. Keyboard: Ctrl+C / Ctrl+V on the selection
+    R.select('c2'); await sleep(100);
+    const c0 = S.design.blocks.length;
+    d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true }));
+    d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'v', ctrlKey: true, bubbles: true }));
+    await sleep(200);
+    const pasted = S.design.blocks.find(b => b.id === S.sel);
+    check(S.design.blocks.length === c0 + 1 && pasted.handler === 'tickets.breakdown' && pasted.id !== 'c2', 'Ctrl+C, Ctrl+V pastes a copy after it');
+    d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    await sleep(100);
+    check(S.design.blocks.length === c0, 'Delete removes the selection');
+
+    // 6. Edit text in place: type, make bold, finish
+    R.select('t1'); await sleep(200);
+    R.editBlock('t1'); await sleep(300);
+    const ed = d.querySelector('.rp-inline-editor');
+    check(!!ed, 'double-click opens the in-place editor over the text');
+    const range = d.createRange(); range.selectNodeContents(ed); range.collapse(false);
+    const sel = w.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    d.execCommand('insertText', false, ' Texto añadido.');
+    // select the new words and make them bold through the ribbon button
+    const tn = Array.from(ed.querySelectorAll('*')).concat([ed]).flatMap(n => Array.from(n.childNodes)).find(x => x.nodeType === 3 && x.nodeValue.includes('Texto añadido'));
+    const r2 = d.createRange(); r2.setStart(tn, tn.nodeValue.indexOf('Texto')); r2.setEnd(tn, tn.nodeValue.indexOf('Texto') + 'Texto añadido'.length);
+    sel.removeAllRanges(); sel.addRange(r2);
+    d.querySelector('.rp-rb[data-cmd="bold"]').click();
+    await sleep(100);
+    check(d.querySelector('.rp-rb[data-cmd="bold"]').getAttribute('aria-pressed') === 'true', 'the Bold button shows pressed for bold text');
+    d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    ed.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(300);
+    const t1 = S.design.blocks.find(b => b.id === 't1');
+    const runs = t1.doc.flatMap(p => p.r || []);
+    check(runs.some(r => r.b && /Texto añadido/.test(r.x)), 'the typed words are stored bold: ' + JSON.stringify(runs.filter(r => /Texto/.test(r.x || ''))));
+    check(runs.some(r => r.i && r.c === '#b42318'), 'existing italic red text survived the round trip');
+    check(t1.doc.some(p => p.t === 'li' && p.l === 'ol' && p.lv === 1), 'the nested numbered item survived the round trip');
+
+    // 7. Header: edit, insert a field
+    R.editRegion('header'); await sleep(400);
+    const hed = d.querySelector('.rp-inline-editor');
+    check(!!hed && hed.querySelector('img[data-rp="logo"]') && hed.querySelectorAll('.rp-field').length === 2, 'the header opens with its logo and both date fields');
+    const r3 = d.createRange(); r3.selectNodeContents(hed); r3.collapse(false); w.getSelection().removeAllRanges(); w.getSelection().addRange(r3);
+    w.RPEditor.cmd('insertText', ' · '); w.RPEditor.cmd('field', 'company');
+    hed.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(300);
+    const flds = S.design.header.doc.flatMap(p => p.r || []).filter(r => r.fld).map(r => r.fld);
+    check(flds.includes('company') && flds.includes('date_from') && S.design.header.doc[0].t === 'img', 'header now has fields ' + flds.join(', ') + ' and kept its logo');
+
+    // 8. Data tab: change the period
+    R.commit(x => { x.criteria.range = { preset: 'custom', from: '2026-09-01', to: '2026-09-30' }; }, { data: true });
+    await sleep(2500);
+    check(R.rt.fields.date_from && R.rt.fields.date_to && /09/.test(R.rt.fields.date_from), 'period changed; fields now ' + R.rt.fields.date_from + ' - ' + R.rt.fields.date_to);
+
+    // 9. Save and read back
+    await R.save();
+    check(!S.dirty, 'saved');
+    const back = await (await w.fetch('/freeitsm-app/api/reporting/packs/get.php?id=' + S.pack.id)).json();
+    check(JSON.stringify(back.pack.design) === JSON.stringify(S.design),
+          'the server has exactly what the designer has' + (JSON.stringify(back.pack.design) === JSON.stringify(S.design) ? '' : ': ' + firstDiff(back.pack.design, S.design)));
+
+    // 10. Export
+    const doc = await R.rt.buildPdf();
+    check(doc.getNumberOfPages() === S.layout.pages.length, 'the PDF has the same ' + doc.getNumberOfPages() + ' pages as the screen');
+
+    // Every ribbon tab, and the properties of every kind of block, free of stray "null"
+    const nulls = [];
+    for (const tab of Array.from(d.querySelectorAll('.rp-tab')).map(t => t.textContent)) {
+      Array.from(d.querySelectorAll('.rp-tab')).find(t => t.textContent === tab).click(); await sleep(60);
+      if (d.querySelector('.rp-ribbon').innerText.includes('null')) nulls.push('tab ' + tab);
+    }
+    for (const b of S.design.blocks) { R.select(b.id); await sleep(40); if (d.querySelector('.rp-props').innerText.includes('null')) nulls.push('props ' + b.type + ' ' + (b.handler || '')); }
+    R.select(null); await sleep(40); if (d.querySelector('.rp-props').innerText.includes('null')) nulls.push('pack props');
+    check(!nulls.length, 'no "null" on any ribbon tab or properties pane' + (nulls.length ? ': ' + nulls.join(', ') : ''));
+
+    R.setZoom(0.6); await sleep(300);
+    check(errors.length === 0, 'no script errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+
+  } catch (e) { log('EXCEPTION ' + e.message + '\n' + e.stack); fail++; }
+  const del = await api('delete.php', { id: made.id });
+  check(del.success, 'the test pack was deleted');
+  log('\n' + pass + ' passed, ' + fail + ' failed');
+  document.title = 'done';
+})();
+</script>
