@@ -12,6 +12,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo 'Not authenticated';
     exit;
 }
+requireModuleAccessJson('changes');
 
 $attachmentId = (int)($_GET['id'] ?? 0);
 

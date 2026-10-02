@@ -22,6 +22,7 @@ if (!isset($_SESSION['analyst_id'])) {
     header('Location: ../../auth/login.php');
     exit;
 }
+requireModuleAccess('tickets');
 
 $current_page = 'csat';
 $path_prefix  = '../../';

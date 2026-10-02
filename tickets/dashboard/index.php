@@ -10,6 +10,7 @@ require_once '../../includes/functions.php';
 require_once '../../includes/i18n.php';
 require_once '../../includes/theme.php';
 require_once '../../includes/timezone.php';
+requireModuleAccess('tickets');
 I18n::initFromSession();
 Tz::init();
 

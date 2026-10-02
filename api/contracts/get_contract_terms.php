@@ -12,6 +12,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('contracts');
 
 try {
     $contract_id = $_GET['contract_id'] ?? null;

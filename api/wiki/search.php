@@ -13,6 +13,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('wiki');
 
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $type = isset($_GET['type']) ? trim($_GET['type']) : 'all';

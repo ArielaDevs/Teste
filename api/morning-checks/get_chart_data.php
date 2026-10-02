@@ -28,6 +28,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('morning-checks');
 
 try {
     // Get end date from query parameter or default to today

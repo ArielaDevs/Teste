@@ -26,6 +26,12 @@ if (!is_array($in)) {
     exit;
 }
 
+// Every table key is also its module's key (see list.php).
+$tableKey = (string)($in['table_key'] ?? '');
+if (in_array($tableKey, TABLE_VIEW_KEYS, true)) {
+    requireModuleAccessJson($tableKey);
+}
+
 try {
     $conn = connectToDatabase();
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

@@ -14,6 +14,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('system');
 
 $teamId = isset($_GET['team_id']) ? (int) $_GET['team_id'] : 0;
 if (!$teamId) {

@@ -14,6 +14,9 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
+| 2082 | System            | Fix         | Security: module access (#30) guarded pages and write endpoints but left reads open, so any signed-in analyst could read ticket threads, contracts, asset lists, software API keys, workflows, the system log and more for modules their teams were never given; all 188 unguarded analyst reads were classified by their real callers and 158 now require their module (shared ones any of their modules, admin-only ones System), 19 stay open with a stated reason, and tests/module-access-coverage.php fails on any new endpoint that is neither guarded nor listed (driven live as a restricted analyst: 91 endpoints let him in before, 0 after). |
+| 2083 | System            | Fix         | Security: api/settings/get_system_settings.php decrypted every *_secret/*_token/*_password/*_api_key setting but masked only a fixed list, so csat_token_secret and the five cron tokens (bearer credentials for endpoints that need no sign-in) went to any signed-in analyst in plain text; secrets not on the mask list are no longer sent, and the endpoint now needs Assets, Software, Tickets or System. |
+| 2084 | Tickets           | Fix         | Security: the CSAT, Dashboard, Widget library and Triage pages had no page gate (the shared header checks sign-in only after HTML has started, so its redirect never fired and Triage rendered to a signed-out visitor); they now require Tickets, and six endpoints with no caller were removed, including a debug page that printed the request and an attachment's file path. |
 
 
 

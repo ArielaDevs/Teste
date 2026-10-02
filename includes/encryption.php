@@ -182,6 +182,15 @@ define('SETTING_KEYS_NEVER_ENCRYPT', [
 function isEncryptedSettingKey($key) {
     if (in_array($key, SETTING_KEYS_NEVER_ENCRYPT, true)) return false;
     if (in_array($key, ENCRYPTED_SETTING_KEYS, true))     return true;
+    return isSecretSettingName($key);
+}
+
+/**
+ * Is this key named like a credential (*_password, *_secret, *_token, *_api_key)?
+ * The rule isEncryptedSettingKey() falls back on, shared so a reader can refuse to
+ * send such a key in the clear (api/settings/get_system_settings.php).
+ */
+function isSecretSettingName($key) {
     return (bool)preg_match('/_(password|secret|token|api_key)$/i', (string)$key);
 }
 

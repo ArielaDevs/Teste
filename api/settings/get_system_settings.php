@@ -14,6 +14,8 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+// The settings pages of Assets, Software, Tickets and System read through here.
+requireAnyModuleAccessJson(['assets', 'software', 'tickets', 'system']);
 
 try {
     $conn = connectToDatabase();
@@ -28,6 +30,15 @@ try {
     $settings = [];
     foreach ($rows as $row) {
         $value = $row['setting_value'];
+        // A secret by NAME (*_password, *_secret, *_token, *_api_key) that is not on
+        // the mask list is never sent at all. Encryption is rule-based but masking is a
+        // list, so without this csat_token_secret and the cron tokens - bearer
+        // credentials for endpoints that need no sign-in - went out in plain text.
+        // No page reads them from here (checked 2026-10-02).
+        if (isSecretSettingName($row['setting_key']) && isEncryptedSettingKey($row['setting_key'])
+            && !isMaskedSettingKey($row['setting_key'])) {
+            continue;
+        }
         if (isEncryptedSettingKey($row['setting_key'])) {
             $value = decryptValue($value);
         }

@@ -12,6 +12,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('software');
 
 $analyst_id = $_SESSION['analyst_id'];
 
