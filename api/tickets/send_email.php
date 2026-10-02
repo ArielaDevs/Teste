@@ -22,6 +22,14 @@ require_once '../../includes/tenancy.php';
 require_once '../../includes/mailbox_graph.php';
 require_once '../../includes/email_log.php';
 
+// Most bytes of thread pictures one email carries - see processInlineImages().
+// ⚠️ Must stay up here, above the code that sends. Unlike a function, a top-level
+// const only exists once PHP has run the line, and this file's functions are
+// called before execution ever reaches the bottom of it. 2.10.0 declared it next
+// to processInlineImages(), so every reply whose thread held a picture died with
+// "Undefined constant" and was never sent (GH #158 follow-up).
+const INLINE_THREAD_BUDGET = 2 * 1024 * 1024;
+
 header('Content-Type: application/json');
 
 // Check if user is logged in
@@ -386,8 +394,6 @@ function uploadedFileParts($attachments) {
  * 2. data: images - what the editor produces when a screenshot is pasted.
  *    Gmail and Outlook refuse to show a data: image in a received email.
  */
-const INLINE_THREAD_BUDGET = 2 * 1024 * 1024;
-
 function processInlineImages($body, $ticketId) {
     $inlineAttachments = [];
     $cidCounter = 1;
@@ -462,7 +468,9 @@ function processInlineImages($body, $ticketId) {
 
             // Return the CID reference
             return 'src="cid:' . $newCid . '"';
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            // Throwable, not Exception: a fault while embedding one picture must
+            // leave that link as it was, never stop the whole email going out.
             error_log('Inline image processing error: ' . $e->getMessage());
             return $matches[0];
         }

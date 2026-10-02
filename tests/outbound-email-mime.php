@@ -76,6 +76,9 @@ $src = file_get_contents($root . '/api/tickets/send_email.php');
 $at  = strpos($src, 'function getMailboxForTicket');
 $at  = strrpos(substr($src, 0, $at), '/**');
 eval(str_replace('__DIR__', var_export($root . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'tickets', true), substr($src, $at)));
+// ...and its top-level constants, which live above that point (see check 0).
+preg_match_all('/^const [A-Z_]+ = [^;]+;/m', substr($src, 0, $at), $consts);
+eval(implode("\n", $consts[0]));
 
 $pass = 0; $fail = 0;
 function check($ok, $label) {
@@ -112,6 +115,20 @@ function mimeLeaves(string $raw): array {
 $conn = connectToDatabase();
 
 // ---------------------------------------------------------------------------
+echo "0. The endpoint's constants exist before it uses them\n";
+// 2.10.0 declared INLINE_THREAD_BUDGET beside processInlineImages(), BELOW the code
+// that sends. A top-level const is only defined once execution reaches it, so every
+// reply with a picture in its thread died with "Undefined constant". The eval above
+// loads the functions first and so could never see it - this reads the order instead.
+$mainStart = strpos($src, "\ntry {");
+foreach ($consts[0] as $decl) {
+    preg_match('/^const ([A-Z_]+)/', $decl, $cm);
+    check(strpos($src, $decl) < $mainStart, "$cm[1] is declared above the code that sends");
+}
+preg_match_all('/^const ([A-Z_]+)/m', substr($src, $mainStart), $late);
+check(!$late[1], 'no const is declared below the code that sends' . ($late[1] ? ' (found: ' . implode(', ', $late[1]) . ')' : ''));
+check(count($consts[0]) > 0, 'positive control: the constants were found at all');
+
 echo "1. The message builder\n";
 $plain = mimeBuildMessage(['from' => 'a@example.test', 'to' => ['b@example.test'], 'subject' => 'Hi', 'html' => '<p>x</p>']);
 $l = mimeLeaves($plain);

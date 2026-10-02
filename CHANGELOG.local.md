@@ -14,6 +14,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 
 | ID   | Module            | Type        | Description |
 |------|-------------------|-------------|-------------|
+| 2081 | Tickets           | Fix         | A reply or forward whose quoted thread held a picture from the ticket failed on every provider with "Undefined constant INLINE_THREAD_BUDGET", because 2.10.0 declared the top-level const below the code that calls processInlineImages(); it now sits under the requires, a fault embedding one picture (any Throwable) leaves that link as it was instead of stopping the send, and tests/outbound-email-mime.php checks the order it could not see before (GH #158, reported by An Duong). |
 
 
 
