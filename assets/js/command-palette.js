@@ -41,6 +41,8 @@
         ci: '<path d="M2 22V8l10-6 10 6v14"></path><path d="M2 12h20"></path><line x1="12" y1="2" x2="12" y2="22"></line>',
         asset: '<rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line>',
         domain: '<path d="M20.9 13.5A10 10 0 1 0 12 22"></path><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10"></path><path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"></path><rect x="15" y="17" width="7" height="5" rx="1"></rect><path d="M16.5 17v-1.5a2 2 0 0 1 4 0V17"></path>',
+        person: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
+        company: '<path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path>',
         command: '<polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line>',
         search: '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>'
     };
@@ -63,6 +65,8 @@
             knowledge:        cp('type_article', 'Article'),
             contract:         cp('type_contract', 'Contract'),
             domain:           cp('type_domain', 'Domain'),
+            person:           cp('type_person', 'Person'),
+            company:          cp('type_company', 'Company'),
             ci:               cp('type_ci', 'Config item'),
             asset:            cp('type_asset', 'Asset'),
             ticket_content:   cp('type_ticket', 'Ticket'),
@@ -218,7 +222,7 @@
             // be returning results perfectly and the palette will show nothing,
             // with no error anywhere — which is exactly what happened when
             // documents were added server-side (#76).
-            ['ticket', 'change', 'problem', 'knowledge', 'contract', 'domain', 'asset', 'ci', 'document', 'ticket_content', 'article_content', 'document_content'].forEach(function (type) {
+            ['ticket', 'change', 'problem', 'knowledge', 'person', 'company', 'contract', 'domain', 'asset', 'ci', 'document', 'ticket_content', 'article_content', 'document_content'].forEach(function (type) {
                 var group = serverResults.filter(function (r) { return r.type === type; });
                 if (!group.length) return;
                 html += '<div class="cmdp-group-label">' + esc(pluralType(type)) + '</div>';
@@ -287,6 +291,8 @@
             knowledge: cp('group_knowledge', 'Knowledge'),
             contract: cp('group_contract', 'Contracts'),
             domain: cp('group_domain', 'Domains'),
+            person: cp('group_person', 'People'),
+            company: cp('group_company', 'Companies'),
             asset: cp('group_asset', 'Assets'),
             ci: cp('group_ci', 'Configuration items'),
             document: cp('group_document', 'Documents'),

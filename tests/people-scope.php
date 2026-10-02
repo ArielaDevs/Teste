@@ -19,6 +19,7 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/i18n.php';
 require_once __DIR__ . '/../includes/tenancy.php';
 require_once __DIR__ . '/../includes/services/assets.php';
+require_once __DIR__ . '/../includes/people.php';
 I18n::initFromSession();
 
 $pass = 0; $fail = 0;
@@ -44,6 +45,8 @@ foreach ($conn->query("SELECT id FROM analysts WHERE is_active = 1 AND (is_admin
     if (analystCanAccessModule($conn, (int)$cand, 'assets')) { $r = (int)$cand; break; }
 }
 if (!$r) { echo "  SKIP  needs a non-admin analyst with Assets\n"; exit(0); }
+// A second analyst, never asked about yet, to restrict by MODULE (module access is cached per process too).
+$m = (int)$conn->query("SELECT id FROM analysts WHERE is_active = 1 AND (is_admin = 0 OR is_admin IS NULL) AND id > $r ORDER BY id LIMIT 1")->fetchColumn();
 
 $conn->beginTransaction();
 try {
@@ -71,6 +74,36 @@ try {
     $reports = array_column($bossRow['user']['reports'] ?? [], 'id');
     ok('a manager\'s reports in another company are not listed', !in_array($uTheirs, $reports, true), json_encode($reports));
     ok('POSITIVE CONTROL: reports in their own company are', in_array($uMine, $reports, true), json_encode($reports));
+
+    echo "\nPeople pages (#153 step 2):\n";
+    $rows = array_column(peopleListRows($conn, $r, ['q' => 'PS ', 'status' => 'all']), 'id');
+    ok('the list leaves out people in other companies', !in_array($uTheirs, $rows, true), json_encode($rows));
+    ok('POSITIVE CONTROL: and includes their own', in_array($uMine, $rows, true));
+    ok('asking the list for another company returns nobody', peopleListRows($conn, $r, ['company' => $theirs, 'status' => 'all']) === []);
+    ok('a person page for someone in another company is not found', personDetail($conn, $r, $uTheirs) === null);
+    $pd = personDetail($conn, $r, $boss);
+    ok('POSITIVE CONTROL: their own company\'s person opens', $pd !== null && $pd['person']['id'] === $boss);
+    ok('...and lists only the reports they can see', $pd && array_column($pd['person']['reports'], 'id') === [$uMine], json_encode($pd['person']['reports'] ?? null));
+    $pm = personDetail($conn, $r, $uMine);
+    ok('...and shows a manager they can see', $pm && ($pm['person']['manager']['id'] ?? null) === $boss);
+    ok('a company page for a company they cannot access is not found', companyDetail($conn, $r, $theirs) === null);
+    $cd = companyDetail($conn, $r, $mine);
+    ok('POSITIVE CONTROL: their own company opens, with its people', $cd !== null && in_array($uMine, array_column($cd['sections']['people'], 'id'), true));
+    $companyIds = array_column(peopleCompanies($conn, $r), 'id');
+    ok('the companies list is only theirs', $companyIds === [$mine], json_encode($companyIds));
+
+    if ($m) {
+        $conn->prepare("UPDATE analysts SET can_access_all_modules = 0 WHERE id = ?")->execute([$m]);
+        $conn->prepare("DELETE FROM analyst_modules WHERE analyst_id = ?")->execute([$m]);
+        $conn->prepare("DELETE FROM analyst_teams WHERE analyst_id = ?")->execute([$m]);
+        $conn->prepare("INSERT INTO analyst_modules (analyst_id, module_key) VALUES (?, 'people'), (?, 'tickets')")->execute([$m, $m]);
+        $pm2 = personDetail($conn, $m, $uMine);
+        ok('an analyst with only People and Tickets gets just the Tickets section', $pm2 && array_keys($pm2['sections']) === ['tickets'], json_encode(array_keys($pm2['sections'] ?? [])));
+        $cm2 = companyDetail($conn, $m, $mine);
+        ok('...on a company page too (plus its people)', $cm2 && array_keys($cm2['sections']) === ['people', 'tickets'], json_encode(array_keys($cm2['sections'] ?? [])));
+    } else {
+        echo "  SKIP  the module check needs a second non-admin analyst\n";
+    }
 } catch (Throwable $e) {
     ok('the run completed', false, get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
 } finally {

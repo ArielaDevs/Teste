@@ -77,7 +77,7 @@ function connectToDatabase() {
  */
 function getModuleRegistry(): array {
     $keys = ['watchtower','tickets','assets','knowledge','changes','problems','calendar',
-             'morning-checks','reporting','software','forms','contracts','domains','service-status',
+             'morning-checks','reporting','software','forms','contracts','domains','people','service-status',
              'war-room','wiki','lms','process-mapper','checklists','tasks','cmdb','network-mapper','workflow'];
     $out = [];
     foreach ($keys as $k) {

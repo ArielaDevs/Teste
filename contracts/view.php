@@ -28,6 +28,8 @@ if (!$contract_id) {
 // navigation with a real URL, so the moment it is recorded is this one.
 require_once '../includes/recent_trail.php';
 entityVisit('contract', (int) $contract_id);
+// The customer's name links to their People page (#153), for analysts who can open People.
+$peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'people') ? BASE_URL . 'people/' : null;
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
@@ -448,6 +450,7 @@ entityVisit('contract', (int) $contract_id);
 
     <script>
         const API_BASE = '../api/contracts/';
+        const PEOPLE_BASE = <?php echo json_encode($peopleBase); ?>;
         const TASKS_API = '../api/tasks/';
         const CONTRACTS_API = '../api/contracts/';
         const CALENDAR_API = '../api/calendar/';
@@ -564,7 +567,7 @@ entityVisit('contract', (int) $contract_id);
                     </div>` : ''}
                     ${c.party_type === 'customer' ? `<div class="detail-group">
                         <label>${escapeHtml(window.t('contracts.party.customer'))}</label>
-                        <div class="value">${escapeHtml(c.customer_company_name || '')}${c.customer_company_name && c.customer_person_name ? '<br>' : ''}${c.customer_person_name ? escapeHtml(c.customer_person_name) + (c.customer_person_email ? ' <span style="color:var(--text-dim, #888);">' + escapeHtml(c.customer_person_email) + '</span>' : '') : ''}${!c.customer_company_name && !c.customer_person_name ? '-' : ''}</div>
+                        <div class="value">${peopleLink('company.php', c.customer_tenant_id, c.customer_company_name)}${c.customer_company_name && c.customer_person_name ? '<br>' : ''}${c.customer_person_name ? peopleLink('person.php', c.customer_user_id, c.customer_person_name) + (c.customer_person_email ? ' <span style="color:var(--text-dim, #888);">' + escapeHtml(c.customer_person_email) + '</span>' : '') : ''}${!c.customer_company_name && !c.customer_person_name ? '-' : ''}</div>
                     </div>` : `<div class="detail-group">
                         <label>${escapeHtml(window.t('contracts.detail.supplier'))}</label>
                         <div class="value">${escapeHtml(c.supplier_name || '-')}${c.supplier_trading_name ? ' <span style="color:var(--text-dim, #888);">(t/a ' + escapeHtml(c.supplier_trading_name) + ')</span>' : ''}</div>
@@ -724,6 +727,12 @@ entityVisit('contract', (int) $contract_id);
         }
 
         /** " (Supplier: X)" or " (Customer: X)" for a task or event made from this contract (#153). */
+        // A name, linked to its People page when the reader can open People.
+        function peopleLink(page, id, name) {
+            if (!name) return '';
+            return PEOPLE_BASE && id ? '<a href="' + PEOPLE_BASE + page + '?id=' + encodeURIComponent(id) + '">' + escapeHtml(name) + '</a>' : escapeHtml(name);
+        }
+
         function partySuffix(c) {
             if (c.party_type === 'customer') {
                 return c.party_label ? ' ' + window.t('contracts.party.customer_suffix', { customer: c.party_label }) : '';

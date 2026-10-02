@@ -98,7 +98,7 @@
         const people = '<div class="dom-card"><div class="dom-card-h"><h3>' + esc(T('page.people_money')) + '</h3></div><div class="dom-card-b"><div class="dom-fields">'
             + row('field.owner', esc(D.owner_name || ''))
             + row('field.tech_contact', esc(D.tech_contact_name || ''))
-            + row('field.customer', D.customer_user_id ? esc(D.customer_user_name || ('#' + D.customer_user_id)) + (D.customer_user_email && D.customer_user_email !== D.customer_user_name ? '<div class="dom-sub">' + esc(D.customer_user_email) + '</div>' : '') : '')
+            + row('field.customer', D.customer_user_id ? (window.DOM_PEOPLE ? '<a href="' + esc(window.DOM_PEOPLE + 'person.php?id=' + D.customer_user_id) + '">' + esc(D.customer_user_name || ('#' + D.customer_user_id)) + '</a>' : esc(D.customer_user_name || ('#' + D.customer_user_id))) + (D.customer_user_email && D.customer_user_email !== D.customer_user_name ? '<div class="dom-sub">' + esc(D.customer_user_email) + '</div>' : '') : '')
             + (data.multi_company ? row('field.company', esc(D.company_name || '')) : '')
             + row('field.cost', D.cost !== null ? esc(money(D.cost, D.currency)) + (D.billing_years > 1 ? ' <span class="dom-sub">/ ' + esc(T('page.years', { n: D.billing_years })) + '</span>' : '') : '')
             + row('field.cost_centre', esc(D.cost_centre || ''))

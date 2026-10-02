@@ -320,6 +320,47 @@ try {
         } catch (Exception $e) { /* table not ready — no contract results */ }
     }
 
+    // --- People (#153): a person by name, email or job; a company by name -----
+    // Only people in companies the analyst can access - the same rule as the
+    // person page the result opens.
+    if ($can('people')) {
+        try {
+            [$uSql, $uArgs] = isMultiTenant($conn) ? allAccessibleTenantsFilter($conn, $analystId, 'u.tenant_id') : ['', []];
+            $sql = "SELECT u.id, COALESCE(NULLIF(u.preferred_name, ''), NULLIF(u.display_name, ''), u.email, u.username) AS name,
+                           u.email, u.job_title, u.is_active
+                      FROM users u
+                     WHERE (u.display_name LIKE ? OR u.preferred_name LIKE ? OR u.email LIKE ? OR u.job_title LIKE ?)" . $uSql . "
+                     ORDER BY u.is_active DESC, name
+                     LIMIT " . $perType;
+            $stmt = $conn->prepare($sql);
+            $stmt->execute(array_merge([$like, $like, $like, $like], $uArgs));
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $results[] = [
+                    'type'     => 'person',
+                    'module'   => 'people',
+                    'id'       => (int) $r['id'],
+                    'title'    => (string) $r['name'],
+                    'subtitle' => trim(($r['job_title'] ?? '') . ($r['email'] && $r['email'] !== $r['name'] ? ' · ' . $r['email'] : ''), ' ·'),
+                    'url'      => entityLink('person', (int) $r['id']),
+                ];
+            }
+            if (isMultiTenant($conn)) {
+                $ids = array_map('intval', getAccessibleTenantIds($conn, $analystId));
+                if ($ids) {
+                    $in = implode(',', array_fill(0, count($ids), '?'));
+                    $stmt = $conn->prepare("SELECT id, name FROM tenants WHERE name LIKE ? AND id IN ($in) ORDER BY name LIMIT " . $perType);
+                    $stmt->execute(array_merge([$like], $ids));
+                    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                        $results[] = [
+                            'type' => 'company', 'module' => 'people', 'id' => (int) $r['id'],
+                            'title' => $r['name'], 'subtitle' => '', 'url' => entityLink('company', (int) $r['id']),
+                        ];
+                    }
+                }
+            }
+        } catch (Exception $e) { /* no people results */ }
+    }
+
     // --- Domains (#154): by name, registrar or tag -------------------------
     // Scoped data: the analyst's active company, as the register's own list.
     if ($can('domains')) {

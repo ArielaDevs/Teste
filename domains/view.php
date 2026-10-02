@@ -179,9 +179,11 @@ $translationNamespaces = ['common', 'domains'];
             </div>
         </div>
     </div>
-    <script>window.DOMAIN_ID = <?php echo (int)$domainId; ?>;</script>
+    <script>window.DOMAIN_ID = <?php echo (int)$domainId; ?>;
+    // The customer links to their People page (#153), for analysts who can open People.
+    window.DOM_PEOPLE = <?php echo json_encode(analystCanAccessModule($conn, (int)$_SESSION['analyst_id'], 'people') ? BASE_URL . 'people/' : null); ?>;</script>
     <script src="../assets/js/domains.js?v=1"></script>
-    <script src="../assets/js/domains-view.js?v=2"></script>
+    <script src="../assets/js/domains-view.js?v=3"></script>
     <?php endif; ?>
     <script src="../assets/js/mobile.js?v=65"></script>
 </body>

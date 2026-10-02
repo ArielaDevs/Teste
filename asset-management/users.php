@@ -237,6 +237,8 @@ $translationNamespaces = ['common', 'asset-management'];
 
 <script>
 const API = '../api/assets/';
+// Everything about this person, from every module (#153) - for analysts who can open People.
+const PERSON_PAGE = <?php echo json_encode(analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'people') ? BASE_URL . 'people/person.php?id=' : null); ?>;
 // Resolved here: this page does not export the tickets namespace to JavaScript.
 const MANAGER_ACCESS_LABEL = <?php echo json_encode(t('tickets.manager_access.button'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
 let people = [];
@@ -453,6 +455,7 @@ function renderDetail(user, assets) {
             </div>
             <div class="au-actions">
                 <span id="addToBookHost" data-user-id="${user.id}" data-btn-class="au-btn" style="display:contents;"></span>
+                ${PERSON_PAGE ? `<a class="au-btn" href="${PERSON_PAGE}${user.id}">${esc(window.t('common.modules.people.name'))}</a>` : ''}
                 <button type="button" class="au-btn" onclick="openPerson(${user.id})">
                     ${esc(window.t('asset-management.users.edit'))}
                 </button>

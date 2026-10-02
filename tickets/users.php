@@ -522,6 +522,8 @@ $translationNamespaces = ['common', 'tickets'];
 
     <script>
         const API_BASE = '../api/tickets/';
+        // Everything about this person, from every module (#153) - for analysts who can open People.
+        const PERSON_PAGE = <?php echo json_encode(analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'people') ? BASE_URL . 'people/person.php?id=' : null); ?>;
         let users = [];
         let selectedUserId = null;
         let searchTimeout = null;
@@ -754,6 +756,7 @@ $translationNamespaces = ['common', 'tickets'];
                         </div>
                         <div style="display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;">
                             <span id="addToBookHost" data-user-id="${user.id}" style="display:contents;"></span>
+                            ${PERSON_PAGE ? `<a class="btn btn-secondary" href="${PERSON_PAGE}${user.id}">${escapeHtml(t('common.modules.people.name'))}</a>` : ''}
                             <button class="btn btn-secondary" onclick="openUserModal(${user.id})">${escapeHtml(t('common.edit'))}</button>
                             <a class="btn btn-secondary" href="manager-access.php?user_id=${user.id}">${escapeHtml(t('tickets.manager_access.button'))}</a>
                             <button class="btn btn-secondary" onclick="deleteUser(${user.id})">${escapeHtml(t('common.delete'))}</button>
