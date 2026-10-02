@@ -28,6 +28,7 @@ if (!isset($_SESSION['analyst_id'])) {
     exit;
 }
 requireModuleAccessJson('assets');
+Tz::init();   // the analyst's zone, for the assigned date (fmt_local)
 
 $isWrite = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST';
 if ($isWrite) {

@@ -471,7 +471,9 @@ class HandoverTemplates
             'model'    => ['label' => $L('col_model', 'Make and model'), 'get' => fn($a) => trim(($a['manufacturer'] ?? '') . ' ' . ($a['model'] ?? '')) ?: '—'],
             'serial'   => ['label' => $L('col_serial', 'Serial number'), 'get' => fn($a) => $a['service_tag'] ?? '—', 'mono' => true],
             'tag'      => ['label' => $L('col_tag', 'Asset tag'),        'get' => fn($a) => $a['asset_tag'] ?? '—', 'mono' => true],
-            'assigned' => ['label' => $L('col_assigned', 'Assigned'),    'get' => fn($a) => !empty($a['assigned_datetime']) ? date('j M Y', strtotime($a['assigned_datetime'])) : '—'],
+            // fmt_local: assigned_datetime is a UTC instant, and near midnight the
+            // server's zone and the reader's disagree about which DAY it was.
+            'assigned' => ['label' => $L('col_assigned', 'Assigned'),    'get' => fn($a) => !empty($a['assigned_datetime']) ? fmt_local($a['assigned_datetime'], 'j M Y') : '—'],
             'location' => ['label' => $L('col_location', 'Location'),    'get' => fn($a) => $a['location'] ?? '—'],
             'status'   => ['label' => $L('col_status', 'Status'),        'get' => fn($a) => $a['asset_status'] ?? '—'],
             'notes'    => ['label' => $L('col_notes', 'Notes'),          'get' => fn($a) => $a['notes'] ?? '—'],

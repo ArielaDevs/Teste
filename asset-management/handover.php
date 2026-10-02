@@ -30,6 +30,7 @@ require_once '../includes/tenancy.php';
 I18n::initFromSession();
 
 requireModuleAccess('assets');
+Tz::init();   // the analyst's zone, for the assigned date (fmt_local)
 
 $userId     = (int)($_GET['user_id'] ?? 0);
 $templateId = isset($_GET['template_id']) ? (int)$_GET['template_id'] : null;

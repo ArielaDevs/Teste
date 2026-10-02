@@ -68,6 +68,7 @@ require_once $root . '/includes/functions.php';
 require_once $root . '/includes/ticket_numbering.php';
 require_once $root . '/includes/mailbox_imap.php';
 require_once $root . '/includes/mime_message.php';
+require_once $root . '/includes/timezone.php';     // send_email.php's thread dates (fmt_local)
 
 // send_email.php is an endpoint - it runs on include. Load only its functions
 // (everything from getMailboxForTicket() down), with __DIR__ pointed back at
@@ -300,6 +301,32 @@ check(count($r['attachments']) === 1 && $r['attachments'][0]['contentType'] === 
     && base64_decode($r['attachments'][0]['contentBytes']) === $png
     && preg_match('/<img src="cid:inline_image_1_\d+" width="10">/', $r['body']),
     'a data: image becomes an inline part with a cid: reference');
+
+// ---------------------------------------------------------------------------
+echo "7. The quoted thread's dates are in the sender's zone (GH #161)\n";
+// "On 02 Oct 2026 05:20, X wrote:" for an email received at 12:20 in Ho Chi Minh:
+// the date was date('d M Y H:i', strtotime($utc)), which prints the stored UTC
+// digits as if they were local. Set the display zone to UTC+7 and check the
+// thread shows the converted time - and NOT the raw stored one.
+$tzBefore = date_default_timezone_get();
+date_default_timezone_set('Asia/Ho_Chi_Minh');   // no session here, so Tz falls back to this
+Tz::init();
+$row = $conn->query("SELECT ticket_id, received_datetime FROM emails
+                      WHERE ticket_id IS NOT NULL AND received_datetime IS NOT NULL
+                        AND HOUR(received_datetime) BETWEEN 1 AND 15
+                      ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($row) {
+    $body = buildFullEmailBody($conn, (int)$row['ticket_id'], '<p>reply</p>', 'reply');
+    $want = (new DateTime($row['received_datetime'], new DateTimeZone('UTC')))
+              ->setTimezone(new DateTimeZone('Asia/Ho_Chi_Minh'))->format('d M Y H:i');
+    $raw  = (new DateTime($row['received_datetime'], new DateTimeZone('UTC')))->format('d M Y H:i');
+    check($want !== $raw, "positive control: UTC+7 changes the time ($raw UTC = $want local)");
+    check(strpos($body, 'On ' . $want . ',') !== false, "the thread says \"On $want\" (converted)");
+    check(strpos($body, 'On ' . $raw . ',') === false, "and not \"On $raw\" (the stored UTC digits)");
+} else {
+    echo "  SKIP  no email received between 01:00 and 15:59 UTC to test with\n";
+}
+date_default_timezone_set($tzBefore);
 
 echo "\n$pass passed, $fail failed\n";
 exit($fail ? 1 : 0);

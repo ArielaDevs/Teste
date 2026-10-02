@@ -28,6 +28,10 @@ services:
       - DB_USERNAME=freeitsm
       - DB_PASSWORD=freeitsm
       - ENCRYPTION_KEY_PATH=/var/www/encryption_keys/freeitsm.key
+      # Your timezone, e.g. Europe/London or Asia/Ho_Chi_Minh. It is what analysts see
+      # until they choose their own in Preferences, and what emails sent by scheduled
+      # jobs use. Dates are always STORED in UTC; this only changes how they are shown.
+      # - TZ=Europe/London
       # Uncomment when a reverse proxy (nginx, Traefik, Caddy, Cloudflare) terminates
       # HTTPS in front of this container. Without it PHP sees plain HTTP and the session
       # cookie is issued without its Secure flag. Leave it off if nothing fronts the

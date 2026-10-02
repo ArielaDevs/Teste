@@ -19,8 +19,13 @@ require_once($db_config_path);
 // stored on a persistent volume). Leave it to the env var here — do NOT define
 // ENCRYPTION_KEY_PATH in this file, or it would override the compose setting.
 
-// Timezone
-date_default_timezone_set('UTC');
+// Timezone - the install's default: what an analyst sees until they choose their
+// own in Preferences, and what emails sent by scheduled jobs use. Set TZ in the
+// environment (docker-compose.yml), e.g. TZ=Europe/London. This used to be fixed
+// at UTC, so an install whose container was set to UTC+7 still showed UTC to every
+// analyst who had not picked a zone (GH #161). Dates are STORED in UTC either way.
+$tz = getenv('TZ');
+date_default_timezone_set(is_string($tz) && in_array($tz, timezone_identifiers_list(), true) ? $tz : 'UTC');
 
 // Behind a reverse proxy that terminates HTTPS?
 // ⚠️ The single most likely thing to need setting on this image. Almost nobody exposes

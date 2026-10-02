@@ -30,6 +30,7 @@ if (!isset($_SESSION['analyst_id'])) {
     exit;
 }
 requireModuleAccessJson('assets');
+Tz::init();   // the analyst's zone, for the assigned date (fmt_local)
 
 try {
     $in     = json_decode(file_get_contents('php://input'), true) ?: [];

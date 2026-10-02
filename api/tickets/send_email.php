@@ -21,6 +21,7 @@ require_once '../../includes/encryption.php';
 require_once '../../includes/tenancy.php';
 require_once '../../includes/mailbox_graph.php';
 require_once '../../includes/email_log.php';
+require_once '../../includes/timezone.php';   // fmt_local() for the quoted thread's dates
 
 // Most bytes of thread pictures one email carries - see processInlineImages().
 // ⚠️ Must stay up here, above the code that sends. Unlike a function, a top-level
@@ -38,6 +39,7 @@ if (!isset($_SESSION['analyst_id'])) {
     exit;
 }
 requireModuleAccessJson('tickets');
+Tz::init();   // the sending analyst's zone, for the dates in the quoted thread
 
 try {
     // Get POST data
@@ -687,7 +689,12 @@ function buildFullEmailBody($conn, $ticketId, $analystBody, $type) {
         $fromName = htmlspecialchars((string)($e['from_name'] ?: ($e['from_address'] ?? '')), ENT_QUOTES, 'UTF-8');
         $fromAddr = htmlspecialchars((string)($e['from_address'] ?? ''), ENT_QUOTES, 'UTF-8');
         $fromLabel = $fromAddr !== '' ? ($fromName . ' &lt;' . $fromAddr . '&gt;') : $fromName;
-        $date = date('d M Y H:i', strtotime($e['received_datetime']));
+        // In the SENDING analyst's zone (their preference, else the install's).
+        // This was date('d M Y H:i', strtotime($utc)) - parsed and formatted in
+        // the same zone, so it printed the stored UTC digits as if they were local
+        // time: "05:20" in Ho Chi Minh for a 12:20 email (GH #161). The same fault
+        // GH #126 fixed in email templates; this copy was missed then.
+        $date = fmt_local($e['received_datetime'], 'd M Y H:i');
 
         $threadParts[] = '<div style="margin-bottom: 15px;">'
             . '<p style="margin: 0 0 5px 0; color: #666; font-size: 13px;"><strong>On ' . $date . ', ' . $fromLabel . ' wrote:</strong></p>'
