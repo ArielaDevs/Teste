@@ -2,7 +2,7 @@
 /**
  * Domains → Settings (#154).
  *
- * Four tabs, four capabilities (domains/settings/manifest.php). Only the tabs
+ * Five tabs, five capabilities (domains/settings/manifest.php). Only the tabs
  * this analyst may use are rendered at all. Every value is read from and saved
  * to api/domains/settings.php, which validates it and checks the same
  * capability as its tab — the defaults shown here come from the server, so
@@ -45,7 +45,7 @@ $tt = fn(string $k) => htmlspecialchars(t('domains.settings.' . $k));
     <script src="../../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../../assets/css/domains.css?v=3">
+    <link rel="stylesheet" href="../../assets/css/domains.css?v=6">
     <style>
         /* Full-width settings page. ⚠️ max-width alone is not enough: inbox.css's
            `.container { margin: 30px auto }` would keep the gutters. */
@@ -70,7 +70,7 @@ $tt = fn(string $k) => htmlspecialchars(t('domains.settings.' . $k));
         .st-list .action-btn svg { width: 16px; height: 16px; }
         @media (max-width: 900px) { .set-row { grid-template-columns: 1fr; gap: 8px; } }
     </style>
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=165">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=166">
 </head>
 <body data-mobile-module="domains" data-mobile-page="settings">
     <?php include '../includes/header.php'; ?>
@@ -127,6 +127,12 @@ $tt = fn(string $k) => htmlspecialchars(t('domains.settings.' . $k));
                     <option value="dashboard"><?php echo $tt('sf_dashboard'); ?></option>
                     <option value="calendar"><?php echo $tt('sf_calendar'); ?></option>
                     <option value="both"><?php echo $tt('sf_both'); ?></option></select><div class="dflt" data-d="domain_expiry_surface"></div></div></div>
+            <div class="set-row"><div><div class="lbl"><?php echo $tt('cert_surface'); ?></div><div class="desc"><?php echo $tt('cert_surface_desc'); ?></div></div>
+                <div><select data-k="domain_cert_surface">
+                    <option value="off"><?php echo $tt('sf_off'); ?></option>
+                    <option value="dashboard"><?php echo $tt('sf_dashboard'); ?></option>
+                    <option value="calendar"><?php echo $tt('sf_calendar'); ?></option>
+                    <option value="both"><?php echo $tt('sf_both'); ?></option></select><div class="dflt" data-d="domain_cert_surface"></div></div></div>
             <div class="set-actions">
                 <button type="button" class="dom-btn primary" data-save="alerts"><?php echo htmlspecialchars(t('common.save')); ?></button>
                 <button type="button" class="dom-btn" id="btnPreview"><?php echo $tt('preview'); ?></button>
@@ -168,6 +174,37 @@ $tt = fn(string $k) => htmlspecialchars(t('domains.settings.' . $k));
                 <button type="button" class="dom-btn" id="btnRunNow"><?php echo $tt('run_now'); ?></button>
                 <span id="runOut" class="dom-hint" style="font-size:13px"></span>
             </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (settingsTabVisible($visibleTabs, 'service-status')):
+            // The impact choices are Service Status's own levels (install config).
+            $ssLevels = [];
+            try { $ssLevels = connectToDatabase()->query("SELECT id, name FROM service_impact_levels WHERE is_active = 1 ORDER BY severity_order, display_order, id")->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $e) {}
+        ?>
+        <div class="tab-content<?php echo $activeTabId === 'service-status' ? ' active' : ''; ?>" id="service-status-tab" data-capability="<?php echo Cap::DOMAINS_SERVICE_STATUS; ?>" data-settings-tab="service-status">
+            <h2 style="margin:0 0 4px;font-size:18px"><?php echo $tt('ss_title'); ?></h2>
+            <div class="set-box"><?php echo $tt('ss_intro'); ?></div>
+            <div class="set-row"><div><div class="lbl"><?php echo $tt('ss_mode'); ?></div><div class="desc"><?php echo $tt('ss_mode_desc'); ?></div></div>
+                <div><select data-k="domain_status_mode">
+                    <option value="off"><?php echo $tt('ss_off'); ?></option>
+                    <option value="suggest"><?php echo $tt('ss_suggest'); ?></option>
+                    <option value="auto"><?php echo $tt('ss_auto'); ?></option></select><div class="dflt" data-d="domain_status_mode"></div></div></div>
+            <div class="set-row"><div><div class="lbl"><?php echo $tt('ss_on_expired'); ?></div><div class="desc"><?php echo $tt('ss_on_expired_desc'); ?></div></div>
+                <div><label class="toggle-label"><span class="toggle-switch"><input type="checkbox" data-k="domain_status_on_expired"><span class="toggle-slider"></span></span></label><div class="dflt" data-d="domain_status_on_expired"></div></div></div>
+            <div class="set-row"><div><div class="lbl"><?php echo $tt('ss_on_cert'); ?></div><div class="desc"><?php echo $tt('ss_on_cert_desc'); ?></div></div>
+                <div><label class="toggle-label"><span class="toggle-switch"><input type="checkbox" data-k="domain_status_on_cert"><span class="toggle-slider"></span></span></label>
+                    <div style="margin-top:8px"><?php echo $tt('ss_cert_days'); ?> <input type="number" min="0" max="60" data-k="domain_status_cert_days" style="width:90px"></div><div class="dflt" data-d="domain_status_cert_days"></div></div></div>
+            <div class="set-row"><div><div class="lbl"><?php echo $tt('ss_impact'); ?></div><div class="desc"><?php echo $tt('ss_impact_desc'); ?></div></div>
+                <div><select data-k="domain_status_impact">
+                    <option value=""><?php echo $tt('ss_impact_auto'); ?></option>
+                    <?php foreach ($ssLevels as $lv): ?><option value="<?php echo (int)$lv['id']; ?>"><?php echo htmlspecialchars($lv['name']); ?></option><?php endforeach; ?>
+                </select><div class="dflt" data-d="domain_status_impact"></div></div></div>
+            <div class="set-row"><div><div class="lbl"><?php echo $tt('ss_public'); ?></div><div class="desc"><?php echo $tt('ss_public_desc'); ?></div></div>
+                <div><label class="toggle-label"><span class="toggle-switch"><input type="checkbox" data-k="domain_status_public"><span class="toggle-slider"></span></span></label><div class="dflt" data-d="domain_status_public"></div></div></div>
+            <div class="set-row"><div><div class="lbl"><?php echo $tt('ss_resolve'); ?></div><div class="desc"><?php echo $tt('ss_resolve_desc'); ?></div></div>
+                <div><label class="toggle-label"><span class="toggle-switch"><input type="checkbox" data-k="domain_status_auto_resolve"><span class="toggle-slider"></span></span></label><div class="dflt" data-d="domain_status_auto_resolve"></div></div></div>
+            <div class="set-actions"><button type="button" class="dom-btn primary" data-save="service-status"><?php echo htmlspecialchars(t('common.save')); ?></button></div>
         </div>
         <?php endif; ?>
 

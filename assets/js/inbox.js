@@ -3147,6 +3147,7 @@ ${classificationFields}
     loadNotes(email.ticket_id);
     loadTicketAttachments(email.ticket_id);
     loadCmdbObjects(email.ticket_id);
+    loadTicketDomains(email.ticket_id);
     loadTicketAssets(email.ticket_id);
     loadTicketTasks(email.ticket_id);
     loadTimeEntries(email.ticket_id);
@@ -3569,6 +3570,7 @@ function buildLinksSection(email) {
         ${body}
         <span class="strip-pill-group" id="stripAssetPills"></span>
         <span class="strip-pill-group" id="stripCmdbPills"></span>
+        <span class="strip-pill-group" id="stripDomainPills"></span>
         <span class="strip-pill-group" id="stripTaskPills"></span>
         <div class="link-add-wrap">
             <button class="problem-link-btn" onclick="toggleLinkAddMenu(event)">Link to… ▾</button>
@@ -3578,6 +3580,7 @@ function buildLinksSection(email) {
                 <button type="button" onclick="linkAddChoose('ticket')">Ticket</button>
                 <button type="button" onclick="linkAddChoose('equipment')">${escapeHtml(t('tickets.assets.menu_item'))}</button>
                 <button type="button" onclick="linkAddChoose('cmdb')">${escapeHtml(t('tickets.cmdb.menu_item'))}</button>
+                ${window.TICKETS_SHOW_DOMAINS ? `<button type="button" onclick="linkAddChoose('domain')">${escapeHtml(t('tickets.domains.menu_item'))}</button>` : ''}
                 <button type="button" onclick="linkAddChoose('tracker')">${escapeHtml(t('tickets.tracker.menu_item'))}</button>
                 <button type="button" onclick="linkAddChoose('task')">${escapeHtml(t('tickets.tasks.menu_item'))}</button>
             </div>
@@ -3596,7 +3599,8 @@ function syncLinksStripEmpty() {
     if (!note) return;
     const a = document.getElementById('stripAssetPills');
     const c = document.getElementById('stripCmdbPills');
-    const has = (a && a.children.length) || (c && c.children.length);
+    const dm = document.getElementById('stripDomainPills');
+    const has = (a && a.children.length) || (c && c.children.length) || (dm && dm.children.length);
     note.hidden = !!has;
 }
 
@@ -3653,6 +3657,7 @@ function linkAddChoose(kind) {
     else if (kind === 'tracker') openEscalateTrackerModal(id, ref);
     else if (kind === 'equipment') openLinkAssetPicker(id);
     else if (kind === 'cmdb') openLinkCmdbPicker(id);
+    else if (kind === 'domain') openLinkDomainPicker(id);
     else if (kind === 'task') openLinkTaskPicker(id);
     else openLinkTicketModal(id, ref, subj);
 }
@@ -5740,6 +5745,116 @@ function openLinkCmdbPicker(ticketId) {
         else if (e.key === 'Enter' && cmdbAcHighlightedIdx >= 0) { e.preventDefault(); pick(current[cmdbAcHighlightedIdx]); }
         else if (e.key === 'Escape') { close(); }
     };
+}
+
+// ============================================================
+// Domains on a ticket (3.0.0) - pills in the Links strip, the same shape as
+// CMDB objects. Every rule (Domains access, same company, the ticket itself)
+// is server-side in includes/domains/links.php; for an analyst who cannot open
+// Domains none of this is drawn at all.
+// ============================================================
+let domainsForTicket = [];
+let domainAcTimer = null;
+
+async function loadTicketDomains(ticketId) {
+    const host = document.getElementById('stripDomainPills');
+    if (!host || !window.TICKETS_SHOW_DOMAINS) return;
+    domainsForTicket = [];
+    try {
+        const res = await fetch('../api/domains/links.php?for=ticket&id=' + ticketId);
+        const data = await res.json();
+        if (data.success) domainsForTicket = data.domains || [];
+    } catch (e) { /* silent - the strip simply shows no domain pills */ }
+    renderTicketDomains(ticketId);
+}
+
+function renderTicketDomains(ticketId) {
+    const host = document.getElementById('stripDomainPills');
+    if (!host) return;
+    host.innerHTML = domainsForTicket.map(dm => {
+        // A calendar date, so the naive formatter (never fmtDate, which shifts it).
+        const when = dm.expiry_date ? (window.fmtNaiveDate ? fmtNaiveDate(String(dm.expiry_date).slice(0, 10) + 'T00:00:00') : dm.expiry_date) : '';
+        const title = when ? t('tickets.domains.expires', { date: when }) : '';
+        return `<a class="pm-ticket-badge" href="../${escapeHtml(dm.url)}" title="${escapeHtml(title)}">
+            🌐 ${escapeHtml(dm.name)}
+            <span class="pm-ticket-unlink" title="${escapeHtml(t('tickets.domains.unlink_title'))}" onclick="event.preventDefault();event.stopPropagation();removeTicketDomain(event, ${dm.id}, ${ticketId});">✕</span>
+        </a>`;
+    }).join('');
+    syncLinksStripEmpty();
+}
+
+function openLinkDomainPicker(ticketId) {
+    const ui = openStripPicker(t('tickets.domains.search_placeholder'));
+    if (!ui) return;
+    const { input, results, close } = ui;
+    let current = [], hi = -1;
+
+    const renderResults = () => {
+        if (!current.length) {
+            results.innerHTML = `<div class="cmdb-picker-empty">${escapeHtml(t('tickets.domains.no_matches'))}</div>`;
+            results.classList.add('active');
+            return;
+        }
+        results.innerHTML = current.map((r, i) => `
+            <div class="cmdb-picker-result ${i === hi ? 'highlighted' : ''}" data-idx="${i}">
+                <span>${escapeHtml(r.name)}</span>
+                <span class="cmdb-picker-class">${escapeHtml(r.status || '')}</span>
+            </div>`).join('');
+        results.classList.add('active');
+        results.querySelectorAll('.cmdb-picker-result').forEach(el => {
+            el.addEventListener('mousedown', e => { e.preventDefault(); pick(current[parseInt(el.dataset.idx, 10)]); });
+        });
+    };
+
+    const pick = async (r) => {
+        try {
+            const res = await fetch('../api/domains/links.php', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add', domain_id: r.id, kind: 'ticket', target_id: ticketId })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Link failed');
+            showToast(t('tickets.domains.linked_toast', { name: r.name }), 'success');
+            close();
+            await loadTicketDomains(ticketId);
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+    };
+
+    const search = async () => {
+        try {
+            const res = await fetch('../api/domains/links.php?for=ticket&id=' + ticketId + '&pick=1&q=' + encodeURIComponent(input.value.trim()));
+            const data = await res.json();
+            current = data.success ? (data.domains || []) : [];
+            hi = -1;
+            renderResults();
+        } catch (e) { /* silent */ }
+    };
+    input.oninput = () => { if (domainAcTimer) clearTimeout(domainAcTimer); domainAcTimer = setTimeout(search, 200); };
+    input.onkeydown = e => {
+        if (!results.classList.contains('active')) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); hi = Math.min(current.length - 1, hi + 1); renderResults(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); hi = Math.max(0, hi - 1); renderResults(); }
+        else if (e.key === 'Enter' && hi >= 0) { e.preventDefault(); pick(current[hi]); }
+        else if (e.key === 'Escape') { close(); }
+    };
+    // Domains are a short list: show it straight away, before any typing.
+    search();
+}
+
+async function removeTicketDomain(ev, domainId, ticketId) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (!(await showConfirm({ title: 'Confirm', message: t('tickets.domains.unlink_confirm'), okLabel: 'OK', okClass: 'primary' }))) return;
+    try {
+        const res = await fetch('../api/domains/links.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'remove', domain_id: domainId, kind: 'ticket', target_id: ticketId })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Unlink failed');
+        showToast(t('tickets.domains.unlinked_toast'), 'success');
+        await loadTicketDomains(ticketId);
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
 }
 
 async function removeCmdbObject(ev, linkId, ticketId) {

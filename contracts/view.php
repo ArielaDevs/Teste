@@ -16,6 +16,10 @@ requireModuleAccess('contracts');
 $current_page = 'dashboard';
 $path_prefix = '../';
 $translationNamespaces = ['common', 'contracts'];
+// The domains renewed or billed under a contract (3.0.0) - Domains' data, so
+// only for analysts who can open Domains.
+$ctShowDomains = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'domains');
+if ($ctShowDomains) $translationNamespaces[] = 'domains';
 $contract_id = $_GET['id'] ?? null;
 
 if (!$contract_id) {
@@ -46,6 +50,7 @@ $peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analys
     <script src="../assets/js/record-preview.js?v=1"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
+    <link rel="stylesheet" href="../assets/css/domain-links.css?v=1">
     <style>
         body { --accent: var(--con-accent, #f59e0b); }
         /* Full-screen layout with sidebar - matches contracts dashboard */
@@ -377,7 +382,7 @@ $peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analys
         .checkbox-row label { margin: 0; }
     </style>
     <!-- Mobile layer: linked AFTER this page's own <style> so its @media rules win on ties. -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=165">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=166">
 </head>
 <body data-mobile-module="contracts" data-mobile-page="contract-view">
     <?php include 'includes/header.php'; ?>
@@ -653,6 +658,7 @@ $peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analys
                         </h3>
                         <div id="relatedAssetsList" class="related-empty">${escapeHtml(window.t('common.loading'))}</div>
                     </div>
+                    ${window.CT_SHOW_DOMAINS ? '<div class="related-section" id="relatedDomainsSection"><h3>' + escapeHtml(window.t('domains.links.domains_title')) + '</h3><div id="relatedDomainsList"></div></div>' : ''}
                     <div class="related-section" id="relatedTasksSection">
                         <h3>${escapeHtml(window.t('contracts.detail.related_tasks'))}</h3>
                         <div id="relatedTasksList" class="related-empty">${escapeHtml(window.t('common.loading'))}</div>
@@ -806,6 +812,9 @@ $peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analys
         // Related items
         async function loadRelatedItems() {
             loadRelatedAssets();
+            if (window.CT_SHOW_DOMAINS && window.DomainLinks && currentContract) {
+                DomainLinks.mount(document.getElementById('relatedDomainsList'), { kind: 'contract', id: currentContract.id, base: window.CT_BASE, bare: true });
+            }
             loadRelatedTasks();
             loadRelatedEvents();
         }
@@ -1441,6 +1450,8 @@ $peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analys
             </div>
         </div>
     </div>
+    <script>window.CT_SHOW_DOMAINS = <?php echo $ctShowDomains ? 'true' : 'false'; ?>; window.CT_BASE = <?php echo json_encode(BASE_URL); ?>;</script>
+    <script src="../assets/js/domain-links.js?v=1"></script>
     <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

@@ -418,6 +418,12 @@ class DomainsService
         if ($row['security_grade'] !== null && $row['security_grade'] !== $res['grade']) {
             self::audit($conn, $id, null, 'security_grade', $row['security_grade'], $res['grade'], 'check');
         }
+        // A new certificate date moves its calendar entry (domain_cert_surface).
+        // Only for a check somebody asked for: the scheduled run checks many
+        // domains and syncs the calendar once at the end of its own accord.
+        if ($ctx !== null && (string)($row['ssl_expiry_date'] ?? '') !== (string)($res['ssl_expiry_date'] ?? '')) {
+            self::afterDateChange($conn);
+        }
         // Registry-side fields already got a history row from the lookup that
         // changed them; only what DNS showed is recorded here.
         $dnsFieldNames = ['dns_ns' => 'dns_nameservers', 'mx' => 'dns_mx', 'spf' => 'dns_spf', 'dmarc' => 'dns_dmarc'];

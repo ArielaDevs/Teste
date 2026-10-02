@@ -4846,6 +4846,46 @@ return [
         'last_seen_datetime'  => 'DATETIME NULL',
         'dismissed'           => 'TINYINT(1) NOT NULL DEFAULT 0',
     ],
+    // Domains joined to the rest of FreeITSM (3.0.0): four links and the record
+    // of the status incidents a domain raised. Keys and FKs are in
+    // db_verify_indexes.php and api/system/db_verify.php.
+    'domain_cmdb_objects' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'             => 'INT NOT NULL',
+        'cmdb_object_id'        => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'domain_status_services' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'             => 'INT NOT NULL',
+        'service_id'            => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'ticket_domains' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'ticket_id'             => 'INT NOT NULL',
+        'domain_id'             => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'domain_knowledge_articles' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'             => 'INT NOT NULL',
+        'article_id'            => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'domain_status_incidents' => [
+        'id'                => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'         => 'INT NOT NULL',
+        'incident_id'       => 'INT NOT NULL',
+        'trigger_kind'      => 'VARCHAR(30) NOT NULL',
+        'fingerprint'       => 'VARCHAR(100) NOT NULL',
+        'created_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'resolved_datetime' => 'DATETIME NULL',
+    ],
     'domain_certificates' => [
         'id'                  => 'INT NOT NULL AUTO_INCREMENT',
         'domain_id'           => 'INT NOT NULL',

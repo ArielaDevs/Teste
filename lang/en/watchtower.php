@@ -220,6 +220,7 @@ return [
         'expiring'   => '<span class="wt-attention-bold">{count}</span> domain(s) expiring within 30 days',
         'unlocked'   => '<span class="wt-attention-bold">{count}</span> domain(s) without a transfer lock',
         'weak'       => '<span class="wt-attention-bold">{count}</span> domain(s) with a D or F security grade',
+        'services_at_risk' => '<span class="wt-attention-bold">{count}</span> Service Status service(s) at risk from a domain problem',
         'all_clear'  => 'All {count} domains in good order',
         'none'       => 'No domains in the register yet',
     ],

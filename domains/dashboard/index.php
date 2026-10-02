@@ -34,8 +34,8 @@ $translationNamespaces = ['common', 'domains'];
     <script src="../../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../../assets/css/domains.css?v=3">
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=165">
+    <link rel="stylesheet" href="../../assets/css/domains.css?v=6">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=166">
     <script src="../../assets/js/vendor/chart.umd.min.js"></script>
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-dashboard">

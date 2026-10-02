@@ -7333,6 +7333,97 @@ CREATE TABLE IF NOT EXISTS `domain_certificates` (
     CONSTRAINT `fk_domain_certificates_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+-- ---------------------------------------------------------------------------
+-- Domains, joined to the rest of FreeITSM (3.0.0). Four plain links - each is
+-- one row per pair, deleted with either side - and the record of which status
+-- incident a domain raised. A link carries no company of its own: it is only
+-- ever made, and only ever shown, between two records the analyst can already
+-- see (includes/domains/links.php).
+-- ---------------------------------------------------------------------------
+
+-- The configuration items that depend on a domain: what breaks if it lapses.
+CREATE TABLE IF NOT EXISTS `domain_cmdb_objects` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `domain_id`             INT NOT NULL,
+    `cmdb_object_id`        INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_cmdb_obj` (`domain_id`, `cmdb_object_id`),
+    KEY `ix_dco_cmdb_object` (`cmdb_object_id`),
+    CONSTRAINT `fk_dco_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dco_cmdb_object` FOREIGN KEY (`cmdb_object_id`) REFERENCES `cmdb_objects` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dco_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The Service Status services that run on a domain: the ones a lapsed domain
+-- or a failed certificate takes down (Domains -> Settings -> Service Status).
+CREATE TABLE IF NOT EXISTS `domain_status_services` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `domain_id`             INT NOT NULL,
+    `service_id`            INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_status_service` (`domain_id`, `service_id`),
+    KEY `ix_dss_service` (`service_id`),
+    CONSTRAINT `fk_dss_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dss_service` FOREIGN KEY (`service_id`) REFERENCES `status_services` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dss_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tickets about a domain, linked from either side (the ticket's reading pane
+-- or the domain's page) - the same shape as ticket_cmdb_objects.
+CREATE TABLE IF NOT EXISTS `ticket_domains` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `ticket_id`             INT NOT NULL,
+    `domain_id`             INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_ticket_domain` (`ticket_id`, `domain_id`),
+    KEY `ix_ticket_domains_domain` (`domain_id`),
+    CONSTRAINT `fk_td_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_td_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_td_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Runbooks: knowledge articles pinned to a domain ("how to move this domain's
+-- DNS"), linked from the domain or from the article.
+CREATE TABLE IF NOT EXISTS `domain_knowledge_articles` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `domain_id`             INT NOT NULL,
+    `article_id`            INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_article` (`domain_id`, `article_id`),
+    KEY `ix_dka_article` (`article_id`),
+    CONSTRAINT `fk_dka_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dka_article` FOREIGN KEY (`article_id`) REFERENCES `knowledge_articles` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dka_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Status incidents a domain raised by itself (Domains -> Settings -> Service
+-- Status -> raise automatically). One row per (domain, trigger, fingerprint):
+-- the fingerprint carries the date the problem is about, so the same lapse
+-- never raises twice, and renewing re-arms it - the domain_alerts_sent rule.
+-- resolved_datetime is set when the domain recovers and the incident is closed.
+CREATE TABLE IF NOT EXISTS `domain_status_incidents` (
+    `id`                INT NOT NULL AUTO_INCREMENT,
+    `domain_id`         INT NOT NULL,
+    `incident_id`       INT NOT NULL,
+    `trigger_kind`      VARCHAR(30) NOT NULL,
+    `fingerprint`       VARCHAR(100) NOT NULL,
+    `created_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `resolved_datetime` DATETIME NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_status_incident` (`domain_id`, `trigger_kind`, `fingerprint`),
+    KEY `ix_dsi_incident` (`incident_id`),
+    CONSTRAINT `fk_dsi_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dsi_incident` FOREIGN KEY (`incident_id`) REFERENCES `status_incidents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Seed: the domain statuses a fresh install starts with. Only into an empty

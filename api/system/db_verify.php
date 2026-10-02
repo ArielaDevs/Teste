@@ -2726,6 +2726,22 @@ try {
         ['domain_alerts_sent',        'fk_domain_alerts_domain',    "ALTER TABLE domain_alerts_sent ADD CONSTRAINT fk_domain_alerts_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
         ['domain_lookalikes',         'fk_domain_lookalikes_domain', "ALTER TABLE domain_lookalikes ADD CONSTRAINT fk_domain_lookalikes_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
         ['domain_certificates',       'fk_domain_certificates_domain', "ALTER TABLE domain_certificates ADD CONSTRAINT fk_domain_certificates_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        // Domains joined to the rest of FreeITSM (3.0.0). Every link goes with
+        // either side; the analyst who made it can leave without taking it.
+        ['domain_cmdb_objects',       'fk_dco_domain',      "ALTER TABLE domain_cmdb_objects ADD CONSTRAINT fk_dco_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_cmdb_objects',       'fk_dco_cmdb_object', "ALTER TABLE domain_cmdb_objects ADD CONSTRAINT fk_dco_cmdb_object FOREIGN KEY (cmdb_object_id) REFERENCES cmdb_objects (id) ON DELETE CASCADE"],
+        ['domain_cmdb_objects',       'fk_dco_analyst',     "ALTER TABLE domain_cmdb_objects ADD CONSTRAINT fk_dco_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domain_status_services',    'fk_dss_domain',      "ALTER TABLE domain_status_services ADD CONSTRAINT fk_dss_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_status_services',    'fk_dss_service',     "ALTER TABLE domain_status_services ADD CONSTRAINT fk_dss_service FOREIGN KEY (service_id) REFERENCES status_services (id) ON DELETE CASCADE"],
+        ['domain_status_services',    'fk_dss_analyst',     "ALTER TABLE domain_status_services ADD CONSTRAINT fk_dss_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['ticket_domains',            'fk_td_ticket',       "ALTER TABLE ticket_domains ADD CONSTRAINT fk_td_ticket FOREIGN KEY (ticket_id) REFERENCES tickets (id) ON DELETE CASCADE"],
+        ['ticket_domains',            'fk_td_domain',       "ALTER TABLE ticket_domains ADD CONSTRAINT fk_td_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['ticket_domains',            'fk_td_analyst',      "ALTER TABLE ticket_domains ADD CONSTRAINT fk_td_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domain_knowledge_articles', 'fk_dka_domain',      "ALTER TABLE domain_knowledge_articles ADD CONSTRAINT fk_dka_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_knowledge_articles', 'fk_dka_article',     "ALTER TABLE domain_knowledge_articles ADD CONSTRAINT fk_dka_article FOREIGN KEY (article_id) REFERENCES knowledge_articles (id) ON DELETE CASCADE"],
+        ['domain_knowledge_articles', 'fk_dka_analyst',     "ALTER TABLE domain_knowledge_articles ADD CONSTRAINT fk_dka_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domain_status_incidents',   'fk_dsi_domain',      "ALTER TABLE domain_status_incidents ADD CONSTRAINT fk_dsi_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_status_incidents',   'fk_dsi_incident',    "ALTER TABLE domain_status_incidents ADD CONSTRAINT fk_dsi_incident FOREIGN KEY (incident_id) REFERENCES status_incidents (id) ON DELETE CASCADE"],
     ];
     foreach ($domainFks as [$tbl, $name, $sql]) {
         if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;

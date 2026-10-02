@@ -2154,6 +2154,7 @@ function renderArticleDetail() {
             ${currentArticle.body}
         </div>
         <div id="kbDocuments" style="margin-top:24px;"></div>
+        <div id="kbDomains" style="margin-top:16px;"></div>
     `;
 
     // Apply syntax highlighting to any code blocks
@@ -2181,6 +2182,15 @@ function renderArticleDetail() {
             apiBase:    '../api/documents/',
             canEdit:    false,
             showHeading: true      // nothing else on this page names the section
+        });
+    }
+
+    // The domains this article is a runbook for (3.0.0). Listed here, linked in
+    // the editor - the documents rule above: reading is not editing. Nothing at
+    // all when none are linked.
+    if (window.KB_SHOW_DOMAINS && window.DomainLinks) {
+        DomainLinks.mount(document.getElementById('kbDomains'), {
+            kind: 'article', id: currentArticle.id, base: window.KB_BASE, editable: false, hideEmpty: true
         });
     }
 }
@@ -3420,9 +3430,21 @@ function mountEditorDocuments() {
         box.innerHTML = '';
         box.classList.remove('fd-panel');
         if (hint) hint.style.display = id ? 'none' : '';
+        // Nor a domains panel left from the last article: a new one has no id
+        // to link to until it is saved.
+        const leftover = document.getElementById('kbEditorDomains');
+        if (leftover) leftover.innerHTML = '';
         return;
     }
     if (hint) hint.style.display = 'none';
+    // Linking domains lives here with attaching documents (3.0.0).
+    const dom = document.getElementById('kbEditorDomains');
+    // onChange redraws the reading view's list too: Cancel returns to it without
+    // fetching the article again, so it would otherwise show the old links.
+    if (dom && window.DomainLinks) DomainLinks.mount(dom, { kind: 'article', id: id, base: window.KB_BASE, onChange: () => {
+        const read = document.getElementById('kbDomains');
+        if (read) DomainLinks.mount(read, { kind: 'article', id: id, base: window.KB_BASE, editable: false, hideEmpty: true });
+    } });
     FreeITSMDocuments.mount(box, {
         parentType: 'knowledge_article',
         parentId:   id,

@@ -202,6 +202,9 @@ final class Cap
     const DOMAINS_ALERTS     = 'domains.alerts';
     const DOMAINS_MONITORING = 'domains.monitoring';
     const DOMAINS_AUTH_CODES = 'domains.auth_codes';   // reveal / change transfer secrets
+    // SERVICE_STATUS decides whether a domain's problems raise incidents on the
+    // Service Status page, which customers read - sensitive for that reason.
+    const DOMAINS_SERVICE_STATUS = 'domains.service_status';
 
     // ---- Tickets -----------------------------------------------------------
     // The module the whole per-tab design was argued FOR. Fourteen tabs, and they are

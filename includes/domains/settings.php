@@ -33,6 +33,11 @@ if (!defined('DOMAIN_SETTINGS_LOADED')) {
             // Where expiry dates surface: off | dashboard | calendar | both — the
             // same four values Software and Assets use.
             'domain_expiry_surface'        => ['dashboard', 'surface',  'alerts'],
+            // Where CERTIFICATE expiries surface - its own choice, the warranty /
+            // lease rule: two kinds of date, two settings, two calendar markers,
+            // so switching one off never removes the other's entries. Dashboard
+            // by default: the Watchtower card always counted them.
+            'domain_cert_surface'          => ['dashboard', 'surface',  'alerts'],
             // OFF until switched on. Upgrading must never email anybody.
             'domain_alerts_enabled'        => ['0',         'bool',     'alerts'],
             // Days before expiry to warn. 0 = on the day.
@@ -86,6 +91,29 @@ if (!defined('DOMAIN_SETTINGS_LOADED')) {
             // history. On by default: who looked at a transfer secret is exactly
             // the question somebody asks after a domain has been stolen.
             'domain_auth_code_audit'       => ['1',         'bool',     'auth-codes'],
+
+            // ---- Service Status tab (3.0.0) ---------------------------------
+            // What a domain's trouble does to the services linked to it:
+            // off | suggest (a person raises it, one click) | auto (raised by the
+            // scheduled run). Suggest by default: the status page is read by
+            // customers, so nothing reaches it unless somebody chose that.
+            'domain_status_mode'           => ['suggest',   'status_mode', 'service-status'],
+            // Which trouble counts.
+            'domain_status_on_expired'     => ['1',         'bool',     'service-status'],
+            'domain_status_on_cert'        => ['1',         'bool',     'service-status'],
+            // A certificate counts this many days BEFORE it expires (0 = once it
+            // has expired).
+            'domain_status_cert_days'      => ['0',         'int:0:60', 'service-status'],
+            // The impact to record on each service: an impact level id, or blank
+            // for the most severe level that counts as downtime (NOT Service
+            // Status's default level, which is "Operational" on a stock install).
+            'domain_status_impact'         => ['',          'impact',   'service-status'],
+            // Publish the opening update to the status page, or keep it internal
+            // until a person writes to customers. Internal by default - the
+            // Service Status rule (#99) for anything that did not ask.
+            'domain_status_public'         => ['0',         'bool',     'service-status'],
+            // Close the incident by itself when the domain recovers.
+            'domain_status_auto_resolve'   => ['1',         'bool',     'service-status'],
         ];
     }
 
@@ -159,6 +187,12 @@ if (!defined('DOMAIN_SETTINGS_LOADED')) {
                 return in_array($v, ['1', 'true', 'on', 'yes'], true) ? '1' : '0';
             case $rule === 'surface':
                 if (!in_array($v, ['off', 'dashboard', 'calendar', 'both'], true)) throw new InvalidArgumentException('Choose where renewals are shown.');
+                return $v;
+            case $rule === 'status_mode':
+                if (!in_array($v, ['off', 'suggest', 'auto'], true)) throw new InvalidArgumentException('Choose what a domain\'s trouble does on Service Status.');
+                return $v;
+            case $rule === 'impact':
+                if ($v !== '' && !ctype_digit($v)) throw new InvalidArgumentException('Choose an impact level.');
                 return $v;
             case $rule === 'recipients':
                 if (!in_array($v, ['owner', 'list', 'both'], true)) throw new InvalidArgumentException('Choose who receives alerts.');

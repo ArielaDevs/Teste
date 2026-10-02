@@ -12,6 +12,8 @@
         await Promise.all([load(), loadLookups()]);
         const tab = new URLSearchParams(location.search).get('tab');
         if (tab) switchTab(tab);
+        // ?edit=1 - from the register's right-click Edit: straight into the dialog.
+        if (new URLSearchParams(location.search).get('edit') === '1' && D) openEdit();
     });
 
     async function load() {
@@ -19,6 +21,7 @@
             data = await api('get.php?id=' + ID);
             D = data.domain;
             renderHero(); renderOverview(); renderSecurity(); renderCerts(); renderLookalikes(); renderHistory();
+            loadConnections();
         } catch (e) {
             document.getElementById('hero').innerHTML = '<div class="dom-empty">' + esc(e.message) + '</div>';
         }
@@ -207,6 +210,166 @@
         }).join('');
     }
 
+
+    // ---------------------------------------------------------------- connections (3.0.0)
+    // What this domain is part of elsewhere: CIs, Service Status services,
+    // tickets, runbooks and its contract. One card per kind the analyst can open
+    // (the server leaves out the rest); link by searching, unlink with the ✕.
+    // Every rule is server-side in includes/domains/links.php.
+    const KINDS = [
+        { kind: 'cmdb',    icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' },
+        { kind: 'service', icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>' },
+        { kind: 'ticket',  icon: '<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h6"/>' },
+        { kind: 'article', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' },
+    ];
+    let C = null;
+
+    async function loadConnections() {
+        try { C = await api('links.php?domain_id=' + ID); }
+        catch (e) { C = { error: e.message }; }
+        renderConnections();
+    }
+
+    function connIcon(paths) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
+    }
+
+    function riskHtml() {
+        const s = C.status || {};
+        if (!s.ready || !(s.problems || []).length || !s.at_risk || s.mode === undefined) return '';
+        const why = s.problems.map(p => esc(p.kind === 'expired' ? T('links.risk_expired', { date: fmtDate(p.date) })
+            : T(p.date < new Date().toISOString().slice(0, 10) ? 'links.risk_cert_gone' : 'links.risk_cert', { date: fmtDate(p.date) }))).join(' ');
+        let act = '';
+        if (s.incident) {
+            act = '<div class="dom-conn-risk-act">' + esc(T('links.incident_open', { title: s.incident.title }))
+                + ' <a class="dom-btn" href="' + esc(window.DOM_BASE + 'service-status/') + '">' + esc(T('links.incident_view')) + '</a></div>';
+        } else if (s.mode === 'off') {
+            act = '<div class="dom-conn-risk-act dom-sub">' + esc(T('links.mode_off')) + '</div>';
+        } else if (!s.can_raise) {
+            act = '<div class="dom-conn-risk-act dom-sub">' + esc(T('links.cant_raise')) + '</div>';
+        } else {
+            act = '<div class="dom-conn-risk-act">' + (s.mode === 'auto' ? '<span class="dom-sub">' + esc(T('links.mode_auto')) + '</span> ' : '')
+                + '<button type="button" class="dom-btn danger" id="connRaise">' + esc(T('links.raise')) + '</button></div>';
+        }
+        return '<div class="dom-conn-risk" role="alert"><strong>' + esc(T('links.risk_title')) + '</strong> ' + why
+            + ' ' + esc(T('links.risk_body', { n: s.at_risk })) + act + '</div>';
+    }
+
+    function contractHtml() {
+        const has = D && D.contract_id;
+        const label = (data && data.domain && data.domain.contract_label) || '';
+        return '<div class="dom-card dom-conn-card"><div class="dom-card-h"><h3>' + connIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>')
+            + esc(T('links.contract_title')) + '</h3></div><div class="dom-card-b"><p class="dom-hint">' + esc(T('links.contract_hint')) + '</p>'
+            + (has ? '<a class="dom-conn-row-link" href="' + esc(window.DOM_BASE + 'contracts/view.php?id=' + D.contract_id) + '">' + esc(label || ('#' + D.contract_id)) + '</a>'
+                   : '<div class="dom-sub">' + esc(T('links.contract_none')) + '</div>')
+            + ' <button type="button" class="dom-btn" data-goto-edit="1">' + esc(T('links.contract_set')) + '</button></div></div>';
+    }
+
+    function rowHtml(kind, r) {
+        const extra = kind === 'ticket' && r.status
+            ? ' <span class="dom-pill" style="background:' + esc(r.status_colour || '#888') + '22;color:' + esc(r.status_colour || '#666') + '">' + esc(r.status) + '</span>'
+            : (r.inactive ? ' <span class="dom-pill grey">' + esc(T('links.inactive')) + '</span>' : '');
+        return '<li class="dom-conn-row"><div class="dom-conn-row-main"><a class="dom-conn-row-link" href="' + esc(window.DOM_BASE + r.url) + '">' + esc(r.label) + '</a>' + extra
+            + (r.sub ? '<div class="dom-sub">' + esc(r.sub) + '</div>' : '') + '</div>'
+            + '<button type="button" class="dom-conn-x" data-unlink="' + kind + '" data-id="' + r.id + '" title="' + esc(T('links.remove')) + '" aria-label="' + esc(T('links.remove')) + ': ' + esc(r.label) + '">&times;</button></li>';
+    }
+
+    function renderConnections() {
+        const host = document.getElementById('connections');
+        if (!host) return;
+        if (C.error) { host.innerHTML = '<div class="dom-empty">' + esc(C.error) + '</div>'; return; }
+        if (C.ready === false) { host.innerHTML = '<div class="dom-card"><div class="dom-card-b dom-sub">' + esc(T('links.not_ready')) + '</div></div>'; return; }
+        const kinds = KINDS.filter(k => C.links && C.links[k.kind] !== undefined);
+        let total = 0;
+        const cards = kinds.map(k => {
+            const rows = C.links[k.kind];
+            total += rows.length;
+            return '<div class="dom-card dom-conn-card" data-kind="' + k.kind + '"><div class="dom-card-h"><h3>' + connIcon(k.icon) + esc(T('links.' + k.kind + '_title'))
+                + ' <span class="dom-pill grey">' + rows.length + '</span></h3></div><div class="dom-card-b">'
+                + '<p class="dom-hint">' + esc(T('links.' + k.kind + '_hint')) + '</p>'
+                + (rows.length ? '<ul class="dom-conn-list">' + rows.map(r => rowHtml(k.kind, r)).join('') + '</ul>' : '<div class="dom-sub dom-conn-none">' + esc(T('links.none')) + '</div>')
+                + '<div class="dom-person dom-conn-search"><input type="text" data-search="' + k.kind + '" autocomplete="off" placeholder="' + esc(T('links.search_ph')) + '" aria-label="' + esc(T('links.' + k.kind + '_title')) + ': ' + esc(T('links.search_ph')) + '">'
+                + '<ul class="dom-person-results" data-results="' + k.kind + '" role="listbox" hidden></ul></div>'
+                + '</div></div>';
+        }).join('');
+        host.innerHTML = riskHtml() + '<p class="dom-hint dom-conn-intro">' + esc(T('links.intro')) + '</p>'
+            + '<div class="dom-conn-grid">' + contractHtml() + (cards || '') + '</div>'
+            + (kinds.length ? '' : '<div class="dom-sub">' + esc(T('links.nothing_allowed')) + '</div>');
+        const badge = document.getElementById('connBadge');
+        if (badge) badge.innerHTML = total ? '<span class="dom-pill grey">' + total + '</span>' : '';
+        const risk = C.status && C.status.at_risk && (C.status.problems || []).length && !C.status.incident;
+        if (badge && risk) badge.innerHTML = '<span class="dom-pill red">' + total + '</span>';
+    }
+
+    let connTimer = null;
+    async function connSearch(input) {
+        const kind = input.dataset.search;
+        const ul = document.querySelector('[data-results="' + kind + '"]');
+        try {
+            const d = await api('links.php?domain_id=' + ID + '&search=' + encodeURIComponent(kind) + '&q=' + encodeURIComponent(input.value.trim()));
+            const res = d.results || [];
+            ul.innerHTML = res.length
+                ? res.map(r => '<li role="option" tabindex="-1" data-add="' + kind + '" data-id="' + r.id + '">' + esc(r.label) + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</li>').join('')
+                : '<li class="dom-sub" aria-disabled="true">' + esc(T('links.no_match')) + '</li>';
+            ul.hidden = false;
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    function wireConnections() {
+        const host = document.getElementById('connections');
+        if (!host) return;
+        host.addEventListener('input', e => {
+            const inp = e.target.closest('[data-search]');
+            if (!inp) return;
+            clearTimeout(connTimer);
+            connTimer = setTimeout(() => connSearch(inp), 220);
+        });
+        host.addEventListener('focusin', e => { const inp = e.target.closest('[data-search]'); if (inp) connSearch(inp); });
+        host.addEventListener('focusout', e => {
+            const box = e.target.closest('.dom-conn-search');
+            if (box) setTimeout(() => { if (!box.contains(document.activeElement)) box.querySelector('.dom-person-results').hidden = true; }, 150);
+        });
+        // mousedown, not click: the input's blur would hide the list first.
+        host.addEventListener('mousedown', async e => {
+            const li = e.target.closest('[data-add]');
+            if (!li) return;
+            e.preventDefault();
+            try {
+                await api('links.php', { action: 'add', domain_id: ID, kind: li.dataset.add, target_id: Number(li.dataset.id) });
+                showToast(T('links.linked'), 'success');
+                await loadConnections();
+            } catch (err) { showToast(err.message, 'error'); }
+        });
+        host.addEventListener('click', async e => {
+            const x = e.target.closest('[data-unlink]');
+            if (x) {
+                try {
+                    await api('links.php', { action: 'remove', domain_id: ID, kind: x.dataset.unlink, target_id: Number(x.dataset.id) });
+                    showToast(T('links.unlinked'), 'success');
+                    await loadConnections();
+                } catch (err) { showToast(err.message, 'error'); }
+                return;
+            }
+            if (e.target.closest('[data-goto-edit]')) { openEdit(); return; }
+            if (e.target.id === 'connRaise') {
+                busy(e.target, async () => {
+                    await api('links.php', { action: 'raise_incident', domain_id: ID });
+                    showToast(T('links.raised'), 'success');
+                    await loadConnections();
+                });
+            }
+        });
+        host.addEventListener('keydown', e => {
+            const li = e.target.closest('[data-add]');
+            if (li && e.key === 'Enter') { e.preventDefault(); li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+            if (e.key === 'Escape') { const ul = e.target.closest('.dom-conn-search')?.querySelector('.dom-person-results'); if (ul) ul.hidden = true; }
+            if (e.key === 'ArrowDown' && e.target.matches('[data-search]')) {
+                const first = e.target.closest('.dom-conn-search').querySelector('[data-add]');
+                if (first) { e.preventDefault(); first.focus(); }
+            }
+        });
+    }
+
     // ---------------------------------------------------------------- actions
     function switchTab(tab) {
         document.querySelectorAll('#domTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -219,6 +382,7 @@
     }
 
     function wire() {
+        wireConnections();
         document.getElementById('domTabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) switchTab(b.dataset.tab); });
         document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => window.Dom.closeModal(b.dataset.close)));
         document.getElementById('btnRefresh').addEventListener('click', e => busy(e.currentTarget, async () => {

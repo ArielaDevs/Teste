@@ -223,6 +223,7 @@
             const th = e.target.closest('th[data-key]'); if (!th || th.classList.contains('nosort')) return;
             sort = { key: th.dataset.key, dir: sort.key === th.dataset.key ? -sort.dir : 1 }; render();
         });
+        wireCtx();
         document.getElementById('domBody').addEventListener('click', e => {
             const cb = e.target.closest('.cbRow');
             if (cb) {
@@ -499,5 +500,175 @@
             selected.clear();
             await load(false);
         } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // ---------------------------------------------------------------- right-click (3.0.0)
+    // Right-click a domain for what you would otherwise open it to do. One
+    // menu element, built once; submenus fly out and flip at the screen edge -
+    // the Tasks menu's shape (assets/js/tasks-ctx-menu.js). Every action goes
+    // through the same endpoints the domain's own page uses, so the rules and
+    // the history rows are the same.
+    let ctxId = null;
+    const ICON = {
+        open: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+        edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+        refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+        check: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>',
+        status: '<circle cx="12" cy="12" r="9"/>',
+        owner: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        links: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+        globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+        copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+        trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>',
+    };
+    const svg = k => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[k] + '</svg>';
+
+    function ctxMenu() {
+        let m = document.getElementById('domCtx');
+        if (m) return m;
+        m = document.createElement('div');
+        m.id = 'domCtx';
+        m.className = 'dom-ctx';
+        m.setAttribute('role', 'menu');
+        m.hidden = true;
+        document.body.appendChild(m);
+        m.addEventListener('click', onCtxClick);
+        return m;
+    }
+
+    function item(action, icon, label, extra) {
+        return '<button type="button" class="dom-ctx-item' + (extra || '') + '" role="menuitem" data-ctx="' + action + '">' + svg(icon) + '<span class="dom-ctx-label">' + esc(label) + '</span></button>';
+    }
+
+    function sub(label, icon, opts) {
+        return '<div class="dom-ctx-parent" role="none"><button type="button" class="dom-ctx-item" role="menuitem" aria-haspopup="true">' + svg(icon)
+            + '<span class="dom-ctx-label">' + esc(label) + '</span><span class="dom-ctx-arrow">&rsaquo;</span></button><div class="dom-ctx-sub" role="menu">' + opts + '</div></div>';
+    }
+
+    function opt(field, value, label, current, swatch) {
+        return '<button type="button" class="dom-ctx-item' + (current ? ' current' : '') + '" role="menuitemradio" aria-checked="' + (current ? 'true' : 'false') + '" data-field="' + field + '" data-value="' + esc(value) + '">'
+            + (swatch ? '<span class="dom-ctx-swatch" style="background:' + esc(swatch) + '"></span>' : '') + '<span class="dom-ctx-label">' + esc(label) + '</span>'
+            + (current ? '<span class="dom-ctx-check">✓</span>' : '') + '</button>';
+    }
+
+    function openCtx(e, id) {
+        const r = rows.find(x => x.id === id);
+        if (!r) return;
+        e.preventDefault();
+        ctxId = id;
+        const name = r.display_name || r.domain_name;
+        const statuses = (L.statuses || []).filter(s => s.is_active == 1 || String(s.id) === String(r.status_id));
+        const m = ctxMenu();
+        m.innerHTML = '<div class="dom-ctx-head">' + esc(name) + '</div>'
+            + item('open', 'open', T('ctx.open')) + item('open_new', 'open', T('ctx.open_new')) + item('edit', 'edit', T('ctx.edit'))
+            + '<div class="dom-ctx-sep"></div>'
+            + item('refresh', 'refresh', T('ctx.refresh')) + item('check', 'check', T('ctx.check'))
+            + '<div class="dom-ctx-sep"></div>'
+            + sub(T('ctx.status'), 'status', statuses.map(s => opt('status_id', s.id, s.name, String(s.id) === String(r.status_id), s.colour)).join(''))
+            + sub(T('ctx.owner'), 'owner', opt('owner_analyst_id', '', T('ctx.no_owner'), !r.owner_analyst_id)
+                + (L.analysts || []).map(a => opt('owner_analyst_id', a.id, a.name, String(a.id) === String(r.owner_analyst_id))).join(''))
+            + (window.DOM_ME && String(window.DOM_ME) !== String(r.owner_analyst_id) ? item('assign_me', 'owner', T('ctx.assign_me')) : '')
+            + '<div class="dom-ctx-sep"></div>'
+            + item('connections', 'links', T('ctx.connections')) + item('visit', 'globe', T('ctx.visit')) + item('copy', 'copy', T('ctx.copy'))
+            + '<div class="dom-ctx-sep"></div>'
+            + item('delete', 'trash', T('ctx.delete'), ' danger');
+        m.hidden = false;
+        const mw = m.offsetWidth, mh = m.offsetHeight;
+        m.style.left = Math.max(6, Math.min(e.clientX, window.innerWidth - mw - 6)) + 'px';
+        m.style.top = Math.max(6, Math.min(e.clientY, window.innerHeight - mh - 6)) + 'px';
+        m.classList.toggle('flip-sub', e.clientX + mw + 220 > window.innerWidth);
+        m.classList.toggle('flip-sub-v', e.clientY > window.innerHeight * 0.55);
+        const first = m.querySelector('.dom-ctx-item');
+        if (first) first.focus({ preventScroll: true });
+    }
+
+    function closeCtx() {
+        const m = document.getElementById('domCtx');
+        if (m) m.hidden = true;
+        ctxId = null;
+    }
+
+    async function onCtxClick(e) {
+        const b = e.target.closest('.dom-ctx-item');
+        if (!b || ctxId === null) return;
+        if (b.getAttribute('aria-haspopup')) return;               // a submenu's own row
+        const id = ctxId, r = rows.find(x => x.id === id);
+        if (!r) return;
+        const name = r.display_name || r.domain_name;
+        closeCtx();
+        try {
+            if (b.dataset.field) {
+                const v = b.dataset.value === '' ? null : Number(b.dataset.value);
+                await api('bulk_update.php', { ids: [id], fields: { [b.dataset.field]: v } });
+                showToast(T('ctx.updated', { name }), 'success');
+                await load(false);
+                return;
+            }
+            switch (b.dataset.ctx) {
+                case 'open':        location.href = 'view.php?id=' + id; return;
+                case 'open_new':    window.open('view.php?id=' + id, '_blank', 'noopener'); return;
+                case 'edit':        location.href = 'view.php?id=' + id + '&edit=1'; return;
+                case 'connections': location.href = 'view.php?id=' + id + '&tab=connections'; return;
+                case 'visit':       window.open('https://' + r.domain_name, '_blank', 'noopener'); return;
+                case 'copy':
+                    if (await window.copyToClipboard(r.domain_name)) showToast(T('ctx.copied', { name: r.domain_name }), 'success');
+                    return;
+                case 'assign_me':
+                    await api('bulk_update.php', { ids: [id], fields: { owner_analyst_id: Number(window.DOM_ME) } });
+                    showToast(T('ctx.updated', { name }), 'success');
+                    await load(false);
+                    return;
+                case 'refresh':
+                case 'check': {
+                    showToast(T('ctx.working', { name }), 'info');
+                    const lookup = b.dataset.ctx === 'refresh';
+                    const d = await api('process.php', { ids: [id], lookup, check: !lookup });
+                    const res = (d.results || [])[0] || {};
+                    if (lookup && res.lookup_ok === false) showToast(res.lookup_error, 'warning');
+                    else showToast(T('ctx.updated', { name }), 'success');
+                    await load(false);
+                    return;
+                }
+                case 'delete': {
+                    const ok = await showConfirm({ title: T('page.delete_title'), message: T('page.delete_body', { name: r.domain_name }), okLabel: T('bulk.delete_ok'), okClass: 'danger' });
+                    if (!ok) return;
+                    await api('delete.php', { id });
+                    selected.delete(id);
+                    await load(false);
+                    return;
+                }
+            }
+        } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    function wireCtx() {
+        document.getElementById('domBody').addEventListener('contextmenu', e => {
+            const tr = e.target.closest('tr[data-id]');
+            if (!tr) return;
+            openCtx(e, parseInt(tr.dataset.id, 10));
+        });
+        document.addEventListener('click', e => { if (!e.target.closest('#domCtx')) closeCtx(); });
+        document.addEventListener('keydown', e => {
+            const m = document.getElementById('domCtx');
+            if (!m || m.hidden) return;
+            if (e.key === 'Escape') { closeCtx(); return; }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                // Only the top level and the submenu the focus is in.
+                const scope = document.activeElement && document.activeElement.closest('.dom-ctx-sub') || m;
+                const items = [...scope.querySelectorAll(':scope > .dom-ctx-item, :scope > .dom-ctx-parent > .dom-ctx-item')];
+                const i = items.indexOf(document.activeElement);
+                const n = items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length];
+                if (n) { e.preventDefault(); n.focus(); }
+            }
+            if (e.key === 'ArrowRight' && document.activeElement && document.activeElement.getAttribute('aria-haspopup')) {
+                const f = document.activeElement.parentElement.querySelector('.dom-ctx-sub .dom-ctx-item');
+                if (f) { e.preventDefault(); f.focus(); }
+            }
+            if (e.key === 'ArrowLeft' && document.activeElement && document.activeElement.closest('.dom-ctx-sub')) {
+                e.preventDefault(); document.activeElement.closest('.dom-ctx-parent').querySelector(':scope > .dom-ctx-item').focus();
+            }
+        });
+        document.addEventListener('scroll', closeCtx, true);
+        window.addEventListener('resize', closeCtx);
     }
 })();

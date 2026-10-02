@@ -36,7 +36,10 @@ $sections = [
     'certs'      => 4,
     'lookalikes' => 3,
     'changes'    => 3,
-    'alerts'     => 6,
+    'alerts'     => 7,
+    'connections'=> 3,
+    'status'     => 4,
+    'rightclick' => 1,
     'accounts'   => 4,
     'schedule'   => 5,
     'companies'  => 3,
@@ -44,8 +47,8 @@ $sections = [
 ];
 if (!$multi) unset($sections['companies']);
 $h = fn(string $k, array $p = []) => htmlspecialchars(t('domains.help.' . $k, $p));
-/** Paragraph text may carry `code` in backticks, rendered as <code>. */
-$para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspecialchars(t('domains.help.' . $k)));
+/** Paragraph text may carry `code` in backticks and **bold**. */
+$para = fn(string $k) => preg_replace(['/\*\*([^*]+)\*\*/', '/`([^`]+)`/'], ['<strong>$1</strong>', '<code>$1</code>'], htmlspecialchars(t('domains.help.' . $k)));
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
@@ -70,7 +73,7 @@ $para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspec
             --on-accent:    var(--dom-on-accent, #fff);
         }
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=165">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=166">
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-help">
     <?php include 'includes/header.php'; ?>

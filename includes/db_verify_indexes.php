@@ -414,4 +414,15 @@ return [
     ['domain_alerts_sent', 'uq_domain_alert', 'unique', '(`domain_id`,`alert_kind`,`fingerprint`)'],
     ['domain_lookalikes', 'uq_domain_lookalike', 'unique', '(`domain_id`,`lookalike`)'],
     ['domain_certificates', 'uq_domain_certificate', 'unique', '(`domain_id`,`crtsh_id`)'],
+    // Domains joined to the rest of FreeITSM (3.0.0)
+    ['domain_cmdb_objects', 'uq_domain_cmdb_obj', 'unique', '(`domain_id`,`cmdb_object_id`)'],
+    ['domain_cmdb_objects', 'ix_dco_cmdb_object', 'key', '(`cmdb_object_id`)'],
+    ['domain_status_services', 'uq_domain_status_service', 'unique', '(`domain_id`,`service_id`)'],
+    ['domain_status_services', 'ix_dss_service', 'key', '(`service_id`)'],
+    ['ticket_domains', 'uq_ticket_domain', 'unique', '(`ticket_id`,`domain_id`)'],
+    ['ticket_domains', 'ix_ticket_domains_domain', 'key', '(`domain_id`)'],
+    ['domain_knowledge_articles', 'uq_domain_article', 'unique', '(`domain_id`,`article_id`)'],
+    ['domain_knowledge_articles', 'ix_dka_article', 'key', '(`article_id`)'],
+    ['domain_status_incidents', 'uq_domain_status_incident', 'unique', '(`domain_id`,`trigger_kind`,`fingerprint`)'],
+    ['domain_status_incidents', 'ix_dsi_incident', 'key', '(`incident_id`)'],
 ];

@@ -16,6 +16,10 @@ requireModuleAccess('knowledge');
 $current_page = 'knowledge';
 $path_prefix = '../';
 $translationNamespaces = ['common', 'knowledge'];
+// Domains an article is a runbook for (3.0.0) - Domains' data, so only for
+// analysts who can open Domains.
+$showDomains = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'domains');
+if ($showDomains) $translationNamespaces[] = 'domains';
 
 // Read the per-analyst sidebar preference server-side so the .sidebar-hover
 // class is on the HTML from the first paint — avoids the flash where the
@@ -48,6 +52,7 @@ $sidebarHoverClass = $sidebarMode === 'hover' ? ' sidebar-hover' : '';
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../assets/css/knowledge.css?v=27">
+    <link rel="stylesheet" href="../assets/css/domain-links.css?v=1">
     <!-- Prism.js for code syntax highlighting -->
     <link rel="stylesheet" href="../assets/css/vendor/prism-tomorrow.min.css">
     <link rel="stylesheet" href="../assets/css/vendor/prism-toolbar.min.css">
@@ -57,7 +62,7 @@ $sidebarHoverClass = $sidebarMode === 'hover' ? ' sidebar-hover' : '';
     <script src="../assets/js/i18n.js?v=3"></script>
     <script src="../assets/js/tinymce/tinymce.min.js"></script>
     <!-- Mobile-friendly overrides (LAYER 17). Linked LAST so its @media rules win ties against knowledge.css. -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=165">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=166">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
@@ -305,6 +310,7 @@ $sidebarHoverClass = $sidebarMode === 'hover' ? ' sidebar-hover' : '';
                              attachment needs something to attach to. -->
                         <div class="editor-documents" id="kbEditorDocumentsWrap">
                             <div id="kbEditorDocuments"></div>
+                            <?php if ($showDomains): ?><div id="kbEditorDomains" style="margin-top:16px;"></div><?php endif; ?>
                             <p class="field-hint" id="kbEditorDocumentsHint" style="display:none;"><?php echo htmlspecialchars(t('knowledge.editor.documents_after_save')); ?></p>
                         </div>
                     </div>
@@ -549,7 +555,9 @@ $sidebarHoverClass = $sidebarMode === 'hover' ? ' sidebar-hover' : '';
     <!-- jsPDF for searchable PDF generation -->
     <script src="../assets/js/vendor/jspdf.umd.min.js"></script>
     <script>window.API_BASE = '../api/knowledge/';</script>
-    <script src="../assets/js/knowledge.js?v=57"></script>
+    <script>window.KB_SHOW_DOMAINS = <?php echo $showDomains ? 'true' : 'false'; ?>; window.KB_BASE = <?php echo json_encode(BASE_URL); ?>;</script>
+    <script src="../assets/js/domain-links.js?v=1"></script>
+    <script src="../assets/js/knowledge.js?v=58"></script>
     <!-- Prism.js for code syntax highlighting when viewing articles -->
     <script src="../assets/js/vendor/prism.min.js"></script>
     <script src="../assets/js/vendor/prism-powershell.min.js"></script>

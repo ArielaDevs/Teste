@@ -49,8 +49,8 @@ $translationNamespaces = ['common', 'domains'];
     <script src="../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/domains.css?v=3">
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=165">
+    <link rel="stylesheet" href="../assets/css/domains.css?v=6">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=166">
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-view">
     <?php include 'includes/header.php'; ?>
@@ -85,6 +85,7 @@ $translationNamespaces = ['common', 'domains'];
             <button type="button" class="tab" data-tab="lookalikes"><?php echo htmlspecialchars(t('domains.tab.lookalikes')); ?> <span id="laBadge"></span></button>
             <button type="button" class="tab" data-tab="history"><?php echo htmlspecialchars(t('domains.tab.history')); ?></button>
             <button type="button" class="tab" data-tab="documents"><?php echo htmlspecialchars(t('domains.tab.documents')); ?></button>
+            <button type="button" class="tab" data-tab="connections"><?php echo htmlspecialchars(t('domains.tab.connections')); ?> <span id="connBadge"></span></button>
         </div>
 
         <div class="tab-content active" id="tab-overview" style="padding:0;background:none;box-shadow:none"><div class="dom-grid" id="overview"></div></div>
@@ -92,6 +93,7 @@ $translationNamespaces = ['common', 'domains'];
         <div class="tab-content" id="tab-certs"><div id="certs"></div></div>
         <div class="tab-content" id="tab-lookalikes"><div id="lookalikes"></div></div>
         <div class="tab-content" id="tab-history"><div id="history" class="dom-timeline"></div></div>
+        <div class="tab-content" id="tab-connections" style="padding:0;background:none;box-shadow:none"><div id="connections"><div class="dom-sub"><?php echo htmlspecialchars(t('common.loading')); ?></div></div></div>
         <div class="tab-content" id="tab-documents">
             <?php require_once '../includes/documents_panel.php'; renderDocumentsPanel('domain', $domainId, '../'); ?>
         </div>
@@ -183,7 +185,7 @@ $translationNamespaces = ['common', 'domains'];
     // The customer links to their People page (#153), for analysts who can open People.
     window.DOM_PEOPLE = <?php echo json_encode(analystCanAccessModule($conn, (int)$_SESSION['analyst_id'], 'people') ? BASE_URL . 'people/' : null); ?>;</script>
     <script src="../assets/js/domains.js?v=1"></script>
-    <script src="../assets/js/domains-view.js?v=3"></script>
+    <script src="../assets/js/domains-view.js?v=5"></script>
     <?php endif; ?>
     <script src="../assets/js/mobile.js?v=70"></script>
 </body>

@@ -14412,6 +14412,12 @@
     body[data-mobile-page="domains-view"] .dom-shell-pad {
         padding-bottom: calc(var(--dom-vbar-h, 64px) + 16px);
     }
+
+    /* ---- 41j. Connections tab (3.0.0): the linked record is the tap target ---
+       An inline <a> ignores min-height (Techniques §30's inline-box note), so it
+       becomes an inline-block with room above and below. */
+    body[data-mobile-page="domains-view"] .dom-conn-row-link { display: inline-block; padding: 6px 0; }
+    body[data-mobile-page="domains-view"] .dom-conn-x { width: 36px; height: 36px; }
 }
 
 @media (max-width: 768px) {

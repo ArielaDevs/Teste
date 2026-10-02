@@ -240,6 +240,8 @@ function render() {
             // Attached documents (discussion #76) — the diagram, the licence, the
             // rack photo. Before activity and danger, which both read as endings.
             '<div class="o2-sec"><div id="cmdbDocuments"></div></div>' +
+            // The domains this CI depends on (3.0.0): what breaks if one lapses.
+            (window.SHOW_DOMAINS ? '<div class="o2-sec"><div id="cmdbDomains"></div></div>' : '') +
             '<div class="o2-sec">' + activityHtml() + '</div>' +
             '<div class="o2-sec">' + dangerHtml() + '</div>' +
         '</div>';
@@ -251,6 +253,13 @@ function render() {
             parentId:   obj.id,
             apiBase:    '../api/documents/',
             showHeading: true      // every other section here carries its own title
+        });
+    }
+
+    if (window.SHOW_DOMAINS && window.DomainLinks && obj && obj.id) {
+        DomainLinks.mount(document.getElementById('cmdbDomains'), {
+            kind: 'cmdb', id: obj.id, base: window.APP_BASE,
+            cardClass: 'o2-card', headClass: 'o2-card-head', titleClass: 'o2-card-title'
         });
     }
 
@@ -666,10 +675,10 @@ function activityHtml() {
 
     const row = (t, isOpen) =>
         '<a class="o2-tik" href="../tickets/?ticket_id=' + t.id + '">' +
-            '<span class="o2-tik-ref">' + esc(t.reference || ('#' + t.id)) + '</span>' +
+            '<span class="o2-tik-ref">' + esc(t.ticket_number || ('#' + t.id)) + '</span>' +
             '<span class="o2-tik-sub">' + esc(t.subject || window.t('cmdb.activity.no_subject')) + '</span>' +
-            '<span class="o2-tik-meta">' + esc(t.status_name || window.t('cmdb.activity.unknown_status')) +
-            (t.priority_name ? ' · ' + esc(t.priority_name) : '') + '</span>' +
+            '<span class="o2-tik-meta">' + esc(t.status || window.t('cmdb.activity.unknown_status')) +
+            (t.priority ? ' · ' + esc(t.priority) : '') + '</span>' +
         '</a>';
 
     return '<div class="o2-card" id="o2Activity">' + head +
