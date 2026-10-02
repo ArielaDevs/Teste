@@ -917,6 +917,13 @@ class AssetsService
      */
     public static function assetsForUser(PDO $conn, ActorContext $ctx, int $userId): ?array
     {
+        // 🔴 The person first. Without this, an analyst limited to one company
+        // could read anybody's email, phones, job title and employee number by
+        // changing user_id - the assets below were scoped, the person was not.
+        // Out of reach reads exactly like "no such person".
+        if (!analystCanAccessUser($conn, $ctx->actorId, $userId)) {
+            return null;
+        }
         // The whole person, not just the name. The screen used to take these from
         // the row it already had in the list, which silently produced a detail
         // panel with no details whenever the person was not IN that list — after
@@ -962,13 +969,16 @@ class AssetsService
         // everybody pointing at her. Leavers are included and flagged rather than
         // hidden: a manager whose reports have all left is worth seeing, and so is
         // a leaver who still has people pointed at them.
+        // Scoped like the list: a report in a company the reader cannot see is
+        // not shown (a manager can have reports in more than one company).
+        [$repTenantSql, $repTenantArgs] = activeTenantFilter($conn, $ctx->actorId, 'r');
         $r = $conn->prepare(
-            "SELECT id, display_name, email, is_active
-               FROM users
-              WHERE manager_id = ?
-              ORDER BY (display_name IS NULL OR display_name = ''), display_name, email"
+            "SELECT r.id, r.display_name, r.email, r.is_active
+               FROM users r
+              WHERE r.manager_id = ? $repTenantSql
+              ORDER BY (r.display_name IS NULL OR r.display_name = ''), r.display_name, r.email"
         );
-        $r->execute([$userId]);
+        $r->execute(array_merge([$userId], $repTenantArgs));
         $user['reports'] = array_map(static function (array $row): array {
             return [
                 'id'        => (int)$row['id'],
