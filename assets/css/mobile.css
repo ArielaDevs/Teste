@@ -14449,6 +14449,7 @@
        heights go: LAYER 2's flex body hands out the remainder. */
     body[data-mobile-module="people"] .ppl-page {
         flex: 1 1 auto;
+        height: auto;                 /* not the desktop's calc(100vh - 62px) */
         min-height: 0;
         overflow-y: auto;
         overflow-x: hidden;
@@ -14619,6 +14620,12 @@
     body[data-mobile-module="people"] .ppl-stat { padding: 10px 12px; }
     body[data-mobile-module="people"] .ppl-stat .v { font-size: 17px; }
     body[data-mobile-module="people"] .ppl-showall { min-height: 44px; }
+    /* Companies: the search under the intro at full width, one card per row
+       (minmax(0, ...) - a bare 320px track would set a floor, §14). */
+    body[data-mobile-page="people-companies"] .ppl-co-search { flex: 1 1 100%; min-height: 44px; }
+    body[data-mobile-page="people-companies"] .ppl-co-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    body[data-mobile-page="people-companies"] .ppl-co-card { padding: 14px 16px; gap: 12px; }
+    body[data-mobile-page="people-companies"] .ppl-co-card:hover { transform: none; }
 }
 
 @media (max-width: 768px) {

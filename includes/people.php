@@ -118,6 +118,65 @@ function peopleCompanies(PDO $conn, int $analystId): array
     ], $rows);
 }
 
+/**
+ * The companies page's cards: peopleCompanies() plus a few figures for each.
+ *
+ * One grouped query per figure rather than companyDetail() per company. Each
+ * figure obeys the company page's own rules, so a card and the page it opens
+ * cannot disagree: a module's figure only for an analyst who can open that
+ * module (null, not 0, otherwise - "no tickets" would be a claim), limited to
+ * the companies they can access, and a record with no company counted under
+ * the Default company, as peopleCompanyMatch() does.
+ */
+function peopleCompanyCards(PDO $conn, int $analystId): array
+{
+    $cards = peopleCompanies($conn, $analystId);
+    if (!$cards) return [];
+    $default = getDefaultTenantId($conn);
+    $can = fn(string $m) => analystCanAccessModule($conn, $analystId, $m);
+    $grouped = function (string $sql, array $args) use ($conn): array {
+        $st = $conn->prepare($sql);
+        $st->execute($args);
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_NUM) as $r) $out[(int)$r[0]] = array_map('intval', array_slice($r, 1));
+        return $out;
+    };
+
+    $tickets = null;
+    if ($can('tickets')) {
+        [$scope, $args] = peopleScope($conn, $analystId, 't.tenant_id');
+        $tickets = $grouped(
+            "SELECT COALESCE(t.tenant_id, $default), SUM(COALESCE(ts.is_closed, 0) = 0)
+               FROM tickets t LEFT JOIN ticket_statuses ts ON ts.id = t.status_id
+              WHERE t.deleted_datetime IS NULL $scope GROUP BY 1", $args);
+    }
+    $assets = null;
+    if ($can('assets')) {
+        [$scope, $args] = peopleScope($conn, $analystId, 'a.tenant_id');
+        $assets = $grouped("SELECT COALESCE(a.tenant_id, $default), COUNT(*) FROM assets a WHERE 1=1 $scope GROUP BY 1", $args);
+    }
+
+    // Everyone, leavers included: the company page's People figure counts its
+    // list, which shows leavers (marked). peopleCompanies() counts current only.
+    $everyone = $grouped("SELECT COALESCE(tenant_id, $default), COUNT(*) FROM users GROUP BY 1", []);
+
+    $codes = [];
+    foreach ($conn->query("SELECT id, ticket_code FROM tenants")->fetchAll(PDO::FETCH_KEY_PAIR) as $id => $code) $codes[(int)$id] = $code;
+    $domains = [];
+    try {
+        foreach ($conn->query("SELECT tenant_id, COUNT(*) FROM tenant_domains GROUP BY tenant_id")->fetchAll(PDO::FETCH_KEY_PAIR) as $id => $n) $domains[(int)$id] = (int)$n;
+    } catch (Throwable $e) { /* routing domains are optional */ }
+
+    foreach ($cards as &$c) {
+        $c['people']       = $everyone[$c['id']][0] ?? 0;
+        $c['ticket_code']  = $codes[$c['id']] ?? null;
+        $c['domains']      = $domains[$c['id']] ?? 0;
+        $c['open_tickets'] = $tickets === null ? null : ($tickets[$c['id']][0] ?? 0);
+        $c['assets']       = $assets === null ? null : ($assets[$c['id']][0] ?? 0);
+    }
+    return $cards;
+}
+
 // ---------------------------------------------------------------------------
 //  One person
 // ---------------------------------------------------------------------------

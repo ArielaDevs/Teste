@@ -171,8 +171,9 @@ function pplSections(array $sections, bool $person): string
     return $h;
 }
 
-/** The <head> every People page shares. */
-function pplHead(string $title, array $namespaces = ['common', 'people']): void
+/** The <head> every People page shares. $extraCss: page stylesheets, linked
+ *  BEFORE mobile.css so the mobile layer still wins its ties (Techniques §9). */
+function pplHead(string $title, array $namespaces = ['common', 'people'], array $extraCss = []): void
 {
     ?>
     <link rel="icon" type="image/svg+xml" href="<?php echo BASE_URL; ?>favicon.svg">
@@ -185,8 +186,10 @@ function pplHead(string $title, array $namespaces = ['common', 'people']): void
     <script src="<?php echo BASE_URL; ?>assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/theme.css?v=25">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/people.css?v=2">
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/mobile.css?v=163">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/people.css?v=4">
+    <?php foreach ($extraCss as $css): ?><link rel="stylesheet" href="<?php echo BASE_URL . pplE($css); ?>">
+    <?php endforeach; ?>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/mobile.css?v=165">
     <script>function pplShowAll(b) { b.closest('.ppl-card').querySelectorAll('tr.ppl-extra').forEach(function (r) { r.hidden = false; }); b.remove(); }</script>
     <?php
 }

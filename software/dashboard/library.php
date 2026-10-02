@@ -300,7 +300,7 @@ $translationNamespaces = ['common', 'software'];
             }
         }
     </style>
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=163">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=165">
 </head>
 <body>
     <?php require_once '../includes/header.php'; ?>

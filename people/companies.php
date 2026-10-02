@@ -17,7 +17,7 @@ requireModuleAccess('people');
 
 $conn = connectToDatabase();
 $analystId = (int)$_SESSION['analyst_id'];
-$companies = peopleCompanies($conn, $analystId);
+$companies = peopleCompanyCards($conn, $analystId);
 $multi = isMultiTenant($conn);
 $current_page = 'companies';
 $path_prefix = '../';
@@ -31,24 +31,65 @@ $path_prefix = '../';
     <?php include 'includes/header.php'; ?>
 
     <main class="ppl-page">
-        <p class="ppl-dim ppl-lead"><?php echo pplE(t($multi ? 'people.companies.intro' : 'people.companies.single')); ?></p>
-        <div class="ppl-companies">
-        <?php foreach ($companies as $co): ?>
-            <a class="ppl-company" href="company.php?id=<?php echo $co['id']; ?>">
-                <span class="ppl-avatar company small">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path></svg>
-                </span>
-                <span class="ppl-company-main">
-                    <span class="n"><?php echo pplE($co['name']); ?>
-                        <?php if ($co['is_default'] && $multi): ?><?php echo pplPill(t('people.companies.default'), null, 'muted'); ?><?php endif; ?>
-                        <?php if (!$co['is_active']): ?><?php echo pplPill(t('people.companies.inactive'), null, 'bad'); ?><?php endif; ?>
+        <div class="ppl-co-bar">
+            <p class="ppl-dim ppl-lead"><?php echo pplE(t($multi ? 'people.companies.intro' : 'people.companies.single')); ?></p>
+            <?php if (count($companies) > 1): ?>
+            <input type="search" class="ppl-co-search" id="pplCoSearch" placeholder="<?php echo pplE(t('people.companies.search_ph')); ?>" aria-label="<?php echo pplE(t('people.companies.search_ph')); ?>" autocomplete="off">
+            <?php endif; ?>
+        </div>
+
+        <div class="ppl-co-grid" id="pplCoGrid">
+        <?php foreach ($companies as $co):
+            // Two letters, and a hue from the name, so each company is recognisable
+            // at a glance rather than one more identical building icon.
+            $hue = crc32(mb_strtolower($co['name'])) % 360;
+            $meta = [];
+            if (!empty($co['ticket_code'])) $meta[] = t('people.companies.code', ['code' => $co['ticket_code']]);
+            if ($co['domains'] > 0) $meta[] = $co['domains'] === 1 ? t('people.companies.domains_one') : t('people.companies.domains_n', ['n' => $co['domains']]);
+            $stats = [[$co['people'], t('people.companies.stat_people'), false]];
+            if ($co['open_tickets'] !== null) $stats[] = [$co['open_tickets'], t('people.companies.stat_open'), $co['open_tickets'] > 0];
+            if ($co['assets'] !== null)       $stats[] = [$co['assets'], t('people.companies.stat_assets'), false];
+        ?>
+            <a class="ppl-co-card<?php echo $co['is_active'] ? '' : ' inactive'; ?>" href="company.php?id=<?php echo $co['id']; ?>"
+               data-search="<?php echo pplE(mb_strtolower($co['name'] . ' ' . ($co['ticket_code'] ?? ''))); ?>">
+                <span class="ppl-co-top">
+                    <span class="ppl-co-avatar" style="--co-hue: <?php echo (int)$hue; ?>" aria-hidden="true"><?php echo pplE(pplInitials($co['name'])); ?></span>
+                    <span class="ppl-co-id">
+                        <span class="ppl-co-name"><?php echo pplE($co['name']); ?>
+                            <?php if ($co['is_default'] && $multi): ?><?php echo pplPill(t('people.companies.default'), null, 'muted'); ?><?php endif; ?>
+                            <?php if (!$co['is_active']): ?><?php echo pplPill(t('people.companies.inactive'), null, 'bad'); ?><?php endif; ?>
+                        </span>
+                        <?php if ($meta): ?><span class="ppl-co-meta"><?php echo pplE(implode(' · ', $meta)); ?></span><?php endif; ?>
                     </span>
-                    <span class="c"><?php echo pplE($co['people'] === 1 ? t('people.companies.person') : t('people.companies.people', ['n' => $co['people']])); ?></span>
+                    <svg class="ppl-co-go" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+                </span>
+                <span class="ppl-co-stats">
+                    <?php foreach ($stats as [$v, $label, $hot]): ?>
+                    <span class="ppl-co-stat<?php echo $hot ? ' hot' : ''; ?>"><span class="v"><?php echo (int)$v; ?></span><span class="l"><?php echo pplE($label); ?></span></span>
+                    <?php endforeach; ?>
                 </span>
             </a>
         <?php endforeach; ?>
         </div>
+        <div class="ppl-card ppl-co-none" id="pplCoNone" hidden><div class="ppl-empty"><?php echo pplE(t('people.companies.none_match')); ?></div></div>
     </main>
+    <script>
+    (function () {
+        var input = document.getElementById('pplCoSearch');
+        if (!input) return;
+        var cards = document.querySelectorAll('#pplCoGrid .ppl-co-card');
+        var none = document.getElementById('pplCoNone');
+        input.addEventListener('input', function () {
+            var q = input.value.trim().toLowerCase(), shown = 0;
+            cards.forEach(function (c) {
+                var hit = q === '' || c.getAttribute('data-search').indexOf(q) !== -1;
+                c.hidden = !hit;
+                if (hit) shown++;
+            });
+            none.hidden = shown > 0;
+        });
+    })();
+    </script>
     <script src="<?php echo BASE_URL; ?>assets/js/mobile.js?v=70"></script>
 </body>
 </html>
