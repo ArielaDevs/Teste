@@ -145,45 +145,85 @@ class AssetsService
         // Left blank + enabled -> mint sequentially; explicitly provided -> validate uniqueness.
         require_once __DIR__ . '/asset_tags.php';
         $assignedTag = null;
+        $manualTagLock = null;
         if (array_key_exists('asset_tag', $in) && trim((string)$in['asset_tag']) !== '') {
             $manualTag = trim((string)$in['asset_tag']);
             if (mb_strlen($manualTag) > 64) {
                 throw new ServiceError('validation', 'invalid_field', "'asset_tag' must be at most 64 characters.");
             }
             require_once __DIR__ . '/../asset_labels.php';
-            if (!assetTagAvailable($conn, $storeTenant, $manualTag)) {
-                throw new ServiceError('conflict', 'conflict', "Asset tag '{$manualTag}' is already in use by another asset in this company.");
+
+            // Concurrency guard: serialize manual tag uniqueness check + insert using a tenant-scoped named lock.
+            // Using company scope avoids collation-aware bypass (e.g. tag-001 vs TAG-001 under case-insensitive collations).
+            $lockKey = 'freeitsm_manual_tag_' . ($storeTenant ?? 0);
+            $stmtLock = $conn->prepare("SELECT GET_LOCK(?, 10)");
+            $stmtLock->execute([$lockKey]);
+            $lockAcquired = (int)$stmtLock->fetchColumn();
+            if ($lockAcquired !== 1) {
+                throw new ServiceError(
+                    'server_error',
+                    'tag_lock_failed',
+                    'Could not acquire the asset tag allocation lock.'
+                );
             }
-            $assignedTag = $manualTag;
-        } elseif (AssetTagsService::isAutogenEnabled($conn, $storeTenant)) {
-            $assignedTag = AssetTagsService::generateNextAssetTag($conn, $storeTenant);
+            $manualTagLock = $lockKey;
         }
 
-        if ($assignedTag !== null) {
-            $columns[] = 'asset_tag';
-            $values[]  = $assignedTag;
+        $ownsTx = !$conn->inTransaction();
+        if ($ownsTx) {
+            $conn->beginTransaction();
         }
 
-        // 🔑 first_seen ONLY. `last_seen` means "when did an agent last report
-        // this machine", and nothing has ever reported a television, a SIM card
-        // or a meeting-room monitor — the very things this path exists to add.
-        //
-        // It used to stamp both, which was invisible while last_seen was shown
-        // nowhere. Now that the asset screen and the asset table both show it
-        // (#1578), a hand-added television would read "21 days ago" in amber, as
-        // though it had stopped reporting, and would sit in the Watchtower "not
-        // seen" count alongside machines that genuinely have. NULL is what makes
-        // the screen able to say **Never reported** instead, and it is the
-        // truthful answer rather than a convenient one.
-        //
-        // first_seen stays: when the record was made is a real fact about it.
-        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
-        $sql = "INSERT INTO assets (" . implode(', ', $columns) . ", first_seen)
+        try {
+            if ($manualTagLock !== null) {
+                if (!assetTagAvailable($conn, $storeTenant, $manualTag)) {
+                    throw new ServiceError('conflict', 'conflict', "Asset tag '{$manualTag}' is already in use by another asset in this company.");
+                }
+                $assignedTag = $manualTag;
+            } elseif (AssetTagsService::isAutogenEnabled($conn, $storeTenant)) {
+                $assignedTag = AssetTagsService::generateNextAssetTag($conn, $storeTenant);
+            }
+
+            if ($assignedTag !== null) {
+                $columns[] = 'asset_tag';
+                $values[]  = $assignedTag;
+            }
+
+            // 🔑 first_seen ONLY. `last_seen` means "when did an agent last report
+            // this machine", and nothing has ever reported a television, a SIM card
+            // or a meeting-room monitor — the very things this path exists to add.
+            //
+            // It used to stamp both, which was invisible while last_seen was shown
+            // nowhere. Now that the asset screen and the asset table both show it
+            // (#1578), a hand-added television would read "21 days ago" in amber, as
+            // though it had stopped reporting, and would sit in the Watchtower "not
+            // seen" count alongside machines that genuinely have. NULL is what makes
+            // the screen able to say **Never reported** instead, and it is the
+            // truthful answer rather than a convenient one.
+            //
+            // first_seen stays: when the record was made is a real fact about it.
+            $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+            $sql = "INSERT INTO assets (" . implode(', ', $columns) . ", first_seen)
                 VALUES ($placeholders, UTC_TIMESTAMP())";
-        $conn->prepare($sql)->execute($values);
-        $assetId = (int)$conn->lastInsertId();
 
-        self::auditWrite($conn, $assetId, $ctx->actorId, 'asset_created', null, $creationNote);
+            $conn->prepare($sql)->execute($values);
+            $assetId = (int)$conn->lastInsertId();
+
+            self::auditWrite($conn, $assetId, $ctx->actorId, 'asset_created', null, $creationNote);
+
+            if ($ownsTx) {
+                $conn->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownsTx && $conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        } finally {
+            if ($manualTagLock !== null) {
+                $conn->prepare("SELECT RELEASE_LOCK(?)")->execute([$manualTagLock]);
+            }
+        }
 
         if ((array_key_exists('warranty_expiry', $in) && $in['warranty_expiry'])
             || (array_key_exists('lease_expiry', $in) && $in['lease_expiry'])) {

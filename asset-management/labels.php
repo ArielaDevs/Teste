@@ -45,13 +45,8 @@ if (!empty($_GET['ids'])) {
 }
 $ids = array_slice(array_values(array_unique($ids)), 0, 200);
 
-// Label stock definitions
-$sheets = [
-    '65' => ['dims' => '38.1 × 21.2 mm', 'w' => 38.1, 'h' => 21.2, 'cols' => 5, 'qr' => 16],
-    '40' => ['dims' => '45.7 × 25.4 mm', 'w' => 45.7, 'h' => 25.4, 'cols' => 4, 'qr' => 19],
-    '24' => ['dims' => '63.5 × 33.9 mm', 'w' => 63.5, 'h' => 33.9, 'cols' => 3, 'qr' => 25],
-    '12' => ['dims' => '63.5 × 72 mm',   'w' => 63.5, 'h' => 72.0, 'cols' => 3, 'qr' => 38],
-];
+// Canonical label stock definitions
+$sheets = assetLabelSheetSpecs();
 
 // Resolve default sheet key and URL overrides
 $sheetsKeys = array_keys($sheets);
@@ -412,7 +407,8 @@ $hostIsLocal = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/i', $labelHo
                     <div class="qr"
                          data-url="<?php echo htmlspecialchars($a['url']); ?>"
                          data-has-logo="<?php echo $logoUrl !== '' ? '1' : '0'; ?>"
-                         data-logo-src="<?php echo htmlspecialchars($logoUrl); ?>"></div>
+                         data-logo-src="<?php echo htmlspecialchars($logoUrl); ?>"
+                         data-ec-level="<?php echo assetLabelQrEcLevel($logoUrl !== ''); ?>"></div>
                     <div class="txt">
                         <?php foreach ($selectedFields as $fk):
                             if ($fk === 'asset_tag') {
@@ -487,7 +483,7 @@ document.querySelectorAll('.qr').forEach(function (box) {
         return;
     }
     try {
-        var ecLevel = hasLogo ? 'H' : 'M';
+        var ecLevel = box.getAttribute('data-ec-level') || (hasLogo ? 'H' : 'M');
         var qr = qrcode(0, ecLevel);
         qr.addData(url);
         qr.make();

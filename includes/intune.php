@@ -276,6 +276,12 @@ function intuneLinkDevicesToAssets(PDO $conn, ?int $companyId = null): array {
         }
     }
 
+    // FreeITSM canonical multi-tenancy: normalise Default company to NULL so assets store
+    // tenant_id = NULL for Default company, exactly matching AssetsService::createAsset().
+    require_once __DIR__ . '/tenancy.php';
+    $defaultTenantId = function_exists('getDefaultTenantId') ? getDefaultTenantId($conn) : null;
+    $companyId = ($companyId !== null && $defaultTenantId !== null && $companyId === $defaultTenantId) ? null : $companyId;
+
     $ignoredTags = AssetsService::getIgnoredServiceTags($conn);
 
     // Step 1: Process devices that already have an explicit asset_id link.
@@ -354,23 +360,38 @@ function intuneLinkDevicesToAssets(PDO $conn, ?int $companyId = null): array {
                 $linkOne->execute([':asset_id' => $res['asset_id'], ':id' => $row['id']]);
             } else {
                 // Tier 4: No reliable existing asset identified — create a new stub.
-                $assignedTag = null;
-                if (AssetTagsService::isAutogenEnabled($conn, $companyId)) {
-                    $assignedTag = AssetTagsService::generateNextAssetTag($conn, $companyId);
+                $ownsTx = !$conn->inTransaction();
+                if ($ownsTx) {
+                    $conn->beginTransaction();
                 }
-                $insert->execute([
-                    ':hostname'         => $hostname,
-                    ':manufacturer'     => $row['manufacturer'] !== null ? substr((string)$row['manufacturer'], 0, 50) : null,
-                    ':model'            => $row['model'] !== null ? substr((string)$row['model'], 0, 50) : null,
-                    ':operating_system' => $row['operating_system'] !== null ? substr((string)$row['operating_system'], 0, 50) : null,
-                    ':service_tag'      => $serialTag,
-                    ':asset_tag'        => $assignedTag,
-                    ':tenant_id'        => $companyId,
-                    ':last_seen'        => $row['last_sync_datetime'],
-                ]);
-                $newAssetId = (int)$conn->lastInsertId();
-                $linkOne->execute([':asset_id' => $newAssetId, ':id' => $row['id']]);
-                $stubsCreated++;
+                try {
+                    $assignedTag = null;
+                    if (AssetTagsService::isAutogenEnabled($conn, $companyId)) {
+                        $assignedTag = AssetTagsService::generateNextAssetTag($conn, $companyId);
+                    }
+                    $insert->execute([
+                        ':hostname'         => $hostname,
+                        ':manufacturer'     => $row['manufacturer'] !== null ? substr((string)$row['manufacturer'], 0, 50) : null,
+                        ':model'            => $row['model'] !== null ? substr((string)$row['model'], 0, 50) : null,
+                        ':operating_system' => $row['operating_system'] !== null ? substr((string)$row['operating_system'], 0, 50) : null,
+                        ':service_tag'      => $serialTag,
+                        ':asset_tag'        => $assignedTag,
+                        ':tenant_id'        => $companyId,
+                        ':last_seen'        => $row['last_sync_datetime'],
+                    ]);
+                    $newAssetId = (int)$conn->lastInsertId();
+                    $linkOne->execute([':asset_id' => $newAssetId, ':id' => $row['id']]);
+
+                    if ($ownsTx) {
+                        $conn->commit();
+                    }
+                    $stubsCreated++;
+                } catch (Throwable $e) {
+                    if ($ownsTx && $conn->inTransaction()) {
+                        $conn->rollBack();
+                    }
+                    throw $e;
+                }
             }
         }
     }

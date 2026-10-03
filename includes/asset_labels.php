@@ -40,7 +40,6 @@ const ASSET_TOKEN_BYTES = 10;
 /** Setting keys for physical label & QR configuration */
 const KEY_LABEL_TITLE           = 'asset_label_title';
 const KEY_LABEL_FIELDS          = 'asset_label_fields';
-const KEY_LABEL_SUBTITLE_FIELD   = 'asset_label_subtitle_field'; // Legacy fallback
 const KEY_LABEL_FOOTER          = 'asset_label_footer';
 const KEY_LABEL_LOGO_ENABLED    = 'asset_label_logo_enabled';
 const KEY_LABEL_LOGO_PATH       = 'asset_label_logo_path';
@@ -80,7 +79,14 @@ function assetEnsureToken(PDO $conn, int $assetId): ?string {
             $stmt->execute([$assetId]);
             $now = $stmt->fetchColumn();
             if (!empty($now)) return (string)$now;
-        } catch (Exception $e) { /* Unique violation: retry */ }
+        } catch (PDOException $e) {
+            // Narrow retry: only retry on true duplicate key / unique collision (SQLSTATE 23000 / MySQL 1062)
+            $isDup = ($e->getCode() === '23000' || ($e->errorInfo[1] ?? null) === 1062);
+            if ($isDup) {
+                continue;
+            }
+            throw $e;
+        }
     }
     return null;
 }
@@ -129,6 +135,31 @@ function assetPublicBaseUrl(?PDO $conn = null): string {
         $conn = connectToDatabase();
     }
     return publicBaseUrl($conn);
+}
+
+/**
+ * Canonical commercial A4 label sheet stock specifications.
+ *
+ * @return array<string, array{dims: string, w: float, h: float, cols: int, qr: int}>
+ */
+function assetLabelSheetSpecs(): array {
+    return [
+        '65' => ['dims' => '38.1 × 21.2 mm', 'w' => 38.1, 'h' => 21.2, 'cols' => 5, 'qr' => 16],
+        '40' => ['dims' => '45.7 × 25.4 mm', 'w' => 45.7, 'h' => 25.4, 'cols' => 4, 'qr' => 19],
+        '24' => ['dims' => '63.5 × 33.9 mm', 'w' => 63.5, 'h' => 33.9, 'cols' => 3, 'qr' => 25],
+        '12' => ['dims' => '63.5 × 72 mm',   'w' => 63.5, 'h' => 72.0, 'cols' => 3, 'qr' => 38],
+    ];
+}
+
+/**
+ * Determine QR code error-correction level based on logo presence.
+ *
+ * Invariants:
+ * - No logo: standard Level M (15% redundancy) for maximum module clarity
+ * - With logo: high Level H (30% redundancy) to guarantee reliable scanning with 22% center overlay
+ */
+function assetLabelQrEcLevel(bool $hasLogo): string {
+    return $hasLogo ? 'H' : 'M';
 }
 
 /**
@@ -181,7 +212,6 @@ function assetLabelAvailableFields(PDO $conn, ?int $tenantId = null): array {
  * @return array{
  *   title: string,
  *   fields: array<string>,
- *   subtitle_field: string,
  *   footer: string,
  *   logo_enabled: bool,
  *   logo_path: string,
@@ -222,7 +252,6 @@ function assetLabelPrintFields(PDO $conn, ?int $tenantId = null): array {
 function assetLabelSettings(PDO $conn, ?int $tenantId = null): array {
     $title        = (string)tenantSetting($conn, $tenantId, KEY_LABEL_TITLE, '');
     $rawFields    = (string)tenantSetting($conn, $tenantId, KEY_LABEL_FIELDS, '');
-    $legacySub    = (string)tenantSetting($conn, $tenantId, KEY_LABEL_SUBTITLE_FIELD, '');
     $footer       = (string)tenantSetting($conn, $tenantId, KEY_LABEL_FOOTER, '');
     $logoEnabled      = (string)tenantSetting($conn, $tenantId, KEY_LABEL_LOGO_ENABLED, '0') === '1';
     $customLogoPath   = (string)tenantSetting($conn, $tenantId, KEY_LABEL_LOGO_PATH, '');
@@ -240,10 +269,8 @@ function assetLabelSettings(PDO $conn, ?int $tenantId = null): array {
         } else {
             $fields = array_map('trim', explode(',', $rawFields));
         }
-    } elseif ($legacySub !== '' && $legacySub !== 'none') {
-        $fields = ['asset_tag', $legacySub];
     } else {
-        $fields = ['asset_tag', 'hostname']; // Backward-compatibility default
+        $fields = ['asset_tag', 'hostname']; // Default standard fields
     }
 
     // Filter to valid known fields
@@ -263,11 +290,10 @@ function assetLabelSettings(PDO $conn, ?int $tenantId = null): array {
     return [
         'title'              => $title,
         'fields'             => $validFields,
-        'subtitle_field'     => $validFields[1] ?? 'hostname',
         'footer'             => $footer,
         'logo_enabled'       => $logoEnabled,
         'logo_path'          => $logoPath,
         'custom_logo_path'   => $customLogoPath,
-                'show_field_labels'  => $showFieldLabels,
+        'show_field_labels'  => $showFieldLabels,
     ];
 }

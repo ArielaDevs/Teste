@@ -37,9 +37,11 @@ try {
     $tenantId = null;
     if (isset($data['tenant_id']) && $data['tenant_id'] !== '' && isMultiTenant($conn)) {
         $wanted = (int)$data['tenant_id'];
-        if (analystCanAccessTenant($conn, $analystId, $wanted)) {
-            $tenantId = $wanted;
+        if (!analystCanAccessTenant($conn, $analystId, $wanted)) {
+            echo json_encode(['success' => false, 'error' => 'You do not have access to this company.']);
+            exit;
         }
+        $tenantId = $wanted;
     } else {
         $tenantId = getActiveTenantId($conn, $analystId);
     }
@@ -90,6 +92,8 @@ try {
     $removeLogo = !empty($data['remove_logo']);
     $hasFile = isset($_FILES['logo']) && is_array($_FILES['logo']) && $_FILES['logo']['error'] !== UPLOAD_ERR_NO_FILE;
     $currentCustom = (string)tenantSetting($conn, $tenantId, KEY_LABEL_LOGO_PATH, '');
+    $oldFileToUnlink = null;
+    $newUploadedFilePath = null;
 
     if ($hasFile) {
         $uploadDir = __DIR__ . '/../../system/uploads/branding';
@@ -101,12 +105,13 @@ try {
         // Store new file following identical 2MB and image whitelist rules as branding settings
         $stored = uploadStoreFile($_FILES['logo'], $uploadDir, UPLOAD_TYPES_IMAGE, 2 * 1024 * 1024);
         $newLogoPath = 'system/uploads/branding/' . $stored['stored_name'];
+        $newUploadedFilePath = __DIR__ . '/../../' . $newLogoPath;
 
-        // Clean up previous custom logo if it was an uploaded file and NOT the system branding logo
+        // Schedule previous custom logo for cleanup ONLY after successful settings persistence
         if ($currentCustom !== '' && brandingPathIsSafe($currentCustom)) {
             $prevFile = __DIR__ . '/../../' . $currentCustom;
             if (file_exists($prevFile)) {
-                @unlink($prevFile);
+                $oldFileToUnlink = $prevFile;
             }
         }
         $logoPath = $newLogoPath;
@@ -114,7 +119,7 @@ try {
         if ($currentCustom !== '' && brandingPathIsSafe($currentCustom)) {
             $prevFile = __DIR__ . '/../../' . $currentCustom;
             if (file_exists($prevFile)) {
-                @unlink($prevFile);
+                $oldFileToUnlink = $prevFile;
             }
         }
         $logoPath = '';
@@ -149,6 +154,11 @@ try {
         $upsert($conn, KEY_LABEL_SHOW_FIELD_LABELS, $showFieldLabels);
     }
 
+    // Settings persisted successfully: now safely delete old logo file if replaced or removed
+    if ($oldFileToUnlink !== null && file_exists($oldFileToUnlink)) {
+        @unlink($oldFileToUnlink);
+    }
+
     // Clear static memory cache
     tenantSetting($conn, null, "", null, true);
 
@@ -163,5 +173,9 @@ try {
         'print_fields'     => $printFields,
     ]);
 } catch (Exception $e) {
+    // If file was uploaded but settings persistence failed, remove newly uploaded file to avoid orphans
+    if (isset($newUploadedFilePath) && $newUploadedFilePath !== null && file_exists($newUploadedFilePath)) {
+        @unlink($newUploadedFilePath);
+    }
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

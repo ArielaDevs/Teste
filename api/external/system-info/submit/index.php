@@ -212,51 +212,69 @@ try {
         $isNew = true;
 
         require_once __DIR__ . '/../../../../includes/services/asset_tags.php';
-        $agentAssignedTag = null;
-        if (AssetTagsService::isAutogenEnabled($conn, $keyTenant)) {
-            $agentAssignedTag = AssetTagsService::generateNextAssetTag($conn, $keyTenant);
+
+        $ownsTx = !$conn->inTransaction();
+        if ($ownsTx) {
+            $conn->beginTransaction();
         }
+        try {
+            $agentAssignedTag = null;
+            if (AssetTagsService::isAutogenEnabled($conn, $keyTenant)) {
+                $agentAssignedTag = AssetTagsService::generateNextAssetTag($conn, $keyTenant);
+            }
 
-        $stmt = $conn->prepare("
-            INSERT INTO assets (
-                hostname, manufacturer, model, memory, service_tag,
-                operating_system, feature_release, build_number, cpu_name, speed,
-                bios_version, first_seen, last_seen,
-                domain, logged_in_user, last_boot_utc,
-                tpm_version, bitlocker_status, gpu_name, tenant_id, asset_tag
-            ) VALUES (
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(),
-                ?, ?, ?,
-                ?, ?, ?, ?, ?
-            )
-        ");
-        $stmt->execute([
-            mb_substr($hostname, 0, 50),
-            strOrNull($data, 'manufacturer', 50),
-            strOrNull($data, 'model', 50),
-            intOrNull($data, 'memory'),
-            strOrNull($data, 'service_tag', 50),
-            strOrNull($data, 'operating_system', 50),
-            strOrNull($data, 'feature_release', 10),
-            strOrNull($data, 'build_number', 50),
-            strOrNull($data, 'cpu_name', 250),
-            intOrNull($data, 'speed'),
-            strOrNull($data, 'bios_version', 20),
-            strOrNull($data, 'domain', 100),
-            strOrNull($data, 'logged_in_user', 100),
-            strOrNull($data, 'last_boot_utc'),
-            $tpmVersion,
-            $bitlockerStatus ? mb_substr($bitlockerStatus, 0, 20) : null,
-            $gpuName,
-            $keyTenant,
-            $agentAssignedTag
-        ]);
+            $stmt = $conn->prepare("
+                INSERT INTO assets (
+                    hostname, manufacturer, model, memory, service_tag,
+                    operating_system, feature_release, build_number, cpu_name, speed,
+                    bios_version, first_seen, last_seen,
+                    domain, logged_in_user, last_boot_utc,
+                    tpm_version, bitlocker_status, gpu_name, tenant_id, asset_tag
+                ) VALUES (
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(),
+                    ?, ?, ?,
+                    ?, ?, ?, ?, ?
+                )
+            ");
+            $stmt->execute([
+                mb_substr($hostname, 0, 50),
+                strOrNull($data, 'manufacturer', 50),
+                strOrNull($data, 'model', 50),
+                intOrNull($data, 'memory'),
+                strOrNull($data, 'service_tag', 50),
+                strOrNull($data, 'operating_system', 50),
+                strOrNull($data, 'feature_release', 10),
+                strOrNull($data, 'build_number', 50),
+                strOrNull($data, 'cpu_name', 250),
+                intOrNull($data, 'speed'),
+                strOrNull($data, 'bios_version', 20),
+                strOrNull($data, 'domain', 100),
+                strOrNull($data, 'logged_in_user', 100),
+                strOrNull($data, 'last_boot_utc'),
+                $tpmVersion,
+                $bitlockerStatus ? mb_substr($bitlockerStatus, 0, 20) : null,
+                $gpuName,
+                $keyTenant,
+                $agentAssignedTag
+            ]);
+            $hostId = (int)$conn->lastInsertId();
 
-        $hostId = (int)$conn->lastInsertId();
-    }
+            if ($ownsTx) {
+                $conn->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownsTx && $conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }    }
 } catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Failed to upsert asset', 'detail' => $e->getMessage()]);
+    exit;
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Failed to upsert asset', 'detail' => $e->getMessage()]);
     exit;

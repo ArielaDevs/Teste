@@ -128,22 +128,19 @@ class AssetTagsService
         }
 
         try {
+            // Atomically initialize sequence row if it does not exist yet to guarantee
+            // SELECT ... FOR UPDATE always has an existing row to lock under first-use concurrency.
+            $initNumber = max(1, $config['initial_number']);
+            $insInit = $conn->prepare(
+                "INSERT IGNORE INTO asset_tag_sequences (tenant_id, next_number, updated_datetime) VALUES (?, ?, UTC_TIMESTAMP())"
+            );
+            $insInit->execute([$seqKey, $initNumber]);
+
             $stmt = $conn->prepare("SELECT id, next_number FROM asset_tag_sequences WHERE tenant_id = ? FOR UPDATE");
             $stmt->execute([$seqKey]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$row) {
-                // Initialize sequence row starting at initial_number
-                $currNumber = max(1, $config['initial_number']);
-                $ins = $conn->prepare(
-                    "INSERT INTO asset_tag_sequences (tenant_id, next_number, updated_datetime) VALUES (?, ?, UTC_TIMESTAMP())"
-                );
-                $ins->execute([$seqKey, $currNumber]);
-                $seqId = (int)$conn->lastInsertId();
-            } else {
-                $seqId = (int)$row['id'];
-                $currNumber = max(1, (int)$row['next_number']);
-            }
+            $seqId = (int)$row['id'];
+            $currNumber = max(1, (int)$row['next_number']);
 
             // Safe conflict loop: probe within company scope to leapfrog any legacy collisions
             $chk = $conn->prepare("SELECT id FROM assets WHERE tenant_id <=> ? AND asset_tag = ? LIMIT 1");
@@ -194,21 +191,17 @@ class AssetTagsService
     {
         $seqKey = self::sequenceTenantKey($conn, $tenantId);
         $next = max(1, $nextNumber);
-        $stmt = $conn->prepare("SELECT id, next_number FROM asset_tag_sequences WHERE tenant_id = ?");
-        $stmt->execute([$seqKey]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row) {
-            // Monotonic invariant: an active sequence counter can only move strictly forward.
-            // Never reset or reduce an existing sequence counter.
-            $currentNext = (int)$row['next_number'];
-            if ($next > $currentNext) {
-                $upd = $conn->prepare("UPDATE asset_tag_sequences SET next_number = ?, updated_datetime = UTC_TIMESTAMP() WHERE id = ?");
-                $upd->execute([$next, (int)$row['id']]);
-            }
-        } else {
-            // Initial sequence number initializes a company sequence ONLY when no sequence row exists yet
-            $ins = $conn->prepare("INSERT INTO asset_tag_sequences (tenant_id, next_number, updated_datetime) VALUES (?, ?, UTC_TIMESTAMP())");
-            $ins->execute([$seqKey, $next]);
-        }
+
+        // Atomically initialize row if missing, or conditionally advance forward if next is greater.
+        // Uses MySQL GREATEST() to guarantee next_number can only move forward monotonically, preventing
+        // concurrent race conditions where a lower out-of-order administrative adjustment overwrites a higher one.
+        $stmt = $conn->prepare(
+            "INSERT INTO asset_tag_sequences (tenant_id, next_number, updated_datetime)
+             VALUES (?, ?, UTC_TIMESTAMP())
+             ON DUPLICATE KEY UPDATE
+                 next_number = GREATEST(next_number, VALUES(next_number)),
+                 updated_datetime = UTC_TIMESTAMP()"
+        );
+        $stmt->execute([$seqKey, $next]);
     }
 }

@@ -30,9 +30,11 @@ try {
     $tenantId = null;
     if (isset($_GET['tenant_id']) && $_GET['tenant_id'] !== '' && isMultiTenant($conn)) {
         $wanted = (int)$_GET['tenant_id'];
-        if (analystCanAccessTenant($conn, $analystId, $wanted)) {
-            $tenantId = $wanted;
+        if (!analystCanAccessTenant($conn, $analystId, $wanted)) {
+            echo json_encode(['success' => false, 'error' => 'You do not have access to this company.']);
+            exit;
         }
+        $tenantId = $wanted;
     } else {
         $tenantId = getActiveTenantId($conn, $analystId);
     }

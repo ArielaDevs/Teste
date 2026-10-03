@@ -235,12 +235,150 @@ Test 7: Monotonic Sequence Non-Reduction Protection
     $afterIncrease = AssetTagsService::getAutogenConfig($conn, null)['next_number'];
     assertTest("Allows advancing sequence counter forward to 20", $afterIncrease === 20, "Got: $afterIncrease");
 
+    // ------------------------------------------------------------------
+    // 8. First-Use Sequence Row Initialization
+    // ------------------------------------------------------------------
+    echo "\nTest 8: First-Use Sequence Row Initialization\n";
+    $conn->exec("DELETE FROM asset_tag_sequences WHERE tenant_id = $seqKey");
+    $seqRowBefore = $conn->query("SELECT COUNT(*) FROM asset_tag_sequences WHERE tenant_id = $seqKey")->fetchColumn();
+    assertTest("Sequence row does not exist prior to first allocation", (int)$seqRowBefore === 0);
+
+    $tagFirst = AssetTagsService::generateNextAssetTag($conn, null);
+    $seqRowAfter = $conn->query("SELECT next_number FROM asset_tag_sequences WHERE tenant_id = $seqKey")->fetchColumn();
+    assertTest("First-use allocation initializes and mints tag safely", !empty($tagFirst));
+    assertTest("Sequence counter initialized in database", (int)$seqRowAfter > 0);
+
+    // ------------------------------------------------------------------
+    // 9. Administrative Advancement Monotonic Non-Reduction (Atomic GREATEST)
+    // ------------------------------------------------------------------
+    echo "\nTest 9: Administrative Advancement Monotonic Serialization\n";
+    AssetTagsService::setNextSequenceNumber($conn, null, 100);
+    $cfg100 = AssetTagsService::getAutogenConfig($conn, null)['next_number'];
+    assertTest("Sequence initialized to 100", $cfg100 === 100);
+
+    AssetTagsService::setNextSequenceNumber($conn, null, 300);
+    AssetTagsService::setNextSequenceNumber($conn, null, 200);
+    $cfgAfterRace = AssetTagsService::getAutogenConfig($conn, null)['next_number'];
+    assertTest("Atomic GREATEST preserves highest sequence advancement (stays 300, rejects 200)", $cfgAfterRace === 300);
+
+    // ------------------------------------------------------------------
+    // 10. Manual Tag Collision Rejection
+    // ------------------------------------------------------------------
+    echo "\nTest 10: Manual Tag Collision Rejection\n";
+    $idManual1 = AssetsService::createAsset($conn, $ctx, [
+        'hostname'  => 'ZZTAG-MAN-COL-01',
+        'asset_tag' => 'TAG-COL-EXACT',
+    ], 'Manual tag 1');
+    $createdAssetIds[] = $idManual1;
+
+    $manualDuplicateCaught = false;
+    try {
+        AssetsService::createAsset($conn, $ctx, [
+            'hostname'  => 'ZZTAG-MAN-COL-02',
+            'asset_tag' => 'TAG-COL-EXACT',
+        ], 'Manual tag duplicate');
+    } catch (ServiceError $se) {
+        if ($se->code === 'conflict') {
+            $manualDuplicateCaught = true;
+        }
+    }
+    assertTest("Rejects duplicate manual tag within company scope with ServiceError conflict", $manualDuplicateCaught);
+
+    // ------------------------------------------------------------------
+    // 11. Sequence Rollback On Failed Asset Creation
+    // ------------------------------------------------------------------
+    echo "\nTest 11: Sequence Rollback On Failed Asset Creation\n";
+    $seqBeforeFail = (int)$conn->query("SELECT next_number FROM asset_tag_sequences WHERE tenant_id = $seqKey")->fetchColumn();
+    $conn->exec("DROP TRIGGER IF EXISTS trg_test_fail_insert");
+    $conn->exec("CREATE TRIGGER trg_test_fail_insert BEFORE INSERT ON assets FOR EACH ROW BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Simulated asset insert failure'; END;");
+    $insertFailed = false;
+    try {
+        AssetsService::createAsset($conn, $ctx, [
+            'hostname'  => 'ZZTAG-FAIL-01',
+            'asset_tag' => '',
+        ], 'Simulated failure asset');
+    } catch (Throwable $e) {
+        $insertFailed = true;
+    } finally {
+        $conn->exec("DROP TRIGGER IF EXISTS trg_test_fail_insert");
+    }
+    $seqAfterFail = (int)$conn->query("SELECT next_number FROM asset_tag_sequences WHERE tenant_id = $seqKey")->fetchColumn();
+    assertTest("Failed asset insert throws and fails closed", $insertFailed);
+    assertTest("Sequence allocation rolled back on failed creation ($seqBeforeFail preserved)", $seqAfterFail === $seqBeforeFail, "Got: $seqAfterFail, Expected: $seqBeforeFail");
+
+    // ------------------------------------------------------------------
+    // 12. Caller-Owned Transaction Preservation
+    // ------------------------------------------------------------------
+    echo "\nTest 12: Caller-Owned Transaction Preservation\n";
+    $conn->beginTransaction();
+    $idTx = AssetsService::createAsset($conn, $ctx, [
+        'hostname'  => 'ZZTAG-TX-CALLER-01',
+        'asset_tag' => '',
+    ], 'Caller-owned transaction asset');
+    $createdAssetIds[] = $idTx;
+    $stillInTx = $conn->inTransaction();
+    assertTest("createAsset preserves caller-owned active transaction", $stillInTx);
+    // When caller rolls back, the asset and sequence allocation roll back atomically
+    $conn->rollBack();
+    $txAssetCount = (int)$conn->query("SELECT COUNT(*) FROM assets WHERE id = $idTx")->fetchColumn();
+    assertTest("Caller rollback reverts asset row successfully", $txAssetCount === 0);
+
+    // ------------------------------------------------------------------
+    // 13. Intune Ingestion Atomicity & Default Company Normalization
+    // ------------------------------------------------------------------
+    echo "\nTest 13: Intune Ingestion Atomicity & Default Company Normalization\n";
+    require_once __DIR__ . '/../includes/intune.php';
+    require_once __DIR__ . '/../includes/tenancy.php';
+    $defTenantId = function_exists('getDefaultTenantId') ? getDefaultTenantId($conn) : 1;
+
+    // Clean up any stale test devices
+    $conn->exec("DELETE FROM intune_devices WHERE intune_id LIKE 'test-guid-intune-%'");
+
+    // Insert an unlinked Intune device to test Tier 4 stub creation
+    $devName = 'ZZINTUNE-STUB-01';
+    $conn->prepare("INSERT INTO intune_devices (intune_id, device_name, serial_number, last_sync_datetime) VALUES (?, ?, ?, UTC_TIMESTAMP())")
+         ->execute(['test-guid-intune-01', $devName, 'ZZ-INTUNE-SER-01']);
+    $intuneRowId = (int)$conn->lastInsertId();
+
+    // Call intuneLinkDevicesToAssets passing numeric Default-company ID ($defTenantId)
+    $resIntune = intuneLinkDevicesToAssets($conn, $defTenantId);
+    $createdStubId = (int)$conn->query("SELECT asset_id FROM intune_devices WHERE id = $intuneRowId")->fetchColumn();
+    $createdAssetIds[] = $createdStubId;
+
+    $stubTenant = $conn->query("SELECT tenant_id FROM assets WHERE id = $createdStubId")->fetchColumn();
+    $stubTag = $conn->query("SELECT asset_tag FROM assets WHERE id = $createdStubId")->fetchColumn();
+
+    assertTest("Intune stub created and linked to device", $createdStubId > 0);
+    assertTest("Intune stub normalizes Default company numeric ID to NULL", $stubTenant === null);
+    assertTest("Intune stub assigns auto-generated asset tag", !empty($stubTag));
+
+    // Test caller-owned transaction preservation in Intune
+    $conn->beginTransaction();
+    $conn->prepare("INSERT INTO intune_devices (intune_id, device_name, serial_number, last_sync_datetime) VALUES (?, ?, ?, UTC_TIMESTAMP())")
+         ->execute(['test-guid-intune-02', 'ZZINTUNE-STUB-02', 'ZZ-INTUNE-SER-02']);
+    $intuneRowId2 = (int)$conn->lastInsertId();
+
+    $resTx = intuneLinkDevicesToAssets($conn, $defTenantId);
+    $createdStubId2 = (int)$conn->query("SELECT asset_id FROM intune_devices WHERE id = $intuneRowId2")->fetchColumn();
+    $createdAssetIds[] = $createdStubId2;
+
+    $intuneStillInTx = $conn->inTransaction();
+    assertTest("intuneLinkDevicesToAssets preserves caller-owned active transaction", $intuneStillInTx);
+    $conn->rollBack();
+
+    $intuneRevertedCount = (int)$conn->query("SELECT COUNT(*) FROM assets WHERE id = $createdStubId2")->fetchColumn();
+    assertTest("Caller rollback reverts Intune stub asset row", $intuneRevertedCount === 0);
+
+    // Clean up test intune_devices rows
+    $conn->exec("DELETE FROM intune_devices WHERE id IN ($intuneRowId, $intuneRowId2)");
+
     echo "\n======================================================================\n";
-    echo "  ALL TESTS PASSED SUCCESSFULLY!\n";
+    echo "  ALL TESTS PASSED SUCCESSFULLY! (13/13)\n";
     echo "======================================================================\n";
 } finally {
     // Clean up test data
     cleanupTestAssets($conn);
+    $conn->exec("DELETE FROM intune_devices WHERE intune_id LIKE 'test-guid-intune-%'");
     $seqKey = AssetTagsService::sequenceTenantKey($conn, null);
     $conn->exec("DELETE FROM asset_tag_sequences WHERE tenant_id = $seqKey");
     $conn->exec("DELETE FROM system_settings WHERE setting_key LIKE 'asset_tag_%'");

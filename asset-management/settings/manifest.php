@@ -133,9 +133,9 @@ return [
             'cap'          => Cap::ASSETS_TAGS,
             'label_key'    => 'asset-management.settings.tab_asset_labels',
             'grant'        => 'Configure physical asset labels, layout and QR code branding',
-            'setting_keys' => ['asset_label_title', 'asset_label_fields', 'asset_label_subtitle_field',
-                               'asset_label_footer', 'asset_label_logo_enabled',
-                               'asset_label_logo_path', 'asset_label_show_field_labels'],
+            'setting_keys' => ['asset_label_title', 'asset_label_fields', 'asset_label_footer',
+                               'asset_label_logo_enabled', 'asset_label_logo_path',
+                               'asset_label_show_field_labels'],
         ],
         [
             'id'           => 'intune',

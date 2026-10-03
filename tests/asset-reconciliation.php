@@ -509,6 +509,42 @@ Test M: Stale Cross-Company Link + Valid Target Company Serial
     ok("Test M: Company B asset completely untouched", $hostMB === 'HOST-MB-ORIG');
 
     // -------------------------------------------------------------------------
+    // Test O: Hostname Conflict Against Pre-Existing Asset (Identity Hierarchy Precedence)
+    // -------------------------------------------------------------------------
+    echo "\nTest O: Hostname Conflict Against Pre-Existing Asset (Identity Hierarchy Precedence)\n";
+    // Scenario:
+    //   Asset A: serial = SER-CONF-ABC, hostname = MACHINE-A
+    //   Asset B: serial = SER-CONF-XYZ, hostname = MACHINE-B
+    //   Incoming payload: serial = SER-CONF-ABC, hostname = MACHINE-B
+    // Expected Invariants:
+    //   1. Authoritative Tier 2 serial resolves to Asset A (not Asset B).
+    //   2. Attempting to rename Asset A to MACHINE-B conflicts with existing Asset B.
+    //   3. hostname_conflict = true, hostname_updated = false.
+    //   4. In database: Asset A retains MACHINE-A, Asset B retains MACHINE-B.
+    $conn->exec("INSERT INTO assets (hostname, service_tag, first_seen) VALUES ('MACHINE-A', 'SER-CONF-ABC', UTC_TIMESTAMP())");
+    $assetA = (int)$conn->lastInsertId();
+    $cleanupAssetIds[] = $assetA;
+
+    $conn->exec("INSERT INTO assets (hostname, service_tag, first_seen) VALUES ('MACHINE-B', 'SER-CONF-XYZ', UTC_TIMESTAMP())");
+    $assetB = (int)$conn->lastInsertId();
+    $cleanupAssetIds[] = $assetB;
+
+    $reconRes = AssetsService::reconcileAsset($conn, [
+        'service_tag' => 'SER-CONF-ABC',
+        'hostname'    => 'MACHINE-B',
+    ], null, 'conflict-test');
+
+    ok("Test O: Resolves to Asset A via authoritative serial number", $reconRes['asset_id'] === $assetA);
+    ok("Test O: Matched by service_tag (Tier 2 precedence over hostname)", $reconRes['matched_by'] === 'service_tag');
+    ok("Test O: Hostname conflict is flagged", $reconRes['hostname_conflict'] === true);
+    ok("Test O: Conflicting rename is NOT applied", $reconRes['hostname_updated'] === false);
+
+    $dbHostA = $conn->query("SELECT hostname FROM assets WHERE id = {$assetA}")->fetchColumn();
+    $dbHostB = $conn->query("SELECT hostname FROM assets WHERE id = {$assetB}")->fetchColumn();
+    ok("Test O: Asset A preserves its original hostname MACHINE-A", $dbHostA === 'MACHINE-A');
+    ok("Test O: Asset B preserves its original hostname MACHINE-B", $dbHostB === 'MACHINE-B');
+
+    // -------------------------------------------------------------------------
     // Test N: Server-Side Capability & Settings Key Permission Enforcement
     // -------------------------------------------------------------------------
     echo "

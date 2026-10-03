@@ -95,7 +95,10 @@ try {
             $origTenantSettings[] = $r;
         }
     }
-} catch (Exception $e) { /* ignore snapshot errors */ }
+} catch (Throwable $e) {
+    echo "  [FAIL] Failed to establish safety restore snapshot before test execution: " . $e->getMessage() . "\n";
+    exit(1);
+}
 
 try {
     // ======================================================================
@@ -144,9 +147,22 @@ try {
     // ======================================================================
     echo "\nTest 4: Custom Field Discovery (e.g. FAR ID)\n";
 
-    // Create a temporary test custom field "FAR ID"
-    $conn->exec("INSERT INTO asset_fields (field_key, label, field_type, is_deleted) VALUES ('far_id', 'FAR ID', 'text', 0) ON DUPLICATE KEY UPDATE is_deleted = 0");
-    $createdCustomFieldId = (int)$conn->lastInsertId();
+    // Create or isolate test custom field "FAR ID" without overwriting pre-existing state
+    $origCustomField = null;
+    $testCreatedCustomField = false;
+    $cfCheck = $conn->prepare("SELECT id, field_key, label, field_type, is_deleted FROM asset_fields WHERE field_key = 'far_id' LIMIT 1");
+    $cfCheck->execute();
+    $existingCF = $cfCheck->fetch(PDO::FETCH_ASSOC);
+    if ($existingCF) {
+        $origCustomField = $existingCF;
+        $createdCustomFieldId = (int)$existingCF['id'];
+        $conn->prepare("UPDATE asset_fields SET label = 'FAR ID', field_type = 'text', is_deleted = 0 WHERE id = ?")->execute([$createdCustomFieldId]);
+        $testCreatedCustomField = false;
+    } else {
+        $conn->exec("INSERT INTO asset_fields (field_key, label, field_type, is_deleted) VALUES ('far_id', 'FAR ID', 'text', 0)");
+        $createdCustomFieldId = (int)$conn->lastInsertId();
+        $testCreatedCustomField = true;
+    }
 
     $available = assetLabelAvailableFields($conn, null);
     assertTest("Discovers custom field far_id with key cf_far_id", isset($available['cf_far_id']));
@@ -230,25 +246,30 @@ try {
 
     $token1 = assetEnsureToken($conn, $cfAssetId);
     assertTest("Mints 20-character hex opaque token", !empty($token1) && strlen($token1) === 20);
+    assertTest("Token is valid hex string", (bool)preg_match('/^[a-f0-9]{20}$/', $token1));
 
     $tokenUrl = assetLabelUrl($token1, $conn);
     assertTest("QR URL uses opaque /a/<token> payload format", strpos($tokenUrl, '/a/' . $token1) !== false);
 
-    // Re-verify that changing selected fields does NOT alter the QR token
+    // Create a second test asset to verify token uniqueness and independence from asset ID
+    $conn->exec("INSERT INTO assets (hostname, asset_tag, service_tag, manufacturer, model, first_seen) VALUES ('ZZ-LBL-CF-02', 'AST-77002', 'SN-FAR-98', 'Dell', 'Latitude 7440', UTC_TIMESTAMP())");
+    $secondAssetId = (int)$conn->lastInsertId();
+    $tokenB = assetEnsureToken($conn, $secondAssetId);
+
+    assertTest("Tokens for different assets are unique", !empty($tokenB) && $token1 !== $tokenB);
+    assertTest("Token is not derived from asset ID", strpos($token1, (string)$cfAssetId) === false && strpos($tokenB, (string)$secondAssetId) === false);
+
+    // Re-verify that changing selected fields does NOT alter the QR token (stability)
     $token2 = assetEnsureToken($conn, $cfAssetId);
-    assertTest("QR token remains invariant across field configuration changes", $token1 === $token2);
+    assertTest("QR token remains invariant and stable across calls", $token1 === $token2);
 
     // ======================================================================
-    // Test 9: Client-Side QR Error Correction Selection Logic
+    // Test 9: Production QR Error Correction Level Selection
     // ======================================================================
     echo "\nTest 9: QR Error Correction Selection Logic\n";
 
-    function getQrEcLevel(bool $hasLogo): string {
-        return $hasLogo ? 'H' : 'M';
-    }
-
-    assertTest("No-logo mode uses standard error-correction 'M'", getQrEcLevel(false) === 'M');
-    assertTest("Logo mode uses Error Correction Level 'H' for higher error-correction capacity", getQrEcLevel(true) === 'H');
+    assertTest("No-logo mode uses standard error-correction 'M' via production helper", assetLabelQrEcLevel(false) === 'M');
+    assertTest("Logo mode uses Error Correction Level 'H' (30% redundancy) via production helper", assetLabelQrEcLevel(true) === 'H');
 
     // ======================================================================
     // Test 10: Canonical Public URL Resolution Hierarchy
@@ -293,8 +314,16 @@ try {
         $conn->exec("DELETE FROM asset_history WHERE asset_id IN (SELECT id FROM assets WHERE hostname LIKE 'ZZ-LBL-%')");
         $conn->exec("DELETE FROM assets WHERE hostname LIKE 'ZZ-LBL-%'");
 
-        if ($createdCustomFieldId > 0) {
+        if (isset($testCreatedCustomField) && $testCreatedCustomField && $createdCustomFieldId > 0) {
             $conn->prepare("DELETE FROM asset_fields WHERE id = ?")->execute([$createdCustomFieldId]);
+        } elseif (isset($origCustomField) && $origCustomField !== null) {
+            $restoreCF = $conn->prepare("UPDATE asset_fields SET label = ?, field_type = ?, is_deleted = ? WHERE id = ?");
+            $restoreCF->execute([
+                $origCustomField['label'],
+                $origCustomField['field_type'],
+                $origCustomField['is_deleted'],
+                $origCustomField['id'],
+            ]);
         }
 
         // Restore public_base_url

@@ -451,7 +451,35 @@ $translationNamespaces = ['common', 'asset-management'];
                     </div>
                 </div>
 
-                <!-- Section 8: Servers & vCenter -->
+                <!-- Section 8: Asset tag auto-generation -->
+                <div class="help-section" id="asset-tags">
+                    <div class="help-section-header">
+                        <span class="help-section-num">8</span>
+                        <h3><?php echo htmlspecialchars(t('asset-management.help.asset_tags.heading')); ?></h3>
+                    </div>
+                    <p><?php echo t('asset-management.help.asset_tags.intro'); ?></p>
+
+                    <div class="help-list">
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_tags.monotonic_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_tags.monotonic_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_tags.lifecycle_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_tags.lifecycle_text'); ?></div>
+                    </div>
+                </div>
+
+                <!-- Section 9: Physical asset labels & QR customisation -->
+                <div class="help-section" id="asset-labels">
+                    <div class="help-section-header">
+                        <span class="help-section-num">9</span>
+                        <h3><?php echo htmlspecialchars(t('asset-management.help.asset_labels.heading')); ?></h3>
+                    </div>
+                    <p><?php echo t('asset-management.help.asset_labels.intro'); ?></p>
+
+                    <div class="help-list">
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_labels.fields_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_labels.fields_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_labels.qr_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_labels.qr_text'); ?></div>
+                    </div>
+                </div>
+
+                <!-- Section 10: Servers & vCenter -->
                 <div class="help-section" id="servers">
                     <div class="help-section-header">
                         <span class="help-section-num">10</span>
@@ -634,7 +662,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
 <div class="help-section" id="tips">
                     <div class="help-section-header">
-                        <span class="help-section-num">15</span>
+                        <span class="help-section-num">17</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_tips')); ?></h3>
                     </div>
                     <div class="help-cards">

@@ -131,26 +131,43 @@ try {
     } else {
         // Host does not exist -> insert (stamped with this key's company)
         require_once __DIR__ . '/../../../../includes/services/asset_tags.php';
-        $softAssignedTag = null;
-        if (AssetTagsService::isAutogenEnabled($conn, $keyTenant)) {
-            $softAssignedTag = AssetTagsService::generateNextAssetTag($conn, $keyTenant);
-        }
-        $stmt = $conn->prepare("INSERT INTO assets (hostname, tenant_id, asset_tag, first_seen, last_seen) VALUES (?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
-        $stmt->execute([$hostname, $keyTenant, $softAssignedTag]);
 
-        // Re-select to get id (scoped to this key's company)
-        $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ?");
-        $stmt->execute([$hostname, $keyTenant]);
-        $hostRow2 = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$hostRow2 || !isset($hostRow2['id'])) {
-            http_response_code(500);
-            echo json_encode(['error' => 'Could not obtain host id after insert']);
-            exit;
+        $ownsTx = !$conn->inTransaction();
+        if ($ownsTx) {
+            $conn->beginTransaction();
         }
-        $hostId = (int)$hostRow2['id'];
-    }
+        try {
+            $softAssignedTag = null;
+            if (AssetTagsService::isAutogenEnabled($conn, $keyTenant)) {
+                $softAssignedTag = AssetTagsService::generateNextAssetTag($conn, $keyTenant);
+            }
+            $stmt = $conn->prepare("INSERT INTO assets (hostname, tenant_id, asset_tag, first_seen, last_seen) VALUES (?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
+            $stmt->execute([$hostname, $keyTenant, $softAssignedTag]);
+
+            // Re-select to get id (scoped to this key's company)
+            $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ?");
+            $stmt->execute([$hostname, $keyTenant]);
+            $hostRow2 = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$hostRow2 || !isset($hostRow2['id'])) {
+                throw new PDOException('Could not obtain host id after insert');
+            }
+            $hostId = (int)$hostRow2['id'];
+
+            if ($ownsTx) {
+                $conn->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownsTx && $conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }    }
 } catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Failed to process host: ' . $e->getMessage()]);
+    exit;
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Failed to process host: ' . $e->getMessage()]);
     exit;
