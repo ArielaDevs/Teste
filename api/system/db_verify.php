@@ -2774,6 +2774,11 @@ try {
         try { $conn->exec($sql); } catch (Exception $e) {}
     }
 
+    // Photo Album: an analyst's pictures go with them.
+    if ($tableExists('photo_album') && !$fkExists('photo_album', 'fk_photo_album_analyst')) {
+        try { $conn->exec("ALTER TABLE photo_album ADD CONSTRAINT fk_photo_album_analyst FOREIGN KEY (analyst_id) REFERENCES analysts (id) ON DELETE CASCADE"); } catch (Exception $e) {}
+    }
+
     // Forms-module foreign keys (db_verify $schema only builds columns + PK;
     // grown installs had NONE of the four freeitsm.sql constraints, and
     // parent_form_id — the #442 version chain — never had one anywhere).

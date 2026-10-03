@@ -7546,6 +7546,27 @@ CREATE TABLE IF NOT EXISTS `cost_centres` (
     CONSTRAINT `fk_cost_centres_parent` FOREIGN KEY (`parent_id`) REFERENCES `cost_centres` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_cost_centres_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- System -> Photo Album: a webcam photo turned into ASCII art, in the browser.
+-- 🔑 The PHOTO is never sent here - only the art (text), its colours when the
+-- Colour palette is used, and a small JPEG of the art for the album grid.
+-- Personal: each analyst sees and deletes only their own.
+CREATE TABLE IF NOT EXISTS `photo_album` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `analyst_id`       INT NOT NULL,
+    `title`            VARCHAR(150) NOT NULL,
+    `style`            VARCHAR(20) NOT NULL DEFAULT 'braille',  -- braille | classic | blocks
+    `palette`          VARCHAR(20) NOT NULL DEFAULT 'green',    -- green | amber | paper | colour
+    `width_chars`      SMALLINT NOT NULL,
+    `height_chars`     SMALLINT NOT NULL,
+    `art`              MEDIUMTEXT NOT NULL,                     -- the characters, one line per row
+    `colours`          MEDIUMTEXT NULL,                         -- base64 RGB, 3 bytes per character; Colour palette only
+    `thumbnail`        MEDIUMTEXT NOT NULL,                     -- data:image/jpeg;base64 of the art, for the album grid
+    `created_datetime` DATETIME NOT NULL,                       -- UTC
+    PRIMARY KEY (`id`),
+    KEY `ix_photo_album_analyst` (`analyst_id`, `created_datetime`),
+    CONSTRAINT `fk_photo_album_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Seed: the domain statuses a fresh install starts with. Only into an empty

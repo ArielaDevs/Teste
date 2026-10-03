@@ -433,4 +433,5 @@ return [
     ['domain_status_incidents', 'ix_dsi_incident', 'key', '(`incident_id`)'],
     ['cost_centres', 'uq_cost_centres_code', 'unique', '(`tenant_id`,`code`)'],
     ['cost_centres', 'ix_cost_centres_parent', 'key', '(`parent_id`)'],
+    ['photo_album', 'ix_photo_album_analyst', 'key', '(`analyst_id`,`created_datetime`)'],
 ];

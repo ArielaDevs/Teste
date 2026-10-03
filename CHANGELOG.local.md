@@ -22,6 +22,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2130 | System            | Improvement | Cost centres screen: Edit and Delete are pencil and bin icon buttons matching Tickets -> Settings; Active (edit modal) and "make missing inactive" (import) are toggle switches, hint wording now says switch off/on; the page's own company drop-down removed - the list follows the header company switcher (help page updated). |
 | 2131 | System            | Improvement | Cost centres follow the header switcher's "All companies": the list shows every reachable company with a Company column (grouped and searchable by company); Add and Import ask which company, Edit keeps a cost centre in its own and offers only same-company parents, Export lists each company separately; single-company view unchanged. |
 | 2132 | System            | Improvement | Cost centres: the page introduction uses the full width instead of stopping at 820px. |
+| 2133 | System            | Feature     | System -> Photo Album (just for fun): the webcam picture turned into ASCII art live in the browser with no AI - Braille (2x4 dots per character, Atkinson dithering), Classic (70-step ramp) or Blocks (Floyd-Steinberg), green/amber/paper/colour screens, detail/brightness/contrast/sharpen sliders, mirror, flip camera, Upload fallback when there is no https; Copy, .txt and .png; personal album in new table photo_album (art + colours + JPEG thumbnail only - the photo never leaves the browser), help page, Feature Bingo card system.photo_album. |
 
 
 

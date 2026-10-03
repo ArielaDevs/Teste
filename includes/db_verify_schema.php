@@ -4983,4 +4983,19 @@ return [
         'updated_datetime' => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
         'is_demo'          => 'TINYINT(1) NOT NULL DEFAULT 0',   // set by the demo data importer (#1297)
     ],
+    // System -> Photo Album: webcam photos as ASCII art. Only the art is stored,
+    // never the photo. Personal to each analyst.
+    'photo_album' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'analyst_id'       => 'INT NOT NULL',
+        'title'            => 'VARCHAR(150) NOT NULL',
+        'style'            => "VARCHAR(20) NOT NULL DEFAULT 'braille'",
+        'palette'          => "VARCHAR(20) NOT NULL DEFAULT 'green'",
+        'width_chars'      => 'SMALLINT NOT NULL',
+        'height_chars'     => 'SMALLINT NOT NULL',
+        'art'              => 'MEDIUMTEXT NOT NULL',
+        'colours'          => 'MEDIUMTEXT NULL',
+        'thumbnail'        => 'MEDIUMTEXT NOT NULL',
+        'created_datetime' => 'DATETIME NOT NULL',
+    ],
 ];

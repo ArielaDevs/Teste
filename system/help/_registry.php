@@ -315,6 +315,20 @@ function getHelpTopics() {
                      . ' kostenstelle excel xlsx csv import export spreadsheet leading zero zeros 0010 hierarchy parent child'
                      . ' inactive retire sync nightly rest api',
         ],
+        // Photo Album - just for fun.
+        'photo-album' => [
+            'hero' => 'Photo Album',
+            'sub'  => 'Take your picture with the webcam and turn it into ASCII art - live, in your browser, with no AI involved.',
+            'sections' => [
+                ['id' => 'overview', 'label' => 'What it does'],
+                ['id' => 'camera',   'label' => 'Taking a picture'],
+                ['id' => 'styles',   'label' => 'Styles and screens'],
+                ['id' => 'adjust',   'label' => 'Getting a good likeness'],
+                ['id' => 'album',    'label' => 'Your album and privacy'],
+            ],
+            'terms' => 'photo album picture webcam camera selfie ascii art braille text art fun green screen amber colour'
+                     . ' dithering contrast brightness sharpen upload copy download png txt https secure camera blocked',
+        ],
         'status-portal' => [
             'hero' => 'Service status on the portal',
             'sub'  => 'Whether the people who raise tickets also see the incidents behind an outage, and the updates your team has marked as external — and how much history to show them.',

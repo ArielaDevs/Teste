@@ -647,6 +647,20 @@ return [
         'check'    => ['rows', 'cost_centres', 'is_active = 1 AND is_demo = 0'],
     ],
 
+    // ───────────────────────── Photo Album (just for fun) ─────────────────────────
+    [
+        'id'       => 'system.photo_album',
+        'module'   => 'system',
+        'tier'     => 'extra',
+        'category' => 'look',
+        'title'    => 'Photo Album',
+        'what'     => 'Your webcam picture turned into ASCII art, live as you move - Braille, classic characters or blocks, on a green, amber, paper or full-colour screen.',
+        'why'      => 'No reason at all, except that it is fun. The photo never leaves your browser; only the art is kept, and only if you save it.',
+        'done'     => 'At least one picture has been saved to an album.',
+        'link'     => 'system/photo-album/',
+        'check'    => ['rows', 'photo_album'],
+    ],
+
     // ───────────────────────── Encryption & maintenance ─────────────────────────
     [
         'id'       => 'system.encryption_key',
