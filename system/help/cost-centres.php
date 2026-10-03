@@ -19,7 +19,7 @@ require __DIR__ . '/_top.php';
         </div>
     </div>
     <p>Each cost centre has a <strong>code</strong>, a <strong>name</strong>, an optional <strong>description</strong>, an optional <strong>parent</strong> and is either <strong>active</strong> or <strong>inactive</strong>. You manage them on <strong>System &rarr; Cost Centres</strong>.</p>
-    <p><strong>Every cost centre belongs to one company.</strong> If you run several companies from one install, the list shown is for the company chosen in the company switcher in the top bar; each company has its own list, and two companies can both have a cost centre 0010 without getting in each other's way. If you have only ever had one company there is nothing to choose and nothing to think about.</p>
+    <p><strong>Every cost centre belongs to one company.</strong> If you run several companies from one install, the list shown is for the company chosen in the company switcher in the top bar; each company has its own list, and two companies can both have a cost centre 0010 without getting in each other's way. Choose <strong>All companies</strong> in the switcher to see every company's cost centres at once, with a Company column; Add and Import then ask which company, and Export lists each company separately, because a file is always one company's list. If you have only ever had one company there is nothing to choose and nothing to think about.</p>
     <div class="help-note"><strong>This is the list itself.</strong> Charging assets and service bookings to a cost centre comes next. Setting up the list now means it is ready, and already in step with your finance system, when that arrives.</div>
 </div>
 

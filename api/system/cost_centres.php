@@ -2,7 +2,8 @@
 /**
  * API: System -> Cost Centres (GH #160, stage 1).
  *
- *   GET  ?action=list&company_id=N                    the company's cost centres (+ the companies to choose from)
+ *   GET  ?action=list&company_id=N                    the company's cost centres (+ the companies to choose from);
+ *                                                     every reachable company's when the header switcher is on "All companies"
  *   POST {action:'save', id?, company_id, code, name, description, parent_id, is_active}
  *   POST {action:'delete', id}
  *   GET  ?action=export&company_id=N&format=xlsx|csv  download the list
@@ -68,18 +69,30 @@ try {
     }
 
     if ($method === 'GET' && $action === 'list') {
-        $rows = CostCentresService::listForCompany($conn, $actor, $companyId);
+        // "All companies" in the header switcher (#1554): every company this
+        // analyst may manage, each row saying which one it is. Otherwise just the
+        // one company. company_id stays the company a NEW one would go into.
+        $all = isActiveTenantAll($conn) && count($companies) > 1;
+        $out = [];
+        foreach ($companies as $c) {
+            if (!$all && $c['id'] !== $companyId) continue;
+            foreach (CostCentresService::listForCompany($conn, $actor, $c['id']) as $r) {
+                $out[] = [
+                    'id'           => (int)$r['id'],
+                    'company_id'   => $c['id'],
+                    'company_name' => $c['name'],
+                    'code'         => $r['code'],
+                    'name'         => $r['name'],
+                    'description'  => $r['description'],
+                    'parent_id'    => $r['parent_id'] === null ? null : (int)$r['parent_id'],
+                    'is_active'    => (int)$r['is_active'] === 1,
+                    'child_count'  => (int)$r['child_count'],
+                ];
+            }
+        }
         echo json_encode([
-            'success' => true, 'ready' => true, 'companies' => $companies, 'company_id' => $companyId,
-            'cost_centres' => array_map(fn($r) => [
-                'id'          => (int)$r['id'],
-                'code'        => $r['code'],
-                'name'        => $r['name'],
-                'description' => $r['description'],
-                'parent_id'   => $r['parent_id'] === null ? null : (int)$r['parent_id'],
-                'is_active'   => (int)$r['is_active'] === 1,
-                'child_count' => (int)$r['child_count'],
-            ], $rows),
+            'success' => true, 'ready' => true, 'all' => $all, 'companies' => $companies, 'company_id' => $companyId,
+            'cost_centres' => $out,
         ]);
         exit;
     }

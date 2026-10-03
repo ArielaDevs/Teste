@@ -71,6 +71,10 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
         .cc-export-menu a { display: block; padding: 8px 12px; border-radius: 5px; font-size: 13px; color: var(--text, #333); text-decoration: none; }
         .cc-export-menu a:hover { background: var(--surface-2, #eceff1); }
         .cc-export-menu small { display: block; color: var(--text-dim, #888); font-size: 11.5px; }
+        .cc-export-menu { max-height: 70vh; overflow-y: auto; }
+        .cc-export-company { padding: 8px 12px 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim, #888); }
+        .cc-export-company:not(:first-child) { border-top: 1px solid var(--border-soft, #eee); margin-top: 4px; padding-top: 10px; }
+        .cc-company { white-space: nowrap; color: var(--text-muted, #666); }
 
         .cc-table-wrap { overflow-x: auto; }
         .cc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -173,6 +177,7 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             <div class="cc-table-wrap">
                 <table class="cc-table">
                     <thead><tr>
+                        <th id="ccColCompany" hidden><?php echo htmlspecialchars($ccT('company')); ?></th>
                         <th><?php echo htmlspecialchars($ccT('col_code')); ?></th>
                         <th><?php echo htmlspecialchars($ccT('col_name')); ?></th>
                         <th class="cc-desc"><?php echo htmlspecialchars($ccT('col_description')); ?></th>
@@ -190,6 +195,10 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
         <div class="cc-modal" role="dialog" aria-modal="true" aria-labelledby="ccEditTitle">
             <div class="cc-modal-head" id="ccEditTitle"></div>
             <div class="cc-modal-body">
+                <div class="cc-field" id="ccCompanyField" hidden>
+                    <label for="ccCompany"><?php echo htmlspecialchars($ccT('company')); ?></label>
+                    <select id="ccCompany"></select>
+                </div>
                 <div class="cc-field">
                     <label for="ccCode"><?php echo htmlspecialchars($ccT('field_code')); ?></label>
                     <input type="text" id="ccCode" maxlength="50" autocomplete="off" spellcheck="false">
@@ -228,6 +237,10 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
                 <div id="ccImportStep1">
                     <div class="cc-note"><?php echo $ccT('import_help_html'); ?></div>
                     <div class="cc-note"><?php echo $ccT('import_zeros_html'); ?></div>
+                    <div class="cc-field" id="ccImportCompanyField" hidden>
+                        <label for="ccImportCompany"><?php echo htmlspecialchars($ccT('company')); ?></label>
+                        <select id="ccImportCompany"></select>
+                    </div>
                     <div class="cc-field">
                         <label for="ccFile"><?php echo htmlspecialchars($ccT('import_file')); ?></label>
                         <input type="file" id="ccFile" accept=".xlsx,.csv,.txt">
@@ -258,8 +271,10 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
         const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
         const toast = (m, k) => { if (typeof showToast === 'function') showToast(m, k); };
 
-        let companyId = 0;
-        let items = [];          // the company's cost centres, flat
+        let companyId = 0;       // the company a NEW cost centre goes into
+        let allMode = false;     // header switcher on "All companies": every company's list, with a Company column
+        let companies = [];
+        let items = [];          // the cost centres, flat
         let byId = new Map();
         let editingId = 0;
         // The pencil and bin from Tickets -> Settings, so the two screens match.
@@ -275,15 +290,22 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
                 // The company is the one chosen in the header's company switcher,
                 // which reloads the page on a change - so no picker of our own.
                 companyId = d.company_id;
+                allMode = !!d.all;
+                companies = d.companies || [];
+                $('ccColCompany').hidden = !allMode;
+                paintExportMenu();
                 $('ccVerify').hidden = d.ready;
                 $('ccPanel').hidden = !d.ready;
                 items = d.cost_centres;
                 byId = new Map(items.map(i => [i.id, i]));
                 render();
             } catch (e) {
-                $('ccBody').innerHTML = '<tr><td colspan="5" class="cc-empty">' + esc(T('load_failed', { error: String(e.message || e) })) + '</td></tr>';
+                $('ccBody').innerHTML = '<tr><td colspan="' + cols() + '" class="cc-empty">' + esc(T('load_failed', { error: String(e.message || e) })) + '</td></tr>';
             }
         }
+        const cols = () => allMode ? 6 : 5;
+        const companyOptions = selected => companies.map(c =>
+            '<option value="' + c.id + '"' + (c.id === selected ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
 
 
         // ── The tree ───────────────────────────────────────────────────────
@@ -297,7 +319,9 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
                 if (!kids.has(p)) kids.set(p, []);
                 kids.get(p).push(i);
             });
-            const cmp = (a, b) => a.code.localeCompare(b.code, undefined, { sensitivity: 'base' });
+            // Company first, so "All companies" reads as one block per company.
+            const cmp = (a, b) => (a.company_name || '').localeCompare(b.company_name || '', undefined, { sensitivity: 'base' })
+                || a.code.localeCompare(b.code, undefined, { sensitivity: 'base' });
             const out = [];
             const walk = (p, depth, guard) => {
                 (kids.get(p) || []).sort(cmp).forEach(i => {
@@ -319,7 +343,7 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
                 : '';
 
             if (!items.length) {
-                $('ccBody').innerHTML = '<tr><td colspan="5" class="cc-empty">' + esc(T('empty')) + '</td></tr>';
+                $('ccBody').innerHTML = '<tr><td colspan="' + cols() + '" class="cc-empty">' + esc(T('empty')) + '</td></tr>';
                 return;
             }
 
@@ -328,20 +352,21 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             let visible = items.filter(i => showInactive || i.is_active);
             let matches = null;
             if (q) {
-                matches = new Set(visible.filter(i => (i.code + ' ' + i.name + ' ' + (i.description || '')).toLowerCase().includes(q)).map(i => i.id));
+                matches = new Set(visible.filter(i => (i.code + ' ' + i.name + ' ' + (i.description || '') + (allMode ? ' ' + i.company_name : '')).toLowerCase().includes(q)).map(i => i.id));
                 const keep = new Set(matches);
                 matches.forEach(id => { for (let p = byId.get(id).parent_id, n = 0; p && n < 1000; p = (byId.get(p) || {}).parent_id, n++) keep.add(p); });
                 visible = items.filter(i => keep.has(i.id));
             }
             const rows = treeOrder(visible);
             if (!rows.length) {
-                $('ccBody').innerHTML = '<tr><td colspan="5" class="cc-empty">' + esc(T('none_match')) + '</td></tr>';
+                $('ccBody').innerHTML = '<tr><td colspan="' + cols() + '" class="cc-empty">' + esc(T('none_match')) + '</td></tr>';
                 return;
             }
             $('ccBody').innerHTML = rows.map(({ item: i, depth }) => {
                 const cls = [!i.is_active ? 'is-inactive' : '', matches && !matches.has(i.id) ? 'is-context' : ''].join(' ');
                 const indent = '<span class="cc-tree"></span>'.repeat(Math.max(0, depth - 1)) + (depth ? '<span class="cc-tree">└</span>' : '');
                 return '<tr class="' + cls + '">'
+                    + (allMode ? '<td class="cc-company">' + esc(i.company_name) + '</td>' : '')
                     + '<td class="cc-code">' + indent + esc(i.code) + '</td>'
                     + '<td>' + esc(i.name) + '</td>'
                     + '<td class="cc-desc">' + esc(i.description || '') + '</td>'
@@ -381,29 +406,48 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             return out;
         }
 
+        // The company the open modal is working in: the cost centre's own when
+        // editing, the picker's when adding in "All companies", else the active one.
+        function editCompany() {
+            const it = editingId ? byId.get(editingId) : null;
+            if (it) return it.company_id;
+            return allMode ? Number($('ccCompany').value) : companyId;
+        }
+
+        // A parent is always in the same company, and never the cost centre
+        // itself or anything below it - that would be a loop.
+        function paintParents(selectedParent) {
+            const it = editingId ? byId.get(editingId) : null;
+            const banned = it ? descendantsOf(it.id).add(it.id) : new Set();
+            const cid = editCompany();
+            $('ccParent').innerHTML = '<option value="">' + esc(T('parent_none')) + '</option>'
+                + treeOrder(items.filter(i => i.company_id === cid)).filter(r => !banned.has(r.item.id)).map(r =>
+                    '<option value="' + r.item.id + '"' + (selectedParent === r.item.id ? ' selected' : '') + '>'
+                    + '  '.repeat(r.depth) + esc(r.item.code + ' - ' + r.item.name) + (r.item.is_active ? '' : ' (' + esc(T('inactive').toLowerCase()) + ')')
+                    + '</option>').join('');
+        }
+
         function openEdit(id) {
             editingId = id || 0;
             const it = id ? byId.get(id) : null;
             $('ccEditTitle').textContent = it ? T('edit_title', { code: it.code }) : T('add_title');
+            // Only a NEW cost centre asks which company: an existing one stays in its own.
+            $('ccCompanyField').hidden = !(allMode && !it);
+            if (allMode && !it) $('ccCompany').innerHTML = companyOptions(companyId);
             $('ccCode').value = it ? it.code : '';
             $('ccName').value = it ? it.name : '';
             $('ccDesc').value = it ? (it.description || '') : '';
             $('ccActive').checked = it ? it.is_active : true;
-            // Never itself or anything below it - that would be a loop.
-            const banned = it ? descendantsOf(it.id).add(it.id) : new Set();
-            $('ccParent').innerHTML = '<option value="">' + esc(T('parent_none')) + '</option>'
-                + treeOrder(items).filter(r => !banned.has(r.item.id)).map(r =>
-                    '<option value="' + r.item.id + '"' + (it && it.parent_id === r.item.id ? ' selected' : '') + '>'
-                    + '  '.repeat(r.depth) + esc(r.item.code + ' - ' + r.item.name) + (r.item.is_active ? '' : ' (' + esc(T('inactive').toLowerCase()) + ')')
-                    + '</option>').join('');
+            paintParents(it ? it.parent_id : null);
             open('ccEdit');
-            setTimeout(() => $('ccCode').focus(), 30);
+            setTimeout(() => $(allMode && !it ? 'ccCompany' : 'ccCode').focus(), 30);
         }
         $('ccAddBtn').addEventListener('click', () => openEdit(0));
+        $('ccCompany').addEventListener('change', () => paintParents(null));
 
         $('ccSave').addEventListener('click', async function () {
             const body = {
-                action: 'save', id: editingId, company_id: companyId,
+                action: 'save', id: editingId, company_id: editCompany(),
                 code: $('ccCode').value, name: $('ccName').value, description: $('ccDesc').value,
                 parent_id: $('ccParent').value || null, is_active: $('ccActive').checked,
             };
@@ -453,8 +497,21 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             const a = e.target.closest('[data-format]');
             if (!a) return;
             e.preventDefault();
-            window.location.href = API + '?action=export&format=' + a.dataset.format + '&company_id=' + companyId;
+            window.location.href = API + '?action=export&format=' + a.dataset.format + '&company_id=' + (a.dataset.company || companyId);
         });
+        // A file is always ONE company's list - it is what an import reads back.
+        // So in "All companies" the menu offers both formats under each company.
+        const exportMenuPlain = $('ccExportMenu').innerHTML;
+        function paintExportMenu() {
+            if (!allMode) { $('ccExportMenu').innerHTML = exportMenuPlain; return; }
+            const tpl = document.createElement('div');
+            tpl.innerHTML = exportMenuPlain;
+            tpl.querySelectorAll('small').forEach(s => s.remove());   // one hint per company is too long a menu
+            $('ccExportMenu').innerHTML = companies.map(c => {
+                tpl.querySelectorAll('[data-format]').forEach(a => a.setAttribute('data-company', c.id));
+                return '<div class="cc-export-company">' + esc(c.name) + '</div>' + tpl.innerHTML;
+            }).join('');
+        }
 
         // ── Import ─────────────────────────────────────────────────────────
         function importStep(n) {
@@ -465,7 +522,12 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             $('ccApply').hidden = n !== 2;
             $('ccImportClose').textContent = n === 3 ? t('common.close') : t('common.cancel');
         }
-        $('ccImportBtn').addEventListener('click', () => { $('ccFile').value = ''; $('ccDeactivate').checked = false; importStep(1); open('ccImport'); });
+        $('ccImportBtn').addEventListener('click', () => {
+            $('ccFile').value = ''; $('ccDeactivate').checked = false;
+            $('ccImportCompanyField').hidden = !allMode;
+            if (allMode) $('ccImportCompany').innerHTML = companyOptions(companyId);
+            importStep(1); open('ccImport');
+        });
         $('ccImportBack').addEventListener('click', () => importStep(1));
 
         async function runImport(apply) {
@@ -473,7 +535,7 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             if (!f) { toast(T('import_choose'), 'warning'); return null; }
             const fd = new FormData();
             fd.append('action', 'import');
-            fd.append('company_id', companyId);
+            fd.append('company_id', allMode ? $('ccImportCompany').value : companyId);
             fd.append('apply', apply ? '1' : '0');
             fd.append('deactivate_missing', $('ccDeactivate').checked ? '1' : '0');
             fd.append('file', f);
