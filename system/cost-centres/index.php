@@ -46,7 +46,7 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
            flex column, so the page scrolls rather than being cut off. */
         .cc-container { flex: 1; min-height: 0; overflow-y: auto; width: 100%; box-sizing: border-box; padding: 24px 32px 40px; }
         .cc-header h2 { margin: 0; font-size: 22px; color: var(--text, #333); }
-        .cc-header p { margin: 5px 0 20px; font-size: 13px; color: var(--text-dim, #888); line-height: 1.55; max-width: 820px; }
+        .cc-header p { margin: 5px 0 20px; font-size: 13px; color: var(--text-dim, #888); line-height: 1.55; }
         .cc-verify { margin-bottom: 18px; padding: 12px 14px; border-radius: 8px; font-size: 13px;
             background: var(--warning-bg, #fff4ce); color: var(--warning-text, #6b5900); border: 1px solid var(--warning-border, #f2d675); }
         .cc-panel { background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; padding: 18px 20px; }
