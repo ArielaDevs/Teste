@@ -19,7 +19,7 @@ require __DIR__ . '/_top.php';
         </div>
     </div>
     <p>Each cost centre has a <strong>code</strong>, a <strong>name</strong>, an optional <strong>description</strong>, an optional <strong>parent</strong> and is either <strong>active</strong> or <strong>inactive</strong>. You manage them on <strong>System &rarr; Cost Centres</strong>.</p>
-    <p><strong>Every cost centre belongs to one company.</strong> If you run several companies from one install, choose the company at the top of the page; each company has its own list, and two companies can both have a cost centre 0010 without getting in each other's way. If you have only ever had one company there is nothing to choose and nothing to think about.</p>
+    <p><strong>Every cost centre belongs to one company.</strong> If you run several companies from one install, the list shown is for the company chosen in the company switcher in the top bar; each company has its own list, and two companies can both have a cost centre 0010 without getting in each other's way. If you have only ever had one company there is nothing to choose and nothing to think about.</p>
     <div class="help-note"><strong>This is the list itself.</strong> Charging assets and service bookings to a cost centre comes next. Setting up the list now means it is ready, and already in step with your finance system, when that arrives.</div>
 </div>
 
@@ -86,7 +86,7 @@ require __DIR__ . '/_top.php';
         <li>A blank <strong>Parent code</strong> means top level. A parent can be another row in the same file.</li>
         <li>CSV files saved with commas, semicolons (Excel in much of Europe) or tabs are all read.</li>
     </ul>
-    <p>Cost centres are matched on their code: codes already in the list are updated, new ones are added, and <strong>nothing is ever deleted</strong>. Tick <strong>Make cost centres that are not in the file inactive</strong> when the file is your complete list.</p>
+    <p>Cost centres are matched on their code: codes already in the list are updated, new ones are added, and <strong>nothing is ever deleted</strong>. Switch on <strong>Make cost centres that are not in the file inactive</strong> when the file is your complete list.</p>
     <p><strong>Preview</strong> shows exactly what will happen, row by row, before anything changes. If any row has a problem, every problem is listed with its line number and <strong>nothing is imported</strong>, not even the good rows. Fix the file and preview again.</p>
     <div class="help-note warn"><strong>Leading zeros and CSV files.</strong> If you open a CSV in Excel and save it again, Excel turns 0010 into 10 before FreeITSM ever sees the file, and there is no way to tell afterwards. Edit your list in the <strong>Excel export</strong>: its codes are stored as text, so the zeros stay. A workbook where a code was typed as a number but formatted to show its zeros (a 0000 format) is read the way it is shown.</div>
 </div>

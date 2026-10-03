@@ -85,9 +85,13 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
         .cc-badge.on { background: #e8f5e9; color: #2e7d32; }
         .cc-badge.off { background: #f0f0f0; color: #888; }
         .cc-actions { text-align: right; white-space: nowrap; }
-        .cc-link { background: none; border: none; cursor: pointer; color: var(--sys-accent, #546e7a); font-size: 12.5px; font-weight: 600; padding: 3px 6px; border-radius: 4px; }
-        .cc-link:hover { background: var(--surface-2, #eceff1); }
-        .cc-link.danger { color: var(--danger-accent, #c62828); }
+        /* Edit / Delete as icons, the same buttons as Tickets -> Settings. Scoped,
+           because inbox.css's bare .action-btn is a big toolbar button. */
+        .cc-actions .action-btn { background: none; border: 1px solid var(--border, #ddd); color: var(--text-muted, #666); cursor: pointer; padding: 6px; margin-left: 4px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .cc-actions .action-btn:hover { background: var(--surface-hover, #f0f0f0); border-color: var(--accent, #0078d4); color: var(--accent, #0078d4); }
+        .cc-actions .action-btn.delete { color: var(--danger-accent, #d13438); }
+        .cc-actions .action-btn.delete:hover { background: var(--danger-bg, #fdf3f3); border-color: var(--danger-accent, #d13438); color: var(--danger-text, #a00); }
+        .cc-actions .action-btn svg { width: 16px; height: 16px; }
         .cc-empty { padding: 28px 10px; text-align: center; color: var(--text-faint, #999); font-size: 13px; }
 
         /* Modals - namespaced so inbox.css's global .modal rules stay out of it. */
@@ -105,9 +109,10 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
         .cc-field textarea { min-height: 70px; resize: vertical; }
         .cc-field input:focus, .cc-field textarea:focus, .cc-field select:focus { outline: none; border-color: var(--sys-accent, #546e7a); }
         .cc-field input#ccCode { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-        .cc-toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; font-size: 13px; color: var(--text, #444); }
-        .cc-toggle input { margin-top: 3px; }
-        .cc-toggle span small { display: block; color: var(--text-dim, #888); font-size: 12px; margin-top: 2px; line-height: 1.45; }
+        /* Toggles use inbox.css's .toggle-label / .toggle-switch (caption above, switch below). */
+        .cc-toggle { margin-bottom: 4px; }
+        .cc-toggle > span { font-weight: 600; color: var(--text, #444); }
+        .cc-toggle > span small { display: block; font-weight: 400; color: var(--text-dim, #888); font-size: 12px; margin-top: 2px; line-height: 1.45; }
         .cc-note { font-size: 12.5px; line-height: 1.55; color: var(--text-muted, #666); background: var(--surface-2, #f5f7f8); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
         .cc-note code { font-size: 12px; }
 
@@ -131,7 +136,6 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
         [data-theme-mode="dark"] .cc-act.update { background: #3a2e12; color: #fcd34d; }
         [data-theme-mode="dark"] .cc-act.deactivate, [data-theme-mode="dark"] .cc-errors { background: #3b1512; color: #f3c7c2; border-color: #7d2e26; }
         [data-theme-mode="dark"] .cc-done { color: #86efac; }
-        [data-theme-mode="dark"] .cc-link.danger { color: #fca5a5; }
         @media (max-width: 700px) {
             .cc-container { padding: 16px; }
             .cc-desc { display: none; }
@@ -152,7 +156,6 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
 
         <div class="cc-panel" id="ccPanel">
             <div class="cc-toolbar">
-                <select id="ccCompany" aria-label="<?php echo htmlspecialchars($ccT('company')); ?>" hidden></select>
                 <input type="search" id="ccSearch" placeholder="<?php echo htmlspecialchars($ccT('search')); ?>" aria-label="<?php echo htmlspecialchars($ccT('search')); ?>">
                 <label class="cc-check"><input type="checkbox" id="ccShowInactive" checked> <?php echo htmlspecialchars($ccT('show_inactive')); ?></label>
                 <span class="cc-spacer"></span>
@@ -205,8 +208,10 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
                     <select id="ccParent"></select>
                     <div class="hint"><?php echo htmlspecialchars($ccT('field_parent_hint')); ?></div>
                 </div>
-                <label class="cc-toggle"><input type="checkbox" id="ccActive">
-                    <span><?php echo htmlspecialchars($ccT('field_active')); ?><small><?php echo htmlspecialchars($ccT('field_active_hint')); ?></small></span></label>
+                <div class="toggle-label cc-toggle">
+                    <span><?php echo htmlspecialchars($ccT('field_active')); ?><small><?php echo htmlspecialchars($ccT('field_active_hint')); ?></small></span>
+                    <label class="toggle-switch"><input type="checkbox" id="ccActive"><span class="toggle-slider"></span></label>
+                </div>
             </div>
             <div class="cc-modal-foot">
                 <button type="button" class="btn btn-secondary" data-close><?php echo htmlspecialchars(t('common.cancel')); ?></button>
@@ -227,8 +232,10 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
                         <label for="ccFile"><?php echo htmlspecialchars($ccT('import_file')); ?></label>
                         <input type="file" id="ccFile" accept=".xlsx,.csv,.txt">
                     </div>
-                    <label class="cc-toggle"><input type="checkbox" id="ccDeactivate">
-                        <span><?php echo htmlspecialchars($ccT('import_deactivate')); ?><small><?php echo htmlspecialchars($ccT('import_deactivate_hint')); ?></small></span></label>
+                    <div class="toggle-label cc-toggle">
+                        <span><?php echo htmlspecialchars($ccT('import_deactivate')); ?><small><?php echo htmlspecialchars($ccT('import_deactivate_hint')); ?></small></span>
+                        <label class="toggle-switch"><input type="checkbox" id="ccDeactivate"><span class="toggle-slider"></span></label>
+                    </div>
                 </div>
                 <div id="ccImportStep2" hidden></div>
             </div>
@@ -255,6 +262,9 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
         let items = [];          // the company's cost centres, flat
         let byId = new Map();
         let editingId = 0;
+        // The pencil and bin from Tickets -> Settings, so the two screens match.
+        const ICON_EDIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+        const ICON_DELETE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
 
         // ── Loading ────────────────────────────────────────────────────────
         async function load() {
@@ -262,8 +272,9 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             try {
                 const d = await (await fetch(url, { credentials: 'same-origin' })).json();
                 if (!d.success) throw new Error(d.error || '');
+                // The company is the one chosen in the header's company switcher,
+                // which reloads the page on a change - so no picker of our own.
                 companyId = d.company_id;
-                paintCompanies(d.companies);
                 $('ccVerify').hidden = d.ready;
                 $('ccPanel').hidden = !d.ready;
                 items = d.cost_centres;
@@ -274,13 +285,6 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
             }
         }
 
-        function paintCompanies(list) {
-            const sel = $('ccCompany');
-            // One company: nothing to choose, so nothing shown.
-            sel.hidden = list.length < 2;
-            sel.innerHTML = list.map(c => '<option value="' + c.id + '"' + (c.id === companyId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
-        }
-        $('ccCompany').addEventListener('change', function () { companyId = Number(this.value); load(); });
 
         // ── The tree ───────────────────────────────────────────────────────
         // Parents first, children under them, each level by code. A cost centre
@@ -342,8 +346,8 @@ $ccT = fn(string $k) => t('system.cost_centres.' . $k);
                     + '<td>' + esc(i.name) + '</td>'
                     + '<td class="cc-desc">' + esc(i.description || '') + '</td>'
                     + '<td><span class="cc-badge ' + (i.is_active ? 'on">' + esc(T('active')) : 'off">' + esc(T('inactive'))) + '</span></td>'
-                    + '<td class="cc-actions"><button type="button" class="cc-link" data-edit="' + i.id + '">' + esc(t('common.edit')) + '</button>'
-                    + '<button type="button" class="cc-link danger" data-delete="' + i.id + '">' + esc(t('common.delete')) + '</button></td>'
+                    + '<td class="cc-actions"><button type="button" class="action-btn" data-edit="' + i.id + '" title="' + esc(t('common.edit')) + '" aria-label="' + esc(t('common.edit')) + '">' + ICON_EDIT + '</button>'
+                    + '<button type="button" class="action-btn delete" data-delete="' + i.id + '" title="' + esc(t('common.delete')) + '" aria-label="' + esc(t('common.delete')) + '">' + ICON_DELETE + '</button></td>'
                     + '</tr>';
             }).join('');
         }

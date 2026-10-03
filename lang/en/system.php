@@ -2259,7 +2259,7 @@ return [
         'field_parent_hint' => 'Optional. Puts this cost centre under another one, to build your hierarchy.',
         'parent_none'       => 'None - top level',
         'field_active'      => 'Active',
-        'field_active_hint' => 'Untick when it is no longer used. It stays on anything already charged to it, but is not offered for anything new.',
+        'field_active_hint' => 'Switch off when it is no longer used. It stays on anything already charged to it, but is not offered for anything new.',
         'saved'             => 'Cost centre saved',
         'save_failed'       => 'Could not save the cost centre.',
 
