@@ -6244,6 +6244,410 @@
             ]
         },
         {
+            "section": "Cost centres",
+            "items": [
+                {
+                    "m": "GET",
+                    "p": "\/cost-centres",
+                    "perm": "cost_centres.read",
+                    "s": "List \/ search cost centres",
+                    "d": "The cost centres of the key's companies, ordered by code. A code is text and is returned exactly as stored - \"0010\" stays \"0010\". Inactive ones are included; filter with active=true for the ones that may be used for new assignments.",
+                    "params": [
+                        {
+                            "name": "company_id",
+                            "in": "query",
+                            "desc": "Narrow to one company inside the key's scope",
+                            "req": false
+                        },
+                        {
+                            "name": "code",
+                            "in": "query",
+                            "desc": "Exact code, ignoring capitals",
+                            "req": false
+                        },
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "desc": "Search code, name and description",
+                            "req": false
+                        },
+                        {
+                            "name": "active",
+                            "in": "query",
+                            "desc": "true \/ false",
+                            "req": false
+                        },
+                        {
+                            "name": "parent_id",
+                            "in": "query",
+                            "desc": "Children of this cost centre; 0 = top level only",
+                            "req": false
+                        },
+                        {
+                            "name": "sort",
+                            "in": "query",
+                            "desc": "code (default), name, updated_at, id - prefix \"-\" for descending",
+                            "req": false
+                        },
+                        {
+                            "name": "page \/ per_page",
+                            "in": "query",
+                            "desc": "Pagination (default 1 \/ 25, max per_page 100)",
+                            "req": false
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "The active list for one company",
+                                "note": "What a picker should offer.",
+                                "query": {
+                                    "company_id": 1,
+                                    "active": "true",
+                                    "per_page": 100
+                                }
+                            },
+                            {
+                                "title": "Find one by code",
+                                "note": "Capitals are ignored: n1414 finds N1414.",
+                                "query": {
+                                    "code": "N1414"
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 400,
+                                "slug": "invalid_parameter",
+                                "when": "'sort' or 'active' is not one of the listed values."
+                            },
+                            {
+                                "code": 403,
+                                "slug": "forbidden",
+                                "when": "company_id is outside the key's company scope."
+                            }
+                        ]
+                    },
+                    "section": "Cost centres",
+                    "slug": "get-cost-centres"
+                },
+                {
+                    "m": "POST",
+                    "p": "\/cost-centres",
+                    "perm": "cost_centres.create",
+                    "s": "Add a cost centre",
+                    "d": "code and name are required. The code is trimmed and otherwise kept exactly as sent - letters, numbers and leading zeros all survive. A code already used in that company (ignoring capitals) is refused with 409. The parent can be given by parent_id or parent_code and must be in the same company.",
+                    "params": [
+                        {
+                            "name": "code",
+                            "in": "body",
+                            "desc": "Up to 50 characters, unique per company ignoring capitals",
+                            "req": true
+                        },
+                        {
+                            "name": "name",
+                            "in": "body",
+                            "desc": "Up to 150 characters",
+                            "req": true
+                        },
+                        {
+                            "name": "company_id",
+                            "in": "body",
+                            "desc": "Company (default: the key's default company)",
+                            "req": false
+                        },
+                        {
+                            "name": "description",
+                            "in": "body",
+                            "desc": "Up to 500 characters",
+                            "req": false
+                        },
+                        {
+                            "name": "parent_id \/ parent_code",
+                            "in": "body",
+                            "desc": "The parent, in the same company. Omit or null for top level",
+                            "req": false
+                        },
+                        {
+                            "name": "is_active",
+                            "in": "body",
+                            "desc": "true (default) \/ false",
+                            "req": false
+                        }
+                    ],
+                    "body": {
+                        "code": "0010",
+                        "name": "Finance",
+                        "description": "Head office finance team",
+                        "parent_code": null,
+                        "is_active": true
+                    },
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "A top-level cost centre",
+                                "note": "The leading zeros are kept.",
+                                "body": {
+                                    "code": "0010",
+                                    "name": "Finance"
+                                }
+                            },
+                            {
+                                "title": "One under another",
+                                "note": "The parent by its code.",
+                                "body": {
+                                    "code": "N1414",
+                                    "name": "Accounts payable",
+                                    "parent_code": "0010"
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 409,
+                                "slug": "conflict",
+                                "when": "The code is already used by a cost centre in that company."
+                            },
+                            {
+                                "code": 422,
+                                "slug": "invalid_field",
+                                "when": "A missing code or name, a value too long, or a parent that is not in the same company."
+                            }
+                        ]
+                    },
+                    "section": "Cost centres",
+                    "slug": "post-cost-centres"
+                },
+                {
+                    "m": "POST",
+                    "p": "\/cost-centres\/sync",
+                    "perm": "cost_centres.update",
+                    "s": "Sync a list from an accounting system",
+                    "d": "Bring one company's cost centres into line with a list, matched on code (ignoring capitals): new codes are added, existing ones updated, and nothing is duplicated, so the same call can be made every night. Only the fields sent are changed - send just code and name and descriptions are left alone. parent_code may refer to a code elsewhere in the same list. With deactivate_missing, active cost centres that are not in the list are made inactive; nothing is ever deleted. ALL OR NOTHING: if any item has a problem nothing is written, and the response is 422 with every problem in error.details.errors, each with its 1-based line in cost_centres. dry_run works it all out and writes nothing. Needs cost_centres.create as well as cost_centres.update. Up to 10,000 items per call.",
+                    "params": [
+                        {
+                            "name": "cost_centres",
+                            "in": "body",
+                            "desc": "Array of {code, name, description, parent_code, is_active}. code is required; name is required for a code that is new",
+                            "req": true
+                        },
+                        {
+                            "name": "company_id",
+                            "in": "body",
+                            "desc": "Company (default: the key's default company)",
+                            "req": false
+                        },
+                        {
+                            "name": "deactivate_missing",
+                            "in": "body",
+                            "desc": "true = make active cost centres that are not in the list inactive",
+                            "req": false
+                        },
+                        {
+                            "name": "dry_run",
+                            "in": "body",
+                            "desc": "true = report what would change, change nothing",
+                            "req": false
+                        }
+                    ],
+                    "body": {
+                        "company_id": 1,
+                        "deactivate_missing": true,
+                        "cost_centres": [
+                            {
+                                "code": "0010",
+                                "name": "Finance",
+                                "is_active": true
+                            },
+                            {
+                                "code": "N1414",
+                                "name": "Accounts payable",
+                                "parent_code": "0010"
+                            }
+                        ]
+                    },
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "The nightly sync",
+                                "note": "The full list from the finance system; anything dropped from it is made inactive.",
+                                "body": {
+                                    "company_id": 1,
+                                    "deactivate_missing": true,
+                                    "cost_centres": [
+                                        {
+                                            "code": "0010",
+                                            "name": "Finance"
+                                        },
+                                        {
+                                            "code": "N1414",
+                                            "name": "Accounts payable",
+                                            "parent_code": "0010"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "title": "See what would change",
+                                "note": "Nothing is written.",
+                                "body": {
+                                    "dry_run": true,
+                                    "cost_centres": [
+                                        {
+                                            "code": "0010",
+                                            "name": "Finance and payroll"
+                                        }
+                                    ]
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 422,
+                                "slug": "invalid_rows",
+                                "when": "One or more items have a problem - a missing code, a new code with no name, the same code twice, a parent that does not exist, or parents that go round in a loop. Nothing was changed; error.details.errors lists every problem with its line."
+                            },
+                            {
+                                "code": 403,
+                                "slug": "forbidden",
+                                "when": "The key lacks cost_centres.create, or company_id is outside its scope."
+                            }
+                        ]
+                    },
+                    "section": "Cost centres",
+                    "slug": "post-cost-centres-sync"
+                },
+                {
+                    "m": "GET",
+                    "p": "\/cost-centres\/{id}",
+                    "perm": "cost_centres.read",
+                    "s": "Get a cost centre",
+                    "d": "One cost centre, with its parent and how many cost centres sit below it. 404 when it does not exist or belongs to a company outside the key's scope.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Cost centre id",
+                            "req": true
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "One cost centre",
+                                "note": "Including its parent.",
+                                "path": {
+                                    "id": 1
+                                }
+                            }
+                        ],
+                        "errors": []
+                    },
+                    "section": "Cost centres",
+                    "slug": "get-cost-centres-id"
+                },
+                {
+                    "m": "PATCH",
+                    "p": "\/cost-centres\/{id}",
+                    "perm": "cost_centres.update",
+                    "s": "Update a cost centre",
+                    "d": "Only the fields sent are changed. Setting is_active to false retires it: it stays on anything already charged to it but is not offered for new assignments. A cost centre cannot move to another company, and cannot be put under itself or anything below it.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Cost centre id",
+                            "req": true
+                        },
+                        {
+                            "name": "code \/ name \/ description",
+                            "in": "body",
+                            "desc": "As for create",
+                            "req": false
+                        },
+                        {
+                            "name": "parent_id \/ parent_code",
+                            "in": "body",
+                            "desc": "null or \"\" = top level",
+                            "req": false
+                        },
+                        {
+                            "name": "is_active",
+                            "in": "body",
+                            "desc": "true \/ false",
+                            "req": false
+                        }
+                    ],
+                    "body": {
+                        "is_active": false
+                    },
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Retire a cost centre",
+                                "note": "Not deleted - just not offered any more.",
+                                "path": {
+                                    "id": 1
+                                },
+                                "body": {
+                                    "is_active": false
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 409,
+                                "slug": "conflict",
+                                "when": "The new code is already used in that company."
+                            },
+                            {
+                                "code": 422,
+                                "slug": "invalid_field",
+                                "when": "company_id was sent, or the parent would make a loop or is in another company."
+                            }
+                        ]
+                    },
+                    "section": "Cost centres",
+                    "slug": "patch-cost-centres-id"
+                },
+                {
+                    "m": "DELETE",
+                    "p": "\/cost-centres\/{id}",
+                    "perm": "cost_centres.delete",
+                    "s": "Delete a cost centre",
+                    "d": "Permanently deletes a cost centre that has nothing below it. For one that has simply stopped being used, set is_active to false instead.",
+                    "params": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "desc": "Cost centre id",
+                            "req": true
+                        }
+                    ],
+                    "extras": {
+                        "examples": [
+                            {
+                                "title": "Delete a mistake",
+                                "note": "Refused while it has children.",
+                                "path": {
+                                    "id": 1
+                                }
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "code": 409,
+                                "slug": "conflict",
+                                "when": "Other cost centres sit below it."
+                            }
+                        ]
+                    },
+                    "section": "Cost centres",
+                    "slug": "delete-cost-centres-id"
+                }
+            ]
+        },
+        {
             "section": "Calendar",
             "items": [
                 {
@@ -16379,6 +16783,175 @@
                 }
             ],
             "errors": []
+        },
+        "GET \/cost-centres": {
+            "examples": [
+                {
+                    "title": "The active list for one company",
+                    "note": "What a picker should offer.",
+                    "query": {
+                        "company_id": 1,
+                        "active": "true",
+                        "per_page": 100
+                    }
+                },
+                {
+                    "title": "Find one by code",
+                    "note": "Capitals are ignored: n1414 finds N1414.",
+                    "query": {
+                        "code": "N1414"
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 400,
+                    "slug": "invalid_parameter",
+                    "when": "'sort' or 'active' is not one of the listed values."
+                },
+                {
+                    "code": 403,
+                    "slug": "forbidden",
+                    "when": "company_id is outside the key's company scope."
+                }
+            ]
+        },
+        "POST \/cost-centres": {
+            "examples": [
+                {
+                    "title": "A top-level cost centre",
+                    "note": "The leading zeros are kept.",
+                    "body": {
+                        "code": "0010",
+                        "name": "Finance"
+                    }
+                },
+                {
+                    "title": "One under another",
+                    "note": "The parent by its code.",
+                    "body": {
+                        "code": "N1414",
+                        "name": "Accounts payable",
+                        "parent_code": "0010"
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 409,
+                    "slug": "conflict",
+                    "when": "The code is already used by a cost centre in that company."
+                },
+                {
+                    "code": 422,
+                    "slug": "invalid_field",
+                    "when": "A missing code or name, a value too long, or a parent that is not in the same company."
+                }
+            ]
+        },
+        "POST \/cost-centres\/sync": {
+            "examples": [
+                {
+                    "title": "The nightly sync",
+                    "note": "The full list from the finance system; anything dropped from it is made inactive.",
+                    "body": {
+                        "company_id": 1,
+                        "deactivate_missing": true,
+                        "cost_centres": [
+                            {
+                                "code": "0010",
+                                "name": "Finance"
+                            },
+                            {
+                                "code": "N1414",
+                                "name": "Accounts payable",
+                                "parent_code": "0010"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "title": "See what would change",
+                    "note": "Nothing is written.",
+                    "body": {
+                        "dry_run": true,
+                        "cost_centres": [
+                            {
+                                "code": "0010",
+                                "name": "Finance and payroll"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 422,
+                    "slug": "invalid_rows",
+                    "when": "One or more items have a problem - a missing code, a new code with no name, the same code twice, a parent that does not exist, or parents that go round in a loop. Nothing was changed; error.details.errors lists every problem with its line."
+                },
+                {
+                    "code": 403,
+                    "slug": "forbidden",
+                    "when": "The key lacks cost_centres.create, or company_id is outside its scope."
+                }
+            ]
+        },
+        "GET \/cost-centres\/{id}": {
+            "examples": [
+                {
+                    "title": "One cost centre",
+                    "note": "Including its parent.",
+                    "path": {
+                        "id": 1
+                    }
+                }
+            ],
+            "errors": []
+        },
+        "PATCH \/cost-centres\/{id}": {
+            "examples": [
+                {
+                    "title": "Retire a cost centre",
+                    "note": "Not deleted - just not offered any more.",
+                    "path": {
+                        "id": 1
+                    },
+                    "body": {
+                        "is_active": false
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 409,
+                    "slug": "conflict",
+                    "when": "The new code is already used in that company."
+                },
+                {
+                    "code": 422,
+                    "slug": "invalid_field",
+                    "when": "company_id was sent, or the parent would make a loop or is in another company."
+                }
+            ]
+        },
+        "DELETE \/cost-centres\/{id}": {
+            "examples": [
+                {
+                    "title": "Delete a mistake",
+                    "note": "Refused while it has children.",
+                    "path": {
+                        "id": 1
+                    }
+                }
+            ],
+            "errors": [
+                {
+                    "code": 409,
+                    "slug": "conflict",
+                    "when": "Other cost centres sit below it."
+                }
+            ]
         }
     }
 }

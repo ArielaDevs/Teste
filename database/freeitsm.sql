@@ -7508,6 +7508,43 @@ CREATE TABLE IF NOT EXISTS `domain_status_incidents` (
     CONSTRAINT `fk_dsi_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_dsi_incident` FOREIGN KEY (`incident_id`) REFERENCES `status_incidents` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- Cost centres (GH #160, stage 1) - System -> Cost Centres
+-- ----------------------------------------------------------
+-- The finance department's list, kept here so things can be charged to it later
+-- (stage 2: assets and service bookings). Most organisations hold the real list
+-- in their accounting system and copy it in by import or through the REST API,
+-- so a cost centre is matched on its CODE, never on its id.
+--
+-- 🔑 Always belongs to ONE company - tenant_id is NOT NULL, unlike most config
+-- tables where NULL means "shared". Two companies can both have a 0010.
+CREATE TABLE IF NOT EXISTS `cost_centres` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `tenant_id`        INT NOT NULL,
+    -- 🔑 TEXT, NEVER A NUMBER. "0010" and "N1414" are both real codes, and a
+    -- number column would turn the first into 10. Unique per company, and the
+    -- unicode_ci collation makes that check ignore case: n1414 = N1414.
+    `code`             VARCHAR(50) NOT NULL,
+    `name`             VARCHAR(150) NOT NULL,
+    `description`      VARCHAR(500) NULL,
+    -- The hierarchy. NULL = top level. Always in the same company - the service
+    -- refuses anything else, and refuses a loop.
+    `parent_id`        INT NULL,
+    -- Inactive = not offered for NEW assignments. Anything already charged to it
+    -- keeps it. Retiring, not deleting, is the normal path.
+    `is_active`        TINYINT(1) NOT NULL DEFAULT 1,
+    `created_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime` DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_cost_centres_code` (`tenant_id`, `code`),
+    KEY `ix_cost_centres_parent` (`parent_id`),
+    -- SET NULL rather than RESTRICT: the service already refuses to delete a cost
+    -- centre that has children, and RESTRICT on a self-reference can block the
+    -- company CASCADE below part-way through.
+    CONSTRAINT `fk_cost_centres_parent` FOREIGN KEY (`parent_id`) REFERENCES `cost_centres` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_cost_centres_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Seed: the domain statuses a fresh install starts with. Only into an empty

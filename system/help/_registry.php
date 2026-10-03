@@ -299,6 +299,22 @@ function getHelpTopics() {
             ],
             'terms' => 'tenant msp client customer multi-tenancy separate organisation domain',
         ],
+        // Cost centres (GH #160).
+        'cost-centres' => [
+            'hero' => 'Cost Centres',
+            'sub'  => 'Keep your finance department\'s cost centres in FreeITSM, for each company - by hand, from a spreadsheet, or kept in step with your accounting system through the API.',
+            'sections' => [
+                ['id' => 'overview',  'label' => 'What a cost centre is here'],
+                ['id' => 'codes',     'label' => 'Codes and leading zeros'],
+                ['id' => 'hierarchy', 'label' => 'Building a hierarchy'],
+                ['id' => 'inactive',  'label' => 'Inactive or delete?'],
+                ['id' => 'import',    'label' => 'Importing and exporting'],
+                ['id' => 'api',       'label' => 'Syncing from your finance system'],
+            ],
+            'terms' => 'cost center centers nominal code codes finance accounting erp sap datev sage xero budget charge code'
+                     . ' kostenstelle excel xlsx csv import export spreadsheet leading zero zeros 0010 hierarchy parent child'
+                     . ' inactive retire sync nightly rest api',
+        ],
         'status-portal' => [
             'hero' => 'Service status on the portal',
             'sub'  => 'Whether the people who raise tickets also see the incidents behind an outage, and the updates your team has marked as external — and how much history to show them.',

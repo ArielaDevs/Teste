@@ -11081,6 +11081,182 @@ return array (
         ),
       ),
     ),
+    'CostCentre' => 
+    array (
+      'type' => 'object',
+      'description' => 'A cost centre (GH #160). Always one company\'s. The code is text, returned exactly as stored - "0010" stays "0010".',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'code' => 
+        array (
+          'type' => 'string',
+          'description' => 'Unique per company, ignoring capitals.',
+        ),
+        'name' => 
+        array (
+          'type' => 'string',
+        ),
+        'description' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'parent' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'null = top level.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'code' => 
+            array (
+              'type' => 'string',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+          ),
+        ),
+        'is_active' => 
+        array (
+          'type' => 'boolean',
+          'description' => 'false = not offered for new assignments; kept on anything already charged to it.',
+        ),
+        'company' => 
+        array (
+          'type' => 'object',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+          ),
+        ),
+        'child_count' => 
+        array (
+          'type' => 'integer',
+        ),
+        'created_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+        ),
+        'updated_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+      ),
+    ),
+    'CostCentreSyncResult' => 
+    array (
+      'type' => 'object',
+      'description' => 'What a sync did (or, with dry_run, would do).',
+      'properties' => 
+      array (
+        'company_id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'applied' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'dry_run' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'counts' => 
+        array (
+          'type' => 'object',
+          'properties' => 
+          array (
+            'create' => 
+            array (
+              'type' => 'integer',
+            ),
+            'update' => 
+            array (
+              'type' => 'integer',
+            ),
+            'unchanged' => 
+            array (
+              'type' => 'integer',
+            ),
+            'deactivate' => 
+            array (
+              'type' => 'integer',
+            ),
+          ),
+        ),
+        'changes' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'object',
+            'properties' => 
+            array (
+              'line' => 
+              array (
+                'type' => 'integer',
+                'nullable' => true,
+                'description' => '1-based position in cost_centres; null for one made inactive because it was missing from the list.',
+              ),
+              'code' => 
+              array (
+                'type' => 'string',
+              ),
+              'name' => 
+              array (
+                'type' => 'string',
+              ),
+              'action' => 
+              array (
+                'type' => 'string',
+                'enum' => 
+                array (
+                  0 => 'create',
+                  1 => 'update',
+                  2 => 'deactivate',
+                ),
+              ),
+              'changes' => 
+              array (
+                'type' => 'array',
+                'items' => 
+                array (
+                  'type' => 'string',
+                  'enum' => 
+                  array (
+                    0 => 'code',
+                    1 => 'name',
+                    2 => 'description',
+                    3 => 'is_active',
+                    4 => 'parent',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
   ),
   'responses' => 
   array (
@@ -12005,15 +12181,23 @@ return array (
                     'nullable' => true,
                   ),
                 ),
-                'domains' => 
+                'domains' =>
                 array (
                   'type' => 'array',
-                  'items' => 
+                  'items' =>
                   array (
                     'type' => 'string',
                   ),
                 ),
-                'contracts' => 
+                'cost_centres' =>
+                array (
+                  'type' => 'array',
+                  'items' =>
+                  array (
+                    'type' => 'string',
+                  ),
+                ),
+                'contracts' =>
                 array (
                   'type' => 'array',
                   'items' => 
@@ -12830,6 +13014,34 @@ return array (
     'POST /workflows/{id}/fire' => 
     array (
       '$ref' => '#/components/schemas/WorkflowFireResult',
+    ),
+    'DELETE /cost-centres/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/DeleteAck',
+    ),
+    'GET /cost-centres' => 
+    array (
+      'type' => 'array',
+      'items' => 
+      array (
+        '$ref' => '#/components/schemas/CostCentre',
+      ),
+    ),
+    'GET /cost-centres/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentre',
+    ),
+    'PATCH /cost-centres/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentre',
+    ),
+    'POST /cost-centres' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentre',
+    ),
+    'POST /cost-centres/sync' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentreSyncResult',
     ),
   ),
   'requestBodies' => 

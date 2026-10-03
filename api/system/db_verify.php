@@ -2762,6 +2762,18 @@ try {
         try { $conn->exec($sql); } catch (Exception $e) {}
     }
 
+    // Cost centres (GH #160). Names + rules match freeitsm.sql: a company takes
+    // its cost centres with it; a parent going leaves its children at the top
+    // level (CostCentresService refuses to delete a parent first anyway).
+    $costCentreFks = [
+        ['cost_centres', 'fk_cost_centres_parent', "ALTER TABLE cost_centres ADD CONSTRAINT fk_cost_centres_parent FOREIGN KEY (parent_id) REFERENCES cost_centres (id) ON DELETE SET NULL"],
+        ['cost_centres', 'fk_cost_centres_tenant', "ALTER TABLE cost_centres ADD CONSTRAINT fk_cost_centres_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE CASCADE"],
+    ];
+    foreach ($costCentreFks as [$tbl, $name, $sql]) {
+        if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;
+        try { $conn->exec($sql); } catch (Exception $e) {}
+    }
+
     // Forms-module foreign keys (db_verify $schema only builds columns + PK;
     // grown installs had NONE of the four freeitsm.sql constraints, and
     // parent_form_id — the #442 version chain — never had one anywhere).

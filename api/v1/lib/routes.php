@@ -228,6 +228,14 @@ return [
     ['GET',    '#^/domain-statuses$#',                     ['domains', 'read'],               'apiDomainStatusesList'],
     ['GET',    '#^/domain-registrar-accounts$#',           ['domains', 'read'],               'apiDomainAccountsList'],
 
+    // Cost centres (GH #160) — company-scoped; /sync is what an accounting system calls.
+    ['GET',    '#^/cost-centres$#',                        ['cost_centres', 'read'],          'apiCostCentresList'],
+    ['POST',   '#^/cost-centres$#',                        ['cost_centres', 'create'],        'apiCostCentresCreate'],
+    ['POST',   '#^/cost-centres/sync$#',                   ['cost_centres', 'update'],        'apiCostCentresSync'],
+    ['GET',    '#^/cost-centres/(\d+)$#',                  ['cost_centres', 'read'],          'apiCostCentresGet'],
+    ['PATCH',  '#^/cost-centres/(\d+)$#',                  ['cost_centres', 'update'],        'apiCostCentresUpdate'],
+    ['DELETE', '#^/cost-centres/(\d+)$#',                  ['cost_centres', 'delete'],        'apiCostCentresDelete'],
+
     ['GET',    '#^/users$#',                               ['users', 'read'],                 'apiUsersList'],
     ['POST',   '#^/users$#',                               ['users', 'create'],               'apiUsersCreate'],
     ['GET',    '#^/users/(\d+)$#',                         ['users', 'read'],                 'apiUsersGet'],

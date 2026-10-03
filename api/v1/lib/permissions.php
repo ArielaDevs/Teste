@@ -226,6 +226,15 @@ function apiV1PermissionCatalog(): array {
                 'delete' => 'Permanently delete a domain and its history',
             ],
         ],
+        'cost_centres' => [
+            'label'   => 'Cost centres',
+            'actions' => [
+                'read'   => 'List and view cost centres (company-scoped)',
+                'create' => 'Add cost centres (sync needs this as well as update)',
+                'update' => 'Change cost centres, and sync a whole list from an accounting system',
+                'delete' => 'Delete a cost centre that has nothing below it',
+            ],
+        ],
         'contract_terms' => [
             'label'   => 'Contract terms',
             'actions' => [

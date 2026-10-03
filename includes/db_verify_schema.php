@@ -4968,4 +4968,18 @@ return [
         'first_seen_datetime' => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
         'acknowledged'        => 'TINYINT(1) NOT NULL DEFAULT 0',
     ],
+
+    // Cost centres (GH #160, stage 1). Always one company's (tenant_id NOT NULL);
+    // the code is TEXT so "0010" stays "0010", unique per company ignoring case.
+    'cost_centres' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'tenant_id'        => 'INT NOT NULL',
+        'code'             => 'VARCHAR(50) NOT NULL',
+        'name'             => 'VARCHAR(150) NOT NULL',
+        'description'      => 'VARCHAR(500) NULL',
+        'parent_id'        => 'INT NULL',
+        'is_active'        => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'created_datetime' => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime' => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+    ],
 ];

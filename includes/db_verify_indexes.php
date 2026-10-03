@@ -431,4 +431,6 @@ return [
     ['domain_knowledge_articles', 'ix_dka_article', 'key', '(`article_id`)'],
     ['domain_status_incidents', 'uq_domain_status_incident', 'unique', '(`domain_id`,`trigger_kind`,`fingerprint`)'],
     ['domain_status_incidents', 'ix_dsi_incident', 'key', '(`incident_id`)'],
+    ['cost_centres', 'uq_cost_centres_code', 'unique', '(`tenant_id`,`code`)'],
+    ['cost_centres', 'ix_cost_centres_parent', 'key', '(`parent_id`)'],
 ];
