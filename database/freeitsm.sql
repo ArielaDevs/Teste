@@ -7536,6 +7536,7 @@ CREATE TABLE IF NOT EXISTS `cost_centres` (
     `is_active`        TINYINT(1) NOT NULL DEFAULT 1,
     `created_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_datetime` DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `is_demo`          TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_cost_centres_code` (`tenant_id`, `code`),
     KEY `ix_cost_centres_parent` (`parent_id`),

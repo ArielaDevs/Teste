@@ -644,7 +644,7 @@ return [
         'why'      => 'With the list in place, what IT spends can be charged to the right budget, using the same codes finance already reports on.',
         'done'     => 'At least one active cost centre exists.',
         'link'     => 'system/cost-centres/',
-        'check'    => ['rows', 'cost_centres', 'is_active = 1'],
+        'check'    => ['rows', 'cost_centres', 'is_active = 1 AND is_demo = 0'],
     ],
 
     // ───────────────────────── Encryption & maintenance ─────────────────────────

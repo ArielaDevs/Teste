@@ -454,6 +454,16 @@ if (!isset($_SESSION['analyst_id'])) {
                 <div class="error-text" id="err-domains" style="display:none"></div>
             </div>
 
+            <div class="module-card" data-module="cost-centres">
+                <h4>Cost Centres</h4>
+                <p class="module-desc">24 cost centres (nominal codes) in the default company, two levels deep, with one retired. Includes 0010 and N1414 to show codes are kept as text.</p>
+                <div class="module-footer">
+                    <span class="record-count">~24 records</span>
+                    <button class="import-btn" id="btn-cost-centres" onclick="importModule('cost-centres', this)" disabled><?php echo htmlspecialchars(t('system.demo.import')); ?></button>
+                </div>
+                <div class="error-text" id="err-cost-centres" style="display:none"></div>
+            </div>
+
             <div class="module-card" data-module="services">
                 <h4>Service Status</h4>
                 <p class="module-desc">5 services with 2 incidents showing resolved and monitoring states.</p>
@@ -637,7 +647,7 @@ if (!isset($_SESSION['analyst_id'])) {
         }
 
         function enableModuleButtons() {
-            const modules = ['tickets', 'assets', 'knowledge', 'changes', 'calendar', 'checks', 'checklists', 'contracts', 'domains', 'services', 'software', 'forms', 'tasks', 'process-mapper', 'cmdb', 'lms', 'workflow', 'network-mapper'];
+            const modules = ['tickets', 'assets', 'knowledge', 'changes', 'calendar', 'checks', 'checklists', 'contracts', 'domains', 'cost-centres', 'services', 'software', 'forms', 'tasks', 'process-mapper', 'cmdb', 'lms', 'workflow', 'network-mapper'];
             modules.forEach(function(m) {
                 const btn = document.getElementById('btn-' + m);
                 if (btn && !btn.classList.contains('success')) {
