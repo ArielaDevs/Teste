@@ -1,4 +1,6 @@
 <?php
+/* 🔴 NEVER OVER THE WEB. See tests/README.md. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * Domains -> Service Status (3.0.0): includes/domains/status_link.php.
  *

@@ -1,4 +1,6 @@
 <?php
+/* 🔴 NEVER OVER THE WEB. See tests/README.md. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * Domains joined to CMDB, Service Status, Tickets, Knowledge and Contracts
  * (3.0.0) - the link rules in includes/domains/links.php.

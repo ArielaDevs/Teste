@@ -1,4 +1,6 @@
 <?php
+/* 🔴 NEVER OVER THE WEB. See tests/README.md. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * Confidential tickets: the email and calendar exits (discussion #62).
  *

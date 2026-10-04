@@ -1,4 +1,6 @@
 <?php
+/* 🔴 NEVER OVER THE WEB. See tests/README.md. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * Domains on the Calendar (3.0.0): two kinds, two settings, one rule from the
  * wiki's Warranty-and-Lease-Alerts-Developer-Guide -

@@ -1,4 +1,6 @@
 <?php
+/* 🔴 NEVER OVER THE WEB. See tests/README.md. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * LMS competency tests (3.0.0): includes/lms/competency_tests.php, the
  * candidate's endpoint (api/lms/test_public.php, over HTTP) and page
