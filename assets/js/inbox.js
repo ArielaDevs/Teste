@@ -256,7 +256,13 @@ function tgGroupOlder(container) {
     const metas = [...container.querySelectorAll('.thread-meta')];
     if (metas.length <= show + 1) return;          // folding one message saves nothing
 
-    const older = metas.slice(0, metas.length - show);
+    /* TRAP: the thread is rendered NEWEST FIRST (loadEmailThread reverses
+       it), so the older messages are the LAST ones on the page. This used to
+       be metas.slice(0, metas.length - show) - written for oldest-first - and
+       folded the NEWEST messages away, leaving the oldest on show: a
+       customer's latest reply was hidden behind "14 older messages". The
+       fold now sits below the recent ones, where older messages are. */
+    const older = metas.slice(show);
     const fold = document.createElement('div');
     fold.className = 'tg-fold';
     container.insertBefore(fold, older[0].previousElementSibling || older[0]);
