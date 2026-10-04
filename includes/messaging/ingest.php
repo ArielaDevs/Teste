@@ -16,6 +16,7 @@ require_once __DIR__ . '/../tenancy.php';
 require_once __DIR__ . '/../ticket_reply.php';
 require_once __DIR__ . '/../ticket_snooze.php';
 require_once __DIR__ . '/../uploads.php';   // uploadStoreBytes() — see F1
+require_once __DIR__ . '/../csat.php';      // csatPendingRequestForChat(), rating helpers
 require_once __DIR__ . '/../i18n.php';      // I18n::tFor() — Telegram bot replies in the customer's own language_code
 
 /**
@@ -49,6 +50,28 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     $body = trim((string) ($msg['body'] ?? ''));
     $mediaItems = is_array($msg['media'] ?? null) ? $msg['media'] : [];
     $hasMedia = !empty($mediaItems);
+
+    // CSAT: a 1–5 rating is an answer to a survey, not a new ticket message.
+    // Two shapes reach here: a rating-button press (Telegram callback_query), and
+    // a bare digit typed in reply to a text rating request on any channel.
+    $csatReply = null;
+    if (!empty($msg['csat'])) {
+        $csatReply = [
+            'response_id' => (int) $msg['csat']['response_id'],
+            'rating'      => (int) $msg['csat']['rating'],
+            'button'      => true,
+            'callback_id' => (string) ($msg['csat']['callback_id'] ?? ''),
+        ];
+    } elseif (!$hasMedia && preg_match('/^[1-5]$/', $body)) {
+        $pending = csatPendingRequestForChat($conn, (int) $channel['id'], $from);
+        if ($pending !== null) {
+            $csatReply = ['response_id' => $pending, 'rating' => (int) $body, 'button' => false];
+        }
+    }
+    if ($csatReply !== null) {
+        return messagingRecordCsatReply($conn, $channel, $from, $csatReply);
+    }
+
     if ($body === '' && !$hasMedia) {
         $body = '[empty message]';
     }
@@ -633,6 +656,44 @@ function messagingUserLabel(PDO $conn, int $userId): string
     if (!$u) return 'user #' . $userId;
     $name = trim((string) $u['display_name']);
     return $name !== '' ? $name . ($u['email'] ? ' <' . $u['email'] . '>' : '') : (string) ($u['email'] ?: 'user #' . $userId);
+}
+
+/**
+ * Record a CSAT rating that came in from a customer's chat, then thank them.
+ * A rating only counts if its request was sent to THIS customer on THIS channel
+ * and has not been answered yet, so a replayed or forged button press changes
+ * nothing. Never creates or touches a ticket.
+ */
+function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, array $reply): array
+{
+    require_once __DIR__ . '/../csat.php';
+    require_once __DIR__ . '/../i18n.php';
+
+    $recorded = csatResponseBelongsToChat($conn, $reply['response_id'], (int) $channel['id'], $chatId)
+        && csatRecordRating($conn, $reply['response_id'], $reply['rating']);
+
+    $provider = null;
+    try {
+        $provider = messagingProvider($channel);
+    } catch (Exception $e) {
+        error_log('CSAT reply: no provider for channel ' . $channel['id'] . ': ' . $e->getMessage());
+    }
+
+    if ($provider instanceof TelegramProvider && $reply['button']) {
+        // Always stop the button's spinner, even when nothing was recorded.
+        $thanks = $recorded
+            ? I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks')
+            : '';
+        $provider->answerCallbackQuery($reply['callback_id'], $thanks);
+    } elseif ($recorded && $provider) {
+        try {
+            $provider->sendMessage($chatId, I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks'));
+        } catch (Exception $e) {
+            error_log('CSAT thanks failed for chat ' . $chatId . ': ' . $e->getMessage());
+        }
+    }
+
+    return ['status' => $recorded ? 'csat_recorded' : 'csat_ignored', 'ticket_id' => null];
 }
 
 /**

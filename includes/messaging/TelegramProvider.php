@@ -50,7 +50,12 @@ class TelegramProvider extends MessagingProvider
         if (!is_array($payload)) {
             return [];
         }
-        // A bot also receives edited_message, channel_post, callback_query, etc.
+        // A press on one of the CSAT rating buttons (see sendRatingRequest()).
+        // Only ours — csat:<response id>:<1-5> — are read; anything else is ignored.
+        if (is_array($payload['callback_query'] ?? null)) {
+            return $this->parseRatingPress($payload['callback_query']);
+        }
+        // A bot also receives edited_message, channel_post, etc.
         // Only plain messages (new or edited) become tickets/replies today.
         $message = $payload['message'] ?? ($payload['edited_message'] ?? null);
         if (!is_array($message)) {
@@ -186,6 +191,84 @@ class TelegramProvider extends MessagingProvider
      * One-time keyboard: it disappears from their client after one tap, so it
      * doesn't linger once the identity gate (ingest.php) has what it needs.
      */
+    /** A rating press: one normalised entry carrying 'csat' for ingest.php. */
+    private function parseRatingPress(array $cb): array
+    {
+        $data = (string)($cb['data'] ?? '');
+        if (!preg_match('/^csat:(\d+):([1-5])$/', $data, $m)) {
+            return [];
+        }
+        $chatId = (string)($cb['message']['chat']['id'] ?? '');
+        $callbackId = (string)($cb['id'] ?? '');
+        if ($chatId === '' || $callbackId === '') {
+            return [];
+        }
+        return [[
+            'from'            => $chatId,
+            'to'              => (string)($this->channel['channel_ref'] ?? ''),
+            'body'            => '',
+            'profile_name'    => '',
+            'provider_msg_id' => 'tgcb:' . $callbackId,
+            'media'           => [],
+            'timestamp'       => null,
+            'language_code'   => trim((string)($cb['from']['language_code'] ?? '')),
+            'csat'            => [
+                'response_id' => (int)$m[1],
+                'rating'      => (int)$m[2],
+                'callback_id' => $callbackId,
+            ],
+        ]];
+    }
+
+    /** Show the 1–5 buttons under the rating question. */
+    public function sendRatingRequest(string $to, string $text, int $responseId): string
+    {
+        $token = $this->channel['credentials']['bot_token'] ?? '';
+        if ($token === '') {
+            throw new Exception('Telegram channel is missing its bot token.');
+        }
+        $row = [];
+        for ($n = 1; $n <= 5; $n++) {
+            $row[] = ['text' => (string)$n, 'callback_data' => 'csat:' . $responseId . ':' . $n];
+        }
+        $payload = json_encode([
+            'chat_id'      => $to,
+            'text'         => $text,
+            'reply_markup' => ['inline_keyboard' => [$row]],
+        ]);
+        [$code, $resp] = $this->httpRequest(self::API_BASE . $token . '/sendMessage', [
+            'method'  => 'POST',
+            'headers' => ['Content-Type: application/json'],
+            'body'    => $payload,
+        ]);
+        $json = json_decode($resp, true);
+        if ($code < 200 || $code >= 300 || empty($json['ok'])) {
+            throw new Exception('Telegram rejected the rating request: ' . ($json['description'] ?? ('HTTP ' . $code)));
+        }
+        return (string)($json['result']['message_id'] ?? '');
+    }
+
+    /**
+     * Stop the button's loading spinner and show a short toast. Best-effort: a
+     * failure here must never undo a rating that has already been saved.
+     */
+    public function answerCallbackQuery(string $callbackQueryId, string $text): void
+    {
+        $token = $this->channel['credentials']['bot_token'] ?? '';
+        if ($token === '' || $callbackQueryId === '') {
+            return;
+        }
+        try {
+            $this->httpRequest(self::API_BASE . $token . '/answerCallbackQuery', [
+                'method'  => 'POST',
+                'headers' => ['Content-Type: application/json'],
+                'body'    => json_encode(['callback_query_id' => $callbackQueryId, 'text' => $text]),
+            ]);
+        } catch (Exception $e) {
+            error_log('Telegram answerCallbackQuery failed: ' . $e->getMessage());
+        }
+    }
+
     public function requestContact(string $chatId, string $promptText, string $buttonText = 'Share phone number'): string
     {
         $token = $this->channel['credentials']['bot_token'] ?? '';

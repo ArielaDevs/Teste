@@ -543,6 +543,10 @@ return [
         'too_short' => 'Utilisez un mot d\'au moins {n} lettres pour rechercher dans les tickets.',
         'not_indexed' => 'Le contenu des tickets n\'a pas encore été indexé sur cette installation.',
     ],
+    'csat_channel' => [
+        'prompt' => 'Comment évaluez-vous le service reçu ? Touchez un chiffre de 1 (mauvais) à 5 (excellent), ou répondez par un seul chiffre.',
+        'thanks' => 'Merci pour votre retour !',
+    ],
     'telegram_bot' => [
         'request_contact_prompt' => 'Bonjour ! Pendant que nous examinons cela, pourriez-vous partager votre numéro de téléphone avec le bouton ci-dessous ? Cela nous aide à vous reconnaître si vous nous avez déjà contactés.',
         'request_contact_button' => 'Partager le numéro de téléphone',

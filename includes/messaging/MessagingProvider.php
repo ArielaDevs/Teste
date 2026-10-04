@@ -83,6 +83,17 @@ abstract class MessagingProvider
     }
 
     /**
+     * Ask the customer to rate the service 1–5 (CSAT). Default: a plain message
+     * saying to reply with one digit, which the webhook then records (see
+     * csatPendingRequestForChat()). A channel with real buttons overrides this
+     * to show them; $responseId ties a button press back to its csat row.
+     */
+    public function sendRatingRequest(string $to, string $text, int $responseId): string
+    {
+        return $this->sendMessage($to, $text);
+    }
+
+    /**
      * Send a single local file (image, document, …) to a recipient — the
      * outbound twin of downloadMedia(). Returns the provider's message id.
      * Throws on failure, and by default for any provider that doesn't

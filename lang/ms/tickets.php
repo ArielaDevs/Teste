@@ -543,6 +543,10 @@ return [
         'too_short' => 'Gunakan perkataan sekurang-kurangnya {n} huruf untuk mencari di dalam tiket.',
         'not_indexed' => 'Kandungan tiket belum diindeks pada pemasangan ini.',
     ],
+    'csat_channel' => [
+        'prompt' => 'Bagaimanakah anda menilai perkhidmatan yang anda terima? Ketik nombor dari 1 (teruk) hingga 5 (cemerlang), atau balas dengan satu digit.',
+        'thanks' => 'Terima kasih atas maklum balas anda!',
+    ],
     'telegram_bot' => [
         'request_contact_prompt' => 'Hai! Semasa kami menyiasat ini, bolehkah anda kongsikan nombor telefon anda menggunakan butang di bawah? Ini membantu kami mengenali anda jika anda pernah menghubungi kami sebelum ini.',
         'request_contact_button' => 'Kongsi nombor telefon',

@@ -543,6 +543,10 @@ return [
         'too_short' => 'Użyj słowa o długości co najmniej {n} liter, aby wyszukiwać w zgłoszeniach.',
         'not_indexed' => 'Zawartość zgłoszeń nie została jeszcze zindeksowana w tej instalacji.',
     ],
+    'csat_channel' => [
+        'prompt' => 'Jak oceniasz otrzymaną obsługę? Dotknij liczby od 1 (słabo) do 5 (doskonale) albo odpowiedz pojedynczą cyfrą.',
+        'thanks' => 'Dziękujemy za opinię!',
+    ],
     'telegram_bot' => [
         'request_contact_prompt' => 'Cześć! Podczas gdy się tym zajmujemy, czy mógłbyś/mogłabyś podać swój numer telefonu za pomocą przycisku poniżej? Pomoże nam to Cię rozpoznać, jeśli kontaktowałeś/aś się z nami wcześniej.',
         'request_contact_button' => 'Udostępnij numer telefonu',

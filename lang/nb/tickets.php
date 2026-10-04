@@ -543,6 +543,10 @@ return [
         'too_short' => 'Bruk et ord på minst {n} bokstaver for å søke inne i saker.',
         'not_indexed' => 'Saksinnholdet er ikke indeksert på denne installasjonen ennå.',
     ],
+    'csat_channel' => [
+        'prompt' => 'Hvordan vil du vurdere tjenesten du fikk? Trykk på et tall fra 1 (dårlig) til 5 (utmerket), eller svar med ett siffer.',
+        'thanks' => 'Takk for tilbakemeldingen!',
+    ],
     'telegram_bot' => [
         'request_contact_prompt' => 'Hei! Mens vi ser på dette, kan du dele telefonnummeret ditt med knappen nedenfor? Det hjelper oss å kjenne deg igjen hvis du har kontaktet oss før.',
         'request_contact_button' => 'Del telefonnummer',

@@ -701,6 +701,12 @@ return [
     // The Telegram bot's OWN outbound text (not UI chrome) — sent in the
     // CUSTOMER's language_code (includes/messaging/ingest.php), not the
     // analyst's interface language. See I18n::tFor().
+    // Customer-facing satisfaction question on a messaging channel (includes/csat.php).
+    'csat_channel' => [
+        'prompt' => 'How would you rate the service you received? Tap a number from 1 (poor) to 5 (excellent), or reply with a single digit.',
+        'thanks' => 'Thank you for your feedback!',
+    ],
+
     'telegram_bot' => [
         'request_contact_prompt' => 'Hi! While we look into this, could you share your phone number using the button below? It helps us recognise you if you\'ve contacted us before.',
         'request_contact_button' => 'Share phone number',

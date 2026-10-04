@@ -543,6 +543,10 @@ return [
         'too_short' => 'Use uma palavra com pelo menos {n} letras para pesquisar dentro dos chamados.',
         'not_indexed' => 'O conteúdo dos chamados ainda não foi indexado nesta instalação.',
     ],
+    'csat_channel' => [
+        'prompt' => 'Como você avalia o atendimento recebido? Toque em um número de 1 (ruim) a 5 (excelente), ou responda com um único dígito.',
+        'thanks' => 'Obrigado pelo seu feedback!',
+    ],
     'telegram_bot' => [
         'request_contact_prompt' => 'Olá! Enquanto analisamos isso, você poderia compartilhar seu número de telefone usando o botão abaixo? Isso nos ajuda a reconhecê-lo caso já tenha entrado em contato antes.',
         'request_contact_button' => 'Compartilhar número de telefone',

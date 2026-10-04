@@ -91,6 +91,129 @@ const CSAT_RESULT_NO_MAILBOX    = 'no_mailbox';     // ticket has no mailbox to 
  * Pre-flight checks (mode, template existence, mailbox availability) all run
  * BEFORE the row is inserted, so failed sends don't leave orphan tokens behind.
  */
+/**
+ * The messaging channel row a ticket's customer is talking on, or null when the
+ * ticket's latest contact was email/portal (those keep the emailed survey).
+ */
+function csatTicketChannel(PDO $conn, int $ticketId): ?array {
+    require_once __DIR__ . '/messaging/messaging.php';
+    $stmt = $conn->prepare(
+        "SELECT channel_id FROM emails
+         WHERE ticket_id = ? AND channel <> 'email' AND channel_id IS NOT NULL
+         ORDER BY id DESC LIMIT 1"
+    );
+    $stmt->execute([$ticketId]);
+    $cid = $stmt->fetchColumn();
+    if (!$cid) {
+        return null;
+    }
+    $channel = loadMessagingChannel($conn, (int)$cid);
+    return ($channel && !empty($channel['is_active'])) ? $channel : null;
+}
+
+/**
+ * Where to send the rating request on this channel: the customer's own
+ * address, which is the Slack thread for Slack and the sender for everything else
+ * (the same rule send_message.php uses).
+ */
+function csatChannelRecipient(PDO $conn, int $ticketId, array $channel): string {
+    $stmt = $conn->prepare(
+        "SELECT from_address, to_recipients FROM emails
+         WHERE ticket_id = ? AND channel = ? AND direction = 'Inbound'
+         ORDER BY id DESC LIMIT 1"
+    );
+    $stmt->execute([$ticketId, $channel['channel_type'] ?? 'whatsapp']);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return '';
+    }
+    return ($channel['channel_type'] ?? '') === 'slack'
+        ? trim((string)($row['to_recipients'] ?? ''))
+        : (string)$row['from_address'];
+}
+
+/**
+ * The language to write a customer-facing rating message in. Telegram has the
+ * customer's own language_code (stored on the identity link); other channels do
+ * not report one, so they get English.
+ */
+function csatChannelLocale(PDO $conn, array $channel, string $recipient): string {
+    if (($channel['channel_type'] ?? '') !== 'telegram') {
+        return 'en';
+    }
+    $stmt = $conn->prepare("SELECT locale FROM messaging_identity_links WHERE channel_type = 'telegram' AND external_id = ?");
+    $stmt->execute([$recipient]);
+    $locale = (string)($stmt->fetchColumn() ?: '');
+    return $locale !== '' ? $locale : 'en';
+}
+
+/**
+ * Ask a messaging customer for a 1–5 rating, on their channel rather than by
+ * email. Creates the ticket_csat_responses row first so a button press or a
+ * typed digit always has a row to land on. Returns the new response id.
+ */
+function csatSendInChannel(PDO $conn, int $ticketId, array $channel, ?int $analystId): int {
+    require_once __DIR__ . '/messaging/messaging.php';
+    require_once __DIR__ . '/i18n.php';
+
+    $recipient = csatChannelRecipient($conn, $ticketId, $channel);
+    if ($recipient === '') {
+        throw new Exception('This ticket has no customer address on its channel to send the rating request to.');
+    }
+
+    $ins = $conn->prepare(
+        "INSERT INTO ticket_csat_responses (ticket_id, token, sent_datetime, analyst_id, created_at)
+         VALUES (?, ?, UTC_TIMESTAMP(), ?, UTC_TIMESTAMP())"
+    );
+    $ins->execute([$ticketId, csatGenerateToken(), $analystId]);
+    $responseId = (int)$conn->lastInsertId();
+
+    $locale = csatChannelLocale($conn, $channel, $recipient);
+    $text   = I18n::tFor($locale, 'tickets.csat_channel.prompt');
+    messagingProvider($channel)->sendRatingRequest($recipient, $text, $responseId);
+
+    return $responseId;
+}
+
+/** The unanswered in-channel rating request a customer's digit reply belongs to, or null. */
+function csatPendingRequestForChat(PDO $conn, int $channelId, string $chatId): ?int {
+    $stmt = $conn->prepare(
+        "SELECT r.id FROM ticket_csat_responses r
+         JOIN emails e ON e.ticket_id = r.ticket_id
+         WHERE e.channel_id = ? AND e.from_address = ? AND e.direction = 'Inbound'
+           AND r.sent_datetime IS NOT NULL AND r.rating IS NULL
+         ORDER BY r.id DESC LIMIT 1"
+    );
+    $stmt->execute([$channelId, $chatId]);
+    $id = $stmt->fetchColumn();
+    return $id ? (int)$id : null;
+}
+
+/** Does this response belong to this customer on this channel? Guards button presses. */
+function csatResponseBelongsToChat(PDO $conn, int $responseId, int $channelId, string $chatId): bool {
+    $stmt = $conn->prepare(
+        "SELECT 1 FROM ticket_csat_responses r
+         JOIN emails e ON e.ticket_id = r.ticket_id
+         WHERE r.id = ? AND e.channel_id = ? AND e.from_address = ? AND e.direction = 'Inbound'
+         LIMIT 1"
+    );
+    $stmt->execute([$responseId, $channelId, $chatId]);
+    return (bool)$stmt->fetchColumn();
+}
+
+/** Record a 1–5 rating once. Returns false if it was already answered or out of range. */
+function csatRecordRating(PDO $conn, int $responseId, int $rating): bool {
+    if ($rating < 1 || $rating > 5) {
+        return false;
+    }
+    $upd = $conn->prepare(
+        "UPDATE ticket_csat_responses SET rating = ?, responded_datetime = UTC_TIMESTAMP()
+         WHERE id = ? AND rating IS NULL"
+    );
+    $upd->execute([$rating, $responseId]);
+    return $upd->rowCount() > 0;
+}
+
 function sendCsatSurvey(PDO $conn, int $ticketId, ?int $analystId, bool $force = false): array {
     $mode = csatGetSetting($conn, 'csat_mode', 'off');
     if ($mode === 'off') {
@@ -104,6 +227,13 @@ function sendCsatSurvey(PDO $conn, int $ticketId, ?int $analystId, bool $force =
         if ($existing->fetchColumn()) {
             return ['result' => CSAT_RESULT_ALREADY_SENT, 'response_id' => null];
         }
+    }
+
+    // A messaging customer is asked on the channel they are already using — the
+    // email template and mailbox checks below are for email tickets only.
+    $channel = csatTicketChannel($conn, $ticketId);
+    if ($channel) {
+        return ['result' => CSAT_RESULT_SENT, 'response_id' => csatSendInChannel($conn, $ticketId, $channel, $analystId)];
     }
 
     // Pre-flight: an active csat_request template must exist. Without it, the
