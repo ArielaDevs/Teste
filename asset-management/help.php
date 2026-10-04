@@ -77,34 +77,46 @@ $translationNamespaces = ['common', 'asset-management'];
                 <span class="help-nav-num">6</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_deployment')); ?>
             </a>
-            <a href="#servers" class="help-nav-link" data-section="servers">
+            <a href="#reconciliation" class="help-nav-link" data-section="reconciliation">
                 <span class="help-nav-num">7</span>
+                <?php echo htmlspecialchars(t('asset-management.help.reconciliation.nav')); ?>
+            </a>
+            <a href="#asset-tags" class="help-nav-link" data-section="asset-tags">
+                <span class="help-nav-num">8</span>
+                <?php echo htmlspecialchars(t('asset-management.help.asset_tags.nav')); ?>
+            </a>
+            <a href="#asset-labels" class="help-nav-link" data-section="asset-labels">
+                <span class="help-nav-num">9</span>
+                <?php echo htmlspecialchars(t('asset-management.help.asset_labels.nav')); ?>
+            </a>
+            <a href="#servers" class="help-nav-link" data-section="servers">
+                <span class="help-nav-num">10</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_servers')); ?>
             </a>
             <a href="#dashboard" class="help-nav-link" data-section="dashboard">
-                <span class="help-nav-num">8</span>
+                <span class="help-nav-num">11</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_dashboard')); ?>
             </a>
             <a href="#who-holds-what" class="help-nav-link" data-section="who-holds-what">
-                <span class="help-nav-num">9</span>
+                <span class="help-nav-num">12</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_users')); ?>
             </a>
             <a href="#linked-tickets" class="help-nav-link" data-section="linked-tickets">
-                <span class="help-nav-num">10</span>
+                <span class="help-nav-num">13</span>
                 Tickets on an asset
             </a>
             <a href="#linked-contracts" class="help-nav-link" data-section="linked-contracts">
-                <span class="help-nav-num">11</span> Contracts covering an asset
+                <span class="help-nav-num">14</span> Contracts covering an asset
             </a>
             <a href="#right-click" class="help-nav-link" data-section="right-click">
-                <span class="help-nav-num">12</span> Right-click an asset
+                <span class="help-nav-num">15</span> Right-click an asset
             </a>
             <a href="#companies" class="help-nav-link" data-section="companies">
-                <span class="help-nav-num">13</span>
+                <span class="help-nav-num">16</span>
                 <?php echo htmlspecialchars(t('asset-management.help.companies.nav')); ?>
             </a>
             <a href="#tips" class="help-nav-link" data-section="tips">
-                <span class="help-nav-num">14</span>
+                <span class="help-nav-num">15</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_tips')); ?>
             </a>
         </div>
@@ -515,13 +527,58 @@ $translationNamespaces = ['common', 'asset-management'];
                         <span class="param">Schedule:</span> <span class="string">Daily at 12:00</span>
                     </div>
 
-                    <p class="help-note">Each run is idempotent &mdash; the API creates the asset on first contact and updates it on every subsequent run. Software that's been uninstalled is automatically removed from the inventory.</p>
+                    <p class="help-note">Each run is idempotent &mdash; the API creates the asset on first contact and updates it on every subsequent run. Renamed computers have their names updated in place using hardware serial numbers, without losing history or creating duplicates. Software that's been uninstalled is automatically removed.</p>
                 </div>
 
-                <!-- Section 6: Servers & vCenter -->
-                <div class="help-section" id="servers">
+                <!-- Section 7: Discovery & Reconciliation -->
+                <div class="help-section" id="reconciliation">
                     <div class="help-section-header">
                         <span class="help-section-num">7</span>
+                        <h3><?php echo htmlspecialchars(t('asset-management.help.reconciliation.heading')); ?></h3>
+                    </div>
+                    <p><?php echo t('asset-management.help.reconciliation.intro'); ?></p>
+
+                    <div class="help-list">
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.reconciliation.renames_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.reconciliation.renames_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.reconciliation.ignored_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.reconciliation.ignored_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.reconciliation.refresh_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.reconciliation.refresh_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.reconciliation.intune_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.reconciliation.intune_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.reconciliation.companies_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.reconciliation.companies_text'); ?></div>
+                    </div>
+                </div>
+
+                <!-- Section 8: Asset tag auto-generation -->
+                <div class="help-section" id="asset-tags">
+                    <div class="help-section-header">
+                        <span class="help-section-num">8</span>
+                        <h3><?php echo htmlspecialchars(t('asset-management.help.asset_tags.heading')); ?></h3>
+                    </div>
+                    <p><?php echo t('asset-management.help.asset_tags.intro'); ?></p>
+
+                    <div class="help-list">
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_tags.monotonic_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_tags.monotonic_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_tags.lifecycle_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_tags.lifecycle_text'); ?></div>
+                    </div>
+                </div>
+
+                <!-- Section 9: Physical asset labels & QR customisation -->
+                <div class="help-section" id="asset-labels">
+                    <div class="help-section-header">
+                        <span class="help-section-num">9</span>
+                        <h3><?php echo htmlspecialchars(t('asset-management.help.asset_labels.heading')); ?></h3>
+                    </div>
+                    <p><?php echo t('asset-management.help.asset_labels.intro'); ?></p>
+
+                    <div class="help-list">
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_labels.fields_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_labels.fields_text'); ?></div>
+                        <div><strong><?php echo htmlspecialchars(t('asset-management.help.asset_labels.qr_strong')); ?></strong> &mdash; <?php echo t('asset-management.help.asset_labels.qr_text'); ?></div>
+                    </div>
+                </div>
+
+                <!-- Section 10: Servers & vCenter -->
+                <div class="help-section" id="servers">
+                    <div class="help-section-header">
+                        <span class="help-section-num">10</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_servers')); ?></h3>
                     </div>
                     <p>If you run VMware vCenter, FreeITSM can sync your entire virtual machine estate with a single click.</p>
@@ -550,7 +607,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 <!-- Section 7: Dashboard -->
                 <div class="help-section" id="dashboard">
                     <div class="help-section-header">
-                        <span class="help-section-num">8</span>
+                        <span class="help-section-num">11</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_dashboard')); ?></h3>
                     </div>
                     <p>The dashboard lets you visualise your asset estate with customisable Chart.js widgets. Each analyst has their own dashboard &mdash; choose the charts that matter to you.</p>
@@ -581,7 +638,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 <!-- Section 9: Who holds what + the handover document (discussion #56) -->
                 <div class="help-section" id="who-holds-what">
                     <div class="help-section-header">
-                        <span class="help-section-num">9</span>
+                        <span class="help-section-num">12</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.users_heading')); ?></h3>
                     </div>
                     <p><?php echo htmlspecialchars(t('asset-management.help.users_intro')); ?></p>
@@ -625,7 +682,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
                 <div class="help-section" id="linked-tickets">
                     <div class="help-section-header">
-                        <span class="help-section-num">10</span>
+                        <span class="help-section-num">13</span>
                         <h3>Tickets raised against an asset</h3>
                     </div>
                     <p>Every asset has a <strong>Tickets</strong> tab listing what has been reported against it &mdash; open tickets first, then everything that came before. Click any row to open the ticket.</p>
@@ -641,7 +698,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
                 <div class="help-section" id="linked-contracts">
                     <div class="help-section-header">
-                        <span class="help-section-num">11</span>
+                        <span class="help-section-num">14</span>
                         <h3>Contracts covering an asset</h3>
                     </div>
                     <p>Every asset has a <strong>Contracts</strong> tab listing the agreements that cover it &mdash; the mobile service agreement behind a handset, the internet agreement behind a router, the maintenance contract behind a server. Each row shows the supplier, when the contract ends, and when notice has to be given. Click one to open the contract.</p>
@@ -661,7 +718,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
 <div class="help-section" id="right-click">
                     <div class="help-section-header">
-                        <span class="help-section-num">12</span>
+                        <span class="help-section-num">15</span>
                         <h3>Right-click an asset</h3>
                     </div>
                     <p>Right-clicking any asset in the list opens a menu of the things you most often want to do to one piece of equipment, without opening it and without hunting through the detail panel.</p>
@@ -684,7 +741,7 @@ $translationNamespaces = ['common', 'asset-management'];
          language while the translation score still reads 100%. */ ?>
                 <div class="help-section" id="companies">
                     <div class="help-section-header">
-                        <span class="help-section-num">13</span>
+                        <span class="help-section-num">16</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.companies.heading')); ?></h3>
                     </div>
                     <p><?php echo t('asset-management.help.companies.intro'); ?></p>
@@ -694,13 +751,14 @@ $translationNamespaces = ['common', 'asset-management'];
                         <div><?php echo t('asset-management.help.companies.refused'); ?></div>
                         <div><?php echo t('asset-management.help.companies.add'); ?></div>
                         <div><?php echo t('asset-management.help.companies.shared'); ?></div>
+                        <div><?php echo t('asset-management.help.companies.recon'); ?></div>
                     </div>
                     <p class="help-note"><?php echo t('asset-management.help.companies.note'); ?></p>
                 </div>
 
 <div class="help-section" id="tips">
                     <div class="help-section-header">
-                        <span class="help-section-num">14</span>
+                        <span class="help-section-num">17</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_tips')); ?></h3>
                     </div>
                     <div class="help-cards">
@@ -727,6 +785,10 @@ $translationNamespaces = ['common', 'asset-management'];
                         <div class="help-card row">
                             <div class="help-card-icon">&#9889;</div>
                             <div><strong>Idempotent syncs</strong><br>Run the script as many times as you like. It creates assets on first contact and updates them on every subsequent run. Removed software is automatically cleaned up.</div>
+                        </div>
+                        <div class="help-card row">
+                            <div class="help-card-icon">&#9881;</div>
+                            <div><strong>Reconciliation</strong><br>When a computer is renamed, its hardware serial number matches the existing asset. FreeITSM updates the hostname in place, keeping all history, tickets, and user assignments intact.</div>
                         </div>
                     </div>
                 </div>

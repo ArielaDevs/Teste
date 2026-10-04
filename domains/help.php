@@ -40,6 +40,7 @@ $sections = [
     'connections'=> 3,
     'status'     => 4,
     'rightclick' => 1,
+    'people'     => 4,
     'accounts'   => 4,
     'schedule'   => 5,
     'companies'  => 4,

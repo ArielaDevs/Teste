@@ -29,10 +29,22 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/public_url.php';
+require_once __DIR__ . '/tenant_settings.php';
+require_once __DIR__ . '/branding.php';
+require_once __DIR__ . '/i18n.php';
 
 /** Token length in bytes (hex-encoded to 20 chars). Short enough to keep the QR
  *  coarse, long enough that guessing is pointless. */
 const ASSET_TOKEN_BYTES = 10;
+
+/** Setting keys for physical label & QR configuration */
+const KEY_LABEL_TITLE           = 'asset_label_title';
+const KEY_LABEL_FIELDS          = 'asset_label_fields';
+const KEY_LABEL_FOOTER          = 'asset_label_footer';
+const KEY_LABEL_LOGO_ENABLED    = 'asset_label_logo_enabled';
+const KEY_LABEL_LOGO_PATH       = 'asset_label_logo_path';
+const KEY_LABEL_SHOW_FIELD_LABELS = 'asset_label_show_field_labels';
 
 /** Does this database have the label columns yet? Cached per request. */
 function assetLabelsSchemaReady(PDO $conn): bool {
@@ -75,8 +87,13 @@ function assetEnsureToken(PDO $conn, int $assetId): ?string {
             $stmt->execute([$assetId]);
             $now = $stmt->fetchColumn();
             if (!empty($now)) return (string)$now;
-        } catch (Exception $e) {
-            // Unique violation: go round again with a new token.
+        } catch (PDOException $e) {
+            // Only a unique-index collision is worth another go (SQLSTATE 23000 /
+            // MySQL 1062); anything else is a real fault and must surface (PR #164).
+            if ($e->getCode() === '23000' || ($e->errorInfo[1] ?? null) === 1062) {
+                continue;
+            }
+            throw $e;
         }
     }
     return null;
@@ -104,6 +121,9 @@ function assetIdForToken(PDO $conn, string $token): ?int {
  * like it was guarding them. Same reason hostname is checked here rather than
  * by the schema. `<=>` is the null-safe equality operator, so the comparison
  * behaves for the Default company as well as a named one.
+ *
+ * A check in code needs serialising against a concurrent write - every caller
+ * that WRITES a tag goes through AssetTagsService::withLock() (PR #164).
  */
 function assetTagAvailable(PDO $conn, ?int $tenantId, string $tag, ?int $exceptAssetId = null): bool {
     if (!assetLabelsSchemaReady($conn)) return true;
@@ -121,57 +141,154 @@ function assetTagAvailable(PDO $conn, ?int $tenantId, string $tag, ?int $exceptA
  * The URL a label's QR encodes.
  *
  * Absolute, because the code is scanned by a phone that has no idea what the
- * app's base path is. Derived from the install's configured public base URL so
- * that labels printed today still resolve when the app moves.
+ * app's base path is. Built on publicBaseUrl() - the install's ONE answer to
+ * "how does the outside world reach this install?" - so a configured public
+ * address wins over the current request: a label is printed once and lives on a
+ * laptop for years, and deriving it from whichever hostname the printing
+ * analyst happened to be using would bake that in permanently.
+ *
+ * This used to reuse the messaging-only setting, flagged at the time as wanting
+ * a generic key; publicBaseUrl() reads `public_base_url` and still falls back to
+ * `messaging_public_base_url`, so labels printed before PR #164 encode the same
+ * address. It also copes with a configured address that already carries the
+ * app's folder (publicUrlWithAppPath()), which would otherwise print
+ * …/freeitsm-app/freeitsm-app/a/<token> onto physical labels.
  */
-function assetLabelUrl(string $token): string {
-    return rtrim(assetPublicBaseUrl(), '/') . '/a/' . $token;
+function assetLabelUrl(string $token, ?PDO $conn = null): string {
+    return publicAbsoluteUrl($conn ?? connectToDatabase(), 'a/' . $token);
+}
+
+/** The install's public base, including any sub-folder - see assetLabelUrl(). */
+function assetPublicBaseUrl(?PDO $conn = null): string {
+    return publicBaseUrl($conn ?? connectToDatabase());
 }
 
 /**
- * The install's public base, including any sub-folder.
+ * Canonical commercial A4 label sheet stock specifications.
  *
- * REUSES `messagingPublicBaseUrl()` and its `messaging_public_base_url`
- * setting rather than adding a second one. That setting answers the question
- * "how does the outside world reach this install?", which is exactly what a
- * printed label needs to know — and an install that already told us for
- * WhatsApp webhooks should not have to tell us again for asset labels.
- *
- * ⚠️ Divergence worth flagging rather than hiding: the setting is *named* for
- * messaging, and it is now doing install-wide work. It wants renaming to a
- * generic key (with a read-both-fall-back) the next time settings are touched.
- *
- * Why the configured value wins over the current request: a label is printed
- * once and lives on a laptop for years, so deriving it from whichever hostname
- * the printing analyst happened to be using would bake that in permanently.
+ * @return array<string, array{dims: string, w: float, h: float, cols: int, qr: int}>
  */
-function assetPublicBaseUrl(): string {
-    static $base = null;
-    if ($base !== null) return $base;
+function assetLabelSheetSpecs(): array {
+    return [
+        '65' => ['dims' => '38.1 × 21.2 mm', 'w' => 38.1, 'h' => 21.2, 'cols' => 5, 'qr' => 16],
+        '40' => ['dims' => '45.7 × 25.4 mm', 'w' => 45.7, 'h' => 25.4, 'cols' => 4, 'qr' => 19],
+        '24' => ['dims' => '63.5 × 33.9 mm', 'w' => 63.5, 'h' => 33.9, 'cols' => 3, 'qr' => 25],
+        '12' => ['dims' => '63.5 × 72 mm',   'w' => 63.5, 'h' => 72.0, 'cols' => 3, 'qr' => 38],
+    ];
+}
 
-    require_once __DIR__ . '/messaging/messaging.php';
-    $host = '';
+/**
+ * Determine QR code error-correction level based on logo presence.
+ *
+ * Invariants:
+ * - No logo: standard Level M (15% redundancy) for maximum module clarity
+ * - With logo: high Level H (30% redundancy) to guarantee reliable scanning with 22% center overlay
+ */
+function assetLabelQrEcLevel(bool $hasLogo): string {
+    return $hasLogo ? 'H' : 'M';
+}
+
+/** The built-in fields a label can print, in the order the picker offers them. */
+const ASSET_LABEL_STANDARD_FIELDS = ['asset_tag', 'hostname', 'service_tag', 'manufacturer', 'model', 'company', 'location', 'asset_type'];
+
+/** Custom asset fields a label can print: key ('cf_' + field_key) => its own label. */
+function assetLabelCustomFields(PDO $conn, ?int $tenantId = null): array {
+    $out = [];
     try {
-        $host = messagingPublicBaseUrl(connectToDatabase());
-    } catch (Exception $e) {
-        $scheme = requestScheme();
-        $host = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $sql = "SELECT field_key, label FROM asset_fields WHERE is_deleted = 0";
+        $args = [];
+        if ($tenantId !== null && $tenantId > 0 && isMultiTenant($conn)) {
+            $sql .= " AND (tenant_id IS NULL OR tenant_id = ?)";
+            $args[] = $tenantId;
+        }
+        $stmt = $conn->prepare($sql . " ORDER BY label ASC");
+        $stmt->execute($args);
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $out['cf_' . $r['field_key']] = (string)$r['label'];
+        }
+    } catch (Exception $e) { /* custom fields not installed yet */ }
+    return $out;
+}
+
+/**
+ * Every field a label can print, with the name the SETTINGS picker shows -
+ * built-in fields in the reader's language, custom fields marked as such.
+ */
+function assetLabelAvailableFields(PDO $conn, ?int $tenantId = null): array {
+    $fields = [];
+    foreach (ASSET_LABEL_STANDARD_FIELDS as $key) {
+        $fields[$key] = t('asset-management.labels.field.' . $key);
+    }
+    foreach (assetLabelCustomFields($conn, $tenantId) as $key => $label) {
+        $fields[$key] = t('asset-management.labels.field.custom', ['label' => $label]);
+    }
+    return $fields;
+}
+
+/**
+ * The short names printed ON the label beside each value - space on a 38mm
+ * sticker is tight, so "Serial" rather than "Serial / service tag".
+ */
+function assetLabelPrintFields(PDO $conn, ?int $tenantId = null): array {
+    $fields = [];
+    foreach (ASSET_LABEL_STANDARD_FIELDS as $key) {
+        $fields[$key] = t('asset-management.labels.field_short.' . $key);
+    }
+    return $fields + assetLabelCustomFields($conn, $tenantId);
+}
+
+/**
+ * The label settings for a company: header, footer, which fields in which
+ * order, whether to print their names, and the logo inside the QR.
+ *
+ * @return array{title:string, fields:string[], footer:string, logo_enabled:bool,
+ *               logo_path:string, custom_logo_path:string, show_field_labels:bool}
+ */
+function assetLabelSettings(PDO $conn, ?int $tenantId = null): array {
+    $title        = (string)tenantSetting($conn, $tenantId, KEY_LABEL_TITLE, '');
+    $rawFields    = (string)tenantSetting($conn, $tenantId, KEY_LABEL_FIELDS, '');
+    $footer       = (string)tenantSetting($conn, $tenantId, KEY_LABEL_FOOTER, '');
+    $logoEnabled      = (string)tenantSetting($conn, $tenantId, KEY_LABEL_LOGO_ENABLED, '0') === '1';
+    $customLogoPath   = (string)tenantSetting($conn, $tenantId, KEY_LABEL_LOGO_PATH, '');
+    $logoPath         = ($logoEnabled && $customLogoPath !== '' && brandingPathIsSafe($customLogoPath) && file_exists(__DIR__ . '/../' . $customLogoPath)) ? $customLogoPath : '';
+    $showFieldLabels = (string)tenantSetting($conn, $tenantId, KEY_LABEL_SHOW_FIELD_LABELS, '0') === '1';
+
+    $available = assetLabelAvailableFields($conn, $tenantId);
+
+    // Parse configured ordered fields list
+    $fields = [];
+    if ($rawFields !== '') {
+        $decoded = json_decode($rawFields, true);
+        if (is_array($decoded)) {
+            $fields = $decoded;
+        } else {
+            $fields = array_map('trim', explode(',', $rawFields));
+        }
+    } else {
+        $fields = ['asset_tag', 'hostname']; // Default standard fields
     }
 
-    // The app root — the same derivation messagingWebhookUrl() uses, so a
-    // sub-folder install ("/freeitsm-app/") is handled identically.
-    $root = defined('BASE_URL') ? rtrim(BASE_URL, '/') : '';
-    $host = rtrim($host, '/');
-
-    // ⚠️ The setting is documented as scheme://host, but people paste the URL
-    // they actually use — which on a sub-folder install carries the folder, and
-    // on a tunnel (ngrok et al) is copied wholesale from the address bar. Adding
-    // the root again would encode …/freeitsm-app/freeitsm-app/a/<token> into a
-    // code that then gets printed onto physical labels. Accept both forms.
-    if ($root !== '' && substr($host, -strlen($root)) === $root) {
-        $root = '';
+    // Filter to valid known fields
+    $validFields = [];
+    foreach ($fields as $f) {
+        $f = trim((string)$f);
+        if ($f !== '' && isset($available[$f]) && !in_array($f, $validFields, true)) {
+            $validFields[] = $f;
+        }
     }
 
-    $base = $host . $root;
-    return $base;
+    // Mandatory Rule: Asset Tag MUST be present in selected fields
+    if (!in_array('asset_tag', $validFields, true)) {
+        array_unshift($validFields, 'asset_tag');
+    }
+
+    return [
+        'title'              => $title,
+        'fields'             => $validFields,
+        'footer'             => $footer,
+        'logo_enabled'       => $logoEnabled,
+        'logo_path'          => $logoPath,
+        'custom_logo_path'   => $customLogoPath,
+        'show_field_labels'  => $showFieldLabels,
+    ];
 }

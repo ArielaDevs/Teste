@@ -98,6 +98,20 @@ function publicUrlWithAppPath(string $root): string
     return $root . $app;
 }
 
+/** The per-request cache behind publicBaseUrl(); see publicBaseUrlForget(). */
+function &publicBaseUrlCache(): ?string
+{
+    static $root = null;
+    return $root;
+}
+
+/** Forget the cached root - after the setting is saved, or between test cases. */
+function publicBaseUrlForget(): void
+{
+    $root = &publicBaseUrlCache();
+    $root = null;
+}
+
 /**
  * The root every outbound link should be built on, without a trailing slash.
  *
@@ -109,7 +123,7 @@ function publicUrlWithAppPath(string $root): string
  */
 function publicBaseUrl(PDO $conn): string
 {
-    static $root = null;
+    $root = &publicBaseUrlCache();
     if ($root !== null) {
         return $root;
     }
@@ -135,12 +149,12 @@ function publicBaseUrl(PDO $conn): string
         // reflect an unchecked header.
         $host = preg_replace('/[^A-Za-z0-9\.\-:]/', '', (string)$_SERVER['HTTP_HOST']);
         if ($host !== '') {
-            $root = ($https ? 'https://' : 'http://') . $host . rtrim(BASE_URL, '/');
+            $root = ($https ? 'https://' : 'http://') . $host . rtrim(defined('BASE_URL') ? BASE_URL : '/', '/');
             return $root;
         }
     }
 
-    $root = rtrim(BASE_URL, '/');
+    $root = rtrim(defined('BASE_URL') ? BASE_URL : '/', '/');
     return $root;
 }
 

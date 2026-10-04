@@ -1653,6 +1653,9 @@ return [
         'comment'            => 'TEXT NULL',
         'analyst_id'         => 'INT NULL',
         'created_at'         => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        // PR #166 - which chat a rating request was asked in (NULL = emailed).
+        'channel_id'         => 'INT NULL',
+        'channel_from'       => 'VARCHAR(255) NULL',
     ],
 
     'ticket_rota_shifts' => [
@@ -1684,6 +1687,15 @@ return [
         'is_on_call'        => 'TINYINT(1) NOT NULL DEFAULT 0',
         'created_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
         'updated_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+
+    // Generated asset tag counters (PR #164) - ticket_number_counters' shape,
+    // and the same ⚠️: counter_key is the PK, declared in db_verify.php's
+    // $primaryKeys map, not here.
+    'asset_tag_counters' => [
+        'counter_key'       => 'VARCHAR(64) NOT NULL',
+        'next_value'        => 'BIGINT NOT NULL DEFAULT 1',
+        'updated_datetime'  => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
     ],
 
     'assets' => [
@@ -1806,7 +1818,7 @@ return [
     'asset_history' => [
         'id'                => 'INT NOT NULL AUTO_INCREMENT',
         'asset_id'          => 'INT NOT NULL',
-        'analyst_id'        => 'INT NOT NULL',
+        'analyst_id'        => 'INT NULL',
         'field_name'        => 'VARCHAR(100) NOT NULL',
         'old_value'         => 'VARCHAR(500) NULL',
         'new_value'         => 'VARCHAR(500) NULL',

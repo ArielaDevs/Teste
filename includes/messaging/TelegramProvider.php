@@ -29,6 +29,9 @@ require_once __DIR__ . '/MessagingProvider.php';
 class TelegramProvider extends MessagingProvider
 {
     private const API_BASE = 'https://api.telegram.org/bot';
+
+    /** Every update type parseInbound() handles - what setWebhook asks Telegram for. */
+    public const TELEGRAM_UPDATE_TYPES = ['message', 'edited_message', 'callback_query'];
     private const FILE_BASE = 'https://api.telegram.org/file/bot';
 
     public function verifyWebhook(string $rawBody, array $headers, array $params, string $url): bool
@@ -182,16 +185,7 @@ class TelegramProvider extends MessagingProvider
         return (string) ($json['result']['message_id'] ?? '');
     }
 
-    /**
-     * Ask the chat to share their phone number, via Telegram's native
-     * "Share phone number" button (a reply keyboard with request_contact,
-     * not an inline button — that's what makes Telegram hand back a verified
-     * contact object rather than free-typed, unverifiable text).
-     *
-     * One-time keyboard: it disappears from their client after one tap, so it
-     * doesn't linger once the identity gate (ingest.php) has what it needs.
-     */
-    /** A rating press: one normalised entry carrying 'csat' for ingest.php. */
+    /** A rating press (PR #166): one normalised entry carrying 'csat' for ingest.php. */
     private function parseRatingPress(array $cb): array
     {
         $data = (string)($cb['data'] ?? '');
@@ -216,6 +210,10 @@ class TelegramProvider extends MessagingProvider
                 'response_id' => (int)$m[1],
                 'rating'      => (int)$m[2],
                 'callback_id' => $callbackId,
+                // The question the button sat under, so the buttons can be
+                // replaced by the answer (closeRatingRequest()).
+                'message_id'   => (string)($cb['message']['message_id'] ?? ''),
+                'message_text' => (string)($cb['message']['text'] ?? ''),
             ],
         ]];
     }
@@ -249,6 +247,33 @@ class TelegramProvider extends MessagingProvider
     }
 
     /**
+     * Swap the rating buttons for the answer: the question stays, a line saying
+     * what they chose goes under it, and the keyboard goes (editMessageText
+     * without reply_markup removes it). The toast from answerCallbackQuery()
+     * fades in seconds; this is the record the customer keeps, and it leaves
+     * no buttons that would silently do nothing if tapped again.
+     *
+     * Best-effort, like the toast: the rating is already saved.
+     */
+    public function closeRatingRequest(string $chatId, string $messageId, string $question, string $answerLine): void
+    {
+        $token = $this->channel['credentials']['bot_token'] ?? '';
+        if ($token === '' || $chatId === '' || $messageId === '') {
+            return;
+        }
+        $text = trim($question) !== '' ? trim($question) . "\n\n" . $answerLine : $answerLine;
+        try {
+            $this->httpRequest(self::API_BASE . $token . '/editMessageText', [
+                'method'  => 'POST',
+                'headers' => ['Content-Type: application/json'],
+                'body'    => json_encode(['chat_id' => $chatId, 'message_id' => (int)$messageId, 'text' => $text]),
+            ]);
+        } catch (Exception $e) {
+            error_log('Telegram closeRatingRequest failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Stop the button's loading spinner and show a short toast. Best-effort: a
      * failure here must never undo a rating that has already been saved.
      */
@@ -269,6 +294,15 @@ class TelegramProvider extends MessagingProvider
         }
     }
 
+    /**
+     * Ask the chat to share their phone number, via Telegram's native
+     * "Share phone number" button (a reply keyboard with request_contact,
+     * not an inline button — that's what makes Telegram hand back a verified
+     * contact object rather than free-typed, unverifiable text).
+     *
+     * One-time keyboard: it disappears from their client after one tap, so it
+     * doesn't linger once the identity gate (ingest.php) has what it needs.
+     */
     public function requestContact(string $chatId, string $promptText, string $buttonText = 'Share phone number'): string
     {
         $token = $this->channel['credentials']['bot_token'] ?? '';
@@ -422,7 +456,14 @@ class TelegramProvider extends MessagingProvider
             'body'    => json_encode([
                 'url'             => $url,
                 'secret_token'    => $secret,
-                'allowed_updates' => ['message', 'edited_message'],   // all parseInbound() reads
+                // TRAP: this list is everything parseInbound() reads. Leave one
+                //   out and Telegram never sends it - no error anywhere. A
+                //   rating button press is a callback_query; without it the
+                //   button just shimmers on the customer's phone. Telegram keeps
+                //   the list a bot was registered with, so a bot connected
+                //   before a type was added needs Connect pressed again -
+                //   testConnection() checks for that (TELEGRAM_UPDATE_TYPES).
+                'allowed_updates' => self::TELEGRAM_UPDATE_TYPES,
             ]),
         ]);
         $json = json_decode($resp, true);
@@ -453,6 +494,26 @@ class TelegramProvider extends MessagingProvider
         }
 
         $username = $json['result']['username'] ?? '';
-        return 'Connected to Telegram bot ' . ($username !== '' ? "@$username." : '.');
+        $result   = 'Connected to Telegram bot ' . ($username !== '' ? "@$username." : '.');
+
+        // A bot registered before 3.1.0 asked for messages only, so rating
+        // button presses never arrive. Say so here, where an admin looks when
+        // something does not work. A missing list means Telegram's default,
+        // which includes everything we read.
+        try {
+            [$wCode, $wResp] = $this->httpRequest(self::API_BASE . $token . '/getWebhookInfo', ['method' => 'GET']);
+            $info = json_decode($wResp, true)['result'] ?? null;
+            if ($wCode >= 200 && $wCode < 300 && is_array($info)) {
+                if (($info['url'] ?? '') === '') {
+                    $result .= ' Not connected yet - press Connect so messages reach FreeITSM.';
+                } elseif (is_array($info['allowed_updates'] ?? null)
+                          && array_diff(self::TELEGRAM_UPDATE_TYPES, $info['allowed_updates'])) {
+                    $result .= ' This bot was connected by an older version, so rating buttons will not respond - press Connect again to fix it.';
+                }
+            }
+        } catch (Throwable $e) {
+            // The check is advice; the connection itself has already succeeded.
+        }
+        return $result;
     }
 }

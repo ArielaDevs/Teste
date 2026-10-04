@@ -2066,6 +2066,14 @@ $translationNamespaces = ['common', 'tickets'];
                 </div>
 
                 <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="csatInChannel">
+                        <span><?php echo htmlspecialchars(t('tickets.settings.csat_tab.in_channel')); ?></span>
+                    </label>
+                    <small style="display: block; color: var(--text-muted, #666); margin-top: 4px; margin-left: 26px;"><?php echo t('tickets.settings.csat_tab.in_channel_help'); ?></small>
+                </div>
+
+                <div class="form-group">
                     <label><?php echo htmlspecialchars(t('tickets.settings.csat.scale_label')); ?></label>
                     <div style="display: flex; gap: 20px; margin-top: 6px;">
                         <label style="display: flex; gap: 8px; align-items: center; cursor: pointer;">
@@ -2767,7 +2775,7 @@ $translationNamespaces = ['common', 'tickets'];
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step2')); ?></li>
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step3')); ?></li>
                         </ol>
-                        <small style="color:var(--text-muted, #666);"><code>docs/messaging-mattermost-setup.md</code></small>
+                        <small style="color:var(--text-muted, #666);"><a href="https://github.com/edmozley/freeitsm/wiki/Mattermost" target="_blank" rel="noopener">github.com/edmozley/freeitsm/wiki/Mattermost</a></small>
                     </div>
 
                     <!-- Teams setup steps: the Azure side has to exist before the App ID and secret above do. -->
@@ -2780,7 +2788,7 @@ $translationNamespaces = ['common', 'tickets'];
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step4')); ?></li>
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step5')); ?></li>
                         </ol>
-                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_help_more')); ?> <code>docs/messaging-teams-setup.md</code></small>
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_help_more')); ?> <a href="https://github.com/edmozley/freeitsm/wiki/Microsoft-Teams" target="_blank" rel="noopener">github.com/edmozley/freeitsm/wiki/Microsoft-Teams</a></small>
                         <div style="margin-top:10px;">
                             <button type="button" id="teamsPackageBtn" class="btn btn-secondary" style="display:none;" onclick="downloadTeamsPackage()"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_download')); ?></button>
                             <small id="teamsPackageHelp" style="display:none; color:var(--text-muted, #666); margin-left:8px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_download_help')); ?></small>
@@ -6190,6 +6198,7 @@ $translationNamespaces = ['common', 'tickets'];
 
                 document.getElementById('csatDelay').value = data.delay_minutes ?? 0;
                 document.getElementById('csatOnePerTicket').checked = data.one_per_ticket !== '0';
+                document.getElementById('csatInChannel').checked = data.in_channel === '1';
 
                 const scale = document.querySelector(`input[name="csatScale"][value="${data.scale || 'stars'}"]`);
                 if (scale) scale.checked = true;
@@ -6204,6 +6213,7 @@ $translationNamespaces = ['common', 'tickets'];
                 mode:           document.querySelector('input[name="csatMode"]:checked')?.value || 'off',
                 delay_minutes:  parseInt(document.getElementById('csatDelay').value || '0', 10),
                 one_per_ticket: document.getElementById('csatOnePerTicket').checked ? '1' : '0',
+                in_channel:     document.getElementById('csatInChannel').checked ? '1' : '0',
                 scale:          document.querySelector('input[name="csatScale"]:checked')?.value || 'stars',
             };
             try {

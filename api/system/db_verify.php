@@ -74,6 +74,7 @@ $primaryKeys = [
     // ⚠️ No auto-increment id on purpose: counter_key being the PK is what lets
     // the read-and-increment happen in one statement (#1147).
     'ticket_number_counters'    => 'counter_key',
+    'asset_tag_counters'        => 'counter_key',   // the same design, for asset tags (PR #164)
     'attachment_text'           => 'attachment_id',
     'document_text'             => 'document_id',
     'system_settings'           => 'setting_key',
@@ -243,6 +244,31 @@ try {
         }
     } catch (Exception $e) {
         // Non-fatal: ticket history keeps working; only the workflow action stays broken.
+    }
+
+    // `asset_history.analyst_id` was NOT NULL, so a change nobody on the desk
+    // made - an Intune rename, an inventory agent reporting a new hostname
+    // (PR #164) - had no way to be recorded, and the write failed the whole
+    // request. Same probe-then-MODIFY shape as ticket_audit above, and safe for
+    // the same reason: every existing row already has an analyst. The foreign
+    // key is left exactly as it is - a NULL never violates it.
+    try {
+        $ahCol = $conn->prepare(
+            "SELECT IS_NULLABLE FROM information_schema.columns
+             WHERE table_schema = ? AND table_name = 'asset_history' AND column_name = 'analyst_id'"
+        );
+        $ahCol->execute([$dbName]);
+        $ahRow = $ahCol->fetch(PDO::FETCH_ASSOC);
+        if ($ahRow && strtoupper($ahRow['IS_NULLABLE']) === 'NO') {
+            $conn->exec("ALTER TABLE `asset_history` MODIFY `analyst_id` INT NULL");
+            $results[] = [
+                'table'   => 'asset_history',
+                'status'  => 'updated',
+                'details' => ["analyst_id: NOT NULL → NULL (Intune and the inventory agent record changes no analyst made)"],
+            ];
+        }
+    } catch (Exception $e) {
+        // Non-fatal: asset history keeps working for people; only automated entries stay broken.
     }
 
     // `users_assets.user_id` was NOT NULL, so an asset could only ever be
@@ -1795,6 +1821,11 @@ try {
             // If 1, a reopened-then-closed ticket only gets a new survey when the analyst
             // manually triggers it (stops survey-spamming a flaky ticket). If 0, every close fires.
             'csat_one_per_ticket'             => '1',
+            // PR #166: ask chat customers in their chat. OFF on an upgrade - an
+            // install that has emailed every survey for months must not start
+            // messaging its chat customers the day it upgrades. freeitsm.sql
+            // seeds '1' first on a new install, and INSERT IGNORE keeps it.
+            'csat_in_channel'                 => '0',
             // Shared HMAC secret for tokenising survey URLs. Random per install — leaking it
             // would let anyone post ratings on behalf of users, so it stays in system_settings
             // rather than going to a public file or being printed in error pages.
@@ -1838,6 +1869,17 @@ try {
             // increments), and unlike the settings above, turning it on silently at
             // upgrade would lock people out of their own service desk.
             'password_expiry_days'            => '0',
+            'intune_company_id'                 => null,
+            // OFF on upgrade (a new install's freeitsm.sql seeds '1' first, and
+            // INSERT IGNORE keeps it): turning it on renames every asset whose
+            // device has been renamed in Intune since it was linked (PR #164).
+            'intune_sync_hostnames'             => '0',
+            'asset_reconciliation_ignored_serials' => "TO BE FILLED BY O.E.M.\nDEFAULT STRING\nNONE\nSYSTEM SERIAL NUMBER\nNOT SPECIFIED\n123456789",
+            // Asset tags (PR #164): off until somebody switches them on.
+            'asset_tag_autogen_enabled'          => '0',
+            'asset_tag_format'                   => 'AST-{#####}',
+            'asset_tag_start'                    => '1',
+            'asset_tag_scope'                    => 'per_company',
         ];
         // Secrets are seeded already encrypted. The whole block is best-effort: an
         // install that has no encryption key yet must still be able to build its

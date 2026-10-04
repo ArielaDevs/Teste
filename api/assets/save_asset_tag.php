@@ -24,6 +24,8 @@ require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
 require_once '../../includes/tenancy.php';
 require_once '../../includes/asset_labels.php';
+require_once '../../includes/service_context.php';
+require_once '../../includes/services/asset_tags.php';
 
 header('Content-Type: application/json');
 if (!isset($_SESSION['analyst_id'])) { echo json_encode(['success' => false, 'error' => 'Not authenticated']); exit; }
@@ -49,42 +51,11 @@ try {
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT tenant_id, asset_tag FROM assets WHERE id = ?");
-    $stmt->execute([$assetId]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) throw new Exception('Asset not found');
-
-    $old = (string)($row['asset_tag'] ?? '');
-    if ($old === $tag) {
-        echo json_encode(['success' => true, 'asset_tag' => $tag, 'unchanged' => true]);
-        exit;
-    }
-
-    // Blank clears the tag. Everything else has to be free within this company.
-    $tenantId = $row['tenant_id'] === null ? null : (int)$row['tenant_id'];
-    if ($tag !== '' && !assetTagAvailable($conn, $tenantId, $tag, $assetId)) {
-        // Name the conflict plainly: "already in use" without saying where is
-        // the kind of error that has somebody hunting through a list of 4,000.
-        $find = $conn->prepare("SELECT hostname FROM assets WHERE tenant_id <=> ? AND asset_tag = ? AND id <> ? LIMIT 1");
-        $find->execute([$tenantId, $tag, $assetId]);
-        $clash = $find->fetchColumn();
-        throw new Exception($clash
-            ? "That tag is already on " . $clash
-            : "That tag is already in use in this company");
-    }
-
-    $conn->prepare("UPDATE assets SET asset_tag = ? WHERE id = ?")
-         ->execute([$tag === '' ? null : $tag, $assetId]);
-
-    // Best-effort history, matching how the assets service records field edits.
-    try {
-        $conn->prepare(
-            "INSERT INTO asset_history (asset_id, analyst_id, field_name, old_value, new_value, created_datetime)
-             VALUES (?, ?, 'Asset tag', ?, ?, UTC_TIMESTAMP())"
-        )->execute([$assetId, $analystId, ($old === '' ? null : $old), ($tag === '' ? null : $tag)]);
-    } catch (Exception $e) { /* history is best-effort */ }
-
-    echo json_encode(['success' => true, 'asset_tag' => $tag]);
+    // The check, the write and the history row are AssetTagsService::assign()'s
+    // (PR #164): the same per-company lock as a tag typed in on create or
+    // generated, so two paths can never hand out the same tag.
+    $res = AssetTagsService::assign($conn, ActorContext::fromSession($conn), $assetId, $tag);
+    echo json_encode(['success' => true, 'asset_tag' => $res['asset_tag']] + ($res['unchanged'] ? ['unchanged' => true] : []));
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

@@ -1,25 +1,43 @@
 <?php
 /**
  * TeamsProvider — Microsoft Teams one-to-one chats with the FreeITSM bot, via
- * the Bot Framework.
+ * the Bot Framework. Contributed by turbay-a in PR #166; see the Teams and
+ * Mattermost developer guide for what changed at merge.
  *
  * Credentials JSON (messaging_channels.credentials, encrypted at rest):
  *   { "app_id": "<Azure Bot App ID>", "app_secret": "...", "tenant_id": "<AAD tenant>" }
  * The tenant is required for a single-tenant app registration: token requests
  * to the wrong tenant fail with AADSTS700016.
  *
- * Inbound: Bot Framework POSTs an Activity to the webhook with
- *   Authorization: Bearer <JWT>. verifyWebhook() checks the RS256 signature
- *   against Bot Framework's published keys, the issuer, and that the audience
- *   is this channel's app id, so nobody can post fake messages to the webhook.
+ * ── INBOUND ──────────────────────────────────────────────────────────────────
+ * Bot Framework POSTs an Activity with `Authorization: Bearer <JWT>`.
+ * verifyWebhook() checks, in this order:
+ *   1. the RS256 signature, against Bot Framework's published keys - with the
+ *      vendored firebase/php-jwt, the same library SSO uses (includes/oidc.php),
+ *      not a second hand-written RSA/DER decoder;
+ *   2. issuer, audience (this channel's App ID) and expiry (5 min leeway);
+ *   3. the token's `serviceurl` claim equals the activity's serviceUrl.
+ *      TRAP: never trust a serviceUrl the token does not vouch for. Replies are
+ *      POSTed to it WITH THE BOT'S ACCESS TOKEN, so an activity that could name
+ *      its own serviceUrl could collect that token. Bot Framework requires
+ *      this check; the branch first skipped it;
+ *   4. the serviceUrl is a Microsoft Bot Framework host (belt and braces for 3);
+ *   5. the activity comes from THIS channel's Microsoft 365 tenant, so a person
+ *      in another organisation cannot open tickets by finding the bot.
+ *
+ * ── THE REPLY ADDRESS ────────────────────────────────────────────────────────
+ * The serviceUrl is PER CONVERSATION (Teams routes by the user's region), so it
+ * travels with the conversation, not the channel: parseInbound() sets
+ *   to = "<serviceUrl>|<conversationId>"
+ * ingest stores that as the row's to_recipients and messagingReplyAddress()
+ * hands it back to sendMessage().
+ *
+ * TRAP: never store the serviceUrl on the channel. The branch first kept the
+ *   latest one in messaging_channels.channel_ref, which answers one user through
+ *   another user's region.
  *
  * Outbound: POST {serviceUrl}v3/conversations/{conversationId}/activities with
- *   an Azure AD client-credentials token for the Bot Framework scope.
- *
- * Reply address: the conversation id is the customer's chat (stored as the
- * sender, like a Telegram chat id). The serviceUrl is region-specific and is
- * taken from the latest inbound activity; ingest.php keeps it in
- * messaging_channels.channel_ref.
+ * an Azure AD client-credentials token for the Bot Framework scope.
  *
  * Limits: one-to-one chats only (group chats and channels are ignored, as
  * Telegram groups are); images only for analyst attachments, because Teams
@@ -27,6 +45,16 @@
  */
 
 require_once __DIR__ . '/MessagingProvider.php';
+require_once __DIR__ . '/../vendor/firebase-jwt/src/JWT.php';
+require_once __DIR__ . '/../vendor/firebase-jwt/src/JWK.php';
+require_once __DIR__ . '/../vendor/firebase-jwt/src/Key.php';
+require_once __DIR__ . '/../vendor/firebase-jwt/src/JWTExceptionWithPayloadInterface.php';
+require_once __DIR__ . '/../vendor/firebase-jwt/src/BeforeValidException.php';
+require_once __DIR__ . '/../vendor/firebase-jwt/src/ExpiredException.php';
+require_once __DIR__ . '/../vendor/firebase-jwt/src/SignatureInvalidException.php';
+
+use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
 
 class TeamsProvider extends MessagingProvider
 {
@@ -35,8 +63,21 @@ class TeamsProvider extends MessagingProvider
     private const DEFAULT_SERVICE_URL = 'https://smba.trafficmanager.net/teams/';
     private const JWKS_CACHE_SECONDS = 86400;
 
+    /**
+     * Hosts Bot Framework answers on (public cloud and the US government clouds),
+     * and where Teams serves the images a customer sends. A serviceUrl or an
+     * attachment URL outside these never receives the bot's token.
+     */
+    private const SERVICE_HOSTS = ['smba.trafficmanager.net', '.botframework.com', '.teams.microsoft.com',
+                                   '.botframework.us', '.botframework.azure.us', '.teams.microsoft.us'];
+    private const MEDIA_HOSTS   = ['smba.trafficmanager.net', '.botframework.com', '.teams.microsoft.com',
+                                   '.asm.skype.com', '.botframework.us', '.teams.microsoft.us'];
+
     /** Token cache for this request only — never written to disk. */
     private static $tokenCache = [];
+
+    /** Test hook: a key set to verify against instead of Bot Framework's (tests/messaging-teams-mattermost.php). */
+    public static $testKeys = null;
 
     public function verifyWebhook(string $rawBody, array $headers, array $params, string $url): bool
     {
@@ -45,31 +86,60 @@ class TeamsProvider extends MessagingProvider
         if ($appId === '' || stripos($auth, 'Bearer ') !== 0) {
             return false;
         }
-        $parts = explode('.', substr($auth, 7));
-        if (count($parts) !== 3) {
+        $keys = self::$testKeys ?? $this->botFrameworkKeys();
+        if (!$keys) {
             return false;
         }
-        [$h64, $p64, $s64] = $parts;
-        $header = json_decode(self::b64url($h64), true);
-        $claims = json_decode(self::b64url($p64), true);
-        if (!is_array($header) || !is_array($claims) || ($header['alg'] ?? '') !== 'RS256') {
-            return false;
+        $leeway = JWT::$leeway;
+        JWT::$leeway = 300;
+        try {
+            $claims = (array)JWT::decode(trim(substr($auth, 7)), JWK::parseKeySet(['keys' => $keys], 'RS256'));
+        } catch (Throwable $e) {
+            return false;   // bad signature, unknown key, expired, not yet valid
+        } finally {
+            JWT::$leeway = $leeway;
         }
-        $pem = $this->signingKeyPem((string)($header['kid'] ?? ''));
-        if ($pem === null || openssl_verify("$h64.$p64", self::b64url($s64), $pem, OPENSSL_ALGO_SHA256) !== 1) {
-            return false;
-        }
-        $now = time();
         if (($claims['iss'] ?? '') !== self::BOT_ISSUER || ($claims['aud'] ?? '') !== $appId) {
             return false;
         }
-        if (!isset($claims['exp']) || (int)$claims['exp'] < $now - 300) {
+
+        $activity   = json_decode($rawBody, true);
+        $serviceUrl = is_array($activity) ? (string)($activity['serviceUrl'] ?? '') : '';
+        if ($serviceUrl === '' || !self::hostAllowed($serviceUrl, self::SERVICE_HOSTS)) {
             return false;
         }
-        if (isset($claims['nbf']) && (int)$claims['nbf'] > $now + 300) {
+        if (rtrim((string)($claims['serviceurl'] ?? ''), '/') !== rtrim($serviceUrl, '/')) {
             return false;
         }
-        return true;
+        $tenant = strtolower((string)($this->channel['credentials']['tenant_id'] ?? ''));
+        $from   = strtolower((string)($activity['conversation']['tenantId'] ?? ($activity['channelData']['tenant']['id'] ?? '')));
+        return $tenant !== '' && $from === $tenant;
+    }
+
+    /** An https URL whose host is one of $hosts (exact, or a suffix starting with a dot). */
+    private static function hostAllowed(string $url, array $hosts): bool
+    {
+        $p = parse_url($url);
+        if (($p['scheme'] ?? '') !== 'https' || empty($p['host'])) {
+            return false;
+        }
+        $host = strtolower($p['host']);
+        foreach ($hosts as $h) {
+            if ($h[0] === '.' ? substr($host, -strlen($h)) === $h : $host === $h) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** "<serviceUrl>|<conversationId>" -> [serviceUrl, conversationId]. A bare id uses the default region. */
+    private static function splitAddress(string $to): array
+    {
+        $bar = strrpos($to, '|');
+        if ($bar === false) {
+            return [self::DEFAULT_SERVICE_URL, $to];
+        }
+        return [substr($to, 0, $bar), substr($to, $bar + 1)];
     }
 
     public function parseInbound(string $rawBody, array $params): array
@@ -87,7 +157,7 @@ class TeamsProvider extends MessagingProvider
         $convId     = (string)($a['conversation']['id'] ?? '');
         $activityId = (string)($a['id'] ?? '');
         $serviceUrl = (string)($a['serviceUrl'] ?? '');
-        if ($convId === '' || $activityId === '') {
+        if ($convId === '' || $activityId === '' || !self::hostAllowed($serviceUrl, self::SERVICE_HOSTS)) {
             return [];
         }
 
@@ -99,7 +169,7 @@ class TeamsProvider extends MessagingProvider
             if ($r > 0 && $v >= 1 && $v <= 5) {
                 return [[
                     'from'            => $convId,
-                    'to'              => $serviceUrl,
+                    'to'              => $serviceUrl . '|' . $convId,
                     'body'            => '',
                     'profile_name'    => trim((string)($a['from']['name'] ?? '')),
                     'provider_msg_id' => 'teams:' . $activityId,
@@ -129,7 +199,7 @@ class TeamsProvider extends MessagingProvider
 
         return [[
             'from'            => $convId,
-            'to'              => $serviceUrl,   // ingest.php stores this as the channel's serviceUrl
+            'to'              => $serviceUrl . '|' . $convId,   // the reply address - see the file header
             'body'            => $text,
             'profile_name'    => trim((string)($a['from']['name'] ?? '')),
             'provider_msg_id' => 'teams:' . $activityId,
@@ -208,10 +278,14 @@ class TeamsProvider extends MessagingProvider
         if ($url === '') {
             throw new Exception('Media item has no URL.');
         }
+        // The bot's token goes with this request, so only to a Microsoft host,
+        // and never on to wherever a redirect points (the SSO review's rule).
+        if (!self::hostAllowed($url, self::MEDIA_HOSTS)) {
+            throw new Exception('Teams image is not on a Microsoft host; not fetched.');
+        }
         [$code, $body] = $this->httpRequest($url, [
             'method'  => 'GET',
             'headers' => ['Authorization: Bearer ' . $this->accessToken()],
-            'follow'  => true,
         ]);
         if ($code < 200 || $code >= 300 || $body === '') {
             throw new Exception('Teams media download failed (HTTP ' . $code . ').');
@@ -234,11 +308,6 @@ class TeamsProvider extends MessagingProvider
         return (string)($this->channel['credentials']['app_id'] ?? '');
     }
 
-    private function serviceUrl(): string
-    {
-        $stored = trim((string)($this->channel['channel_ref'] ?? ''));
-        return $stored !== '' && strpos($stored, 'https://') === 0 ? $stored : self::DEFAULT_SERVICE_URL;
-    }
 
     /** Azure AD client-credentials token for the Bot Framework scope. */
     private function accessToken(): string
@@ -270,9 +339,13 @@ class TeamsProvider extends MessagingProvider
         return self::$tokenCache[$key] = (string)$json['access_token'];
     }
 
-    private function postActivity(string $conversationId, array $activity): string
+    private function postActivity(string $to, array $activity): string
     {
-        $url = rtrim($this->serviceUrl(), '/') . '/v3/conversations/' . rawurlencode($conversationId) . '/activities';
+        [$serviceUrl, $conversationId] = self::splitAddress($to);
+        if ($conversationId === '' || !self::hostAllowed($serviceUrl, self::SERVICE_HOSTS)) {
+            throw new Exception('No Teams conversation to send to.');
+        }
+        $url = rtrim($serviceUrl, '/') . '/v3/conversations/' . rawurlencode($conversationId) . '/activities';
         [$code, $resp] = $this->httpRequest($url, [
             'method'  => 'POST',
             'headers' => ['Content-Type: application/json', 'Authorization: Bearer ' . $this->accessToken()],
@@ -283,20 +356,6 @@ class TeamsProvider extends MessagingProvider
             throw new Exception('Teams rejected the message: ' . ($json['error']['message'] ?? ('HTTP ' . $code)));
         }
         return (string)($json['id'] ?? '');
-    }
-
-    /** The PEM public key for a Bot Framework signing key id, or null if unknown. */
-    private function signingKeyPem(string $kid): ?string
-    {
-        if ($kid === '') {
-            return null;
-        }
-        foreach ($this->botFrameworkKeys() as $k) {
-            if (($k['kid'] ?? '') === $kid && ($k['kty'] ?? '') === 'RSA' && !empty($k['n']) && !empty($k['e'])) {
-                return self::rsaPem(self::b64url((string)$k['n']), self::b64url((string)$k['e']));
-            }
-        }
-        return null;
     }
 
     /**
@@ -313,7 +372,7 @@ class TeamsProvider extends MessagingProvider
             }
         }
         [$c1, $r1] = $this->httpRequest(self::BOT_OPENID, ['method' => 'GET']);
-        $cfg = json_decode($r1, true);
+        $cfg = json_decode((string)$r1, true);
         $jwks = (string)($cfg['jwks_uri'] ?? '');
         // Only follow the key location Microsoft publishes, never one an attacker names.
         if ($c1 !== 200 || strpos($jwks, 'https://login.botframework.com/') !== 0) {
@@ -328,45 +387,4 @@ class TeamsProvider extends MessagingProvider
         return $keys;
     }
 
-    /** Build an RSA public key PEM from a JWK modulus and exponent (raw bytes). */
-    private static function rsaPem(string $n, string $e): string
-    {
-        $rsaKey = self::derSeq(self::derInt($n) . self::derInt($e));
-        $algo   = self::derSeq("\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01" . "\x05\x00"); // rsaEncryption, NULL
-        $bits   = "\x03" . self::derLen(strlen($rsaKey) + 1) . "\x00" . $rsaKey;
-        return "-----BEGIN PUBLIC KEY-----\n"
-            . chunk_split(base64_encode(self::derSeq($algo . $bits)), 64, "\n")
-            . "-----END PUBLIC KEY-----\n";
-    }
-
-    private static function derInt(string $bytes): string
-    {
-        if ($bytes === '') {
-            $bytes = "\0";
-        }
-        if (ord($bytes[0]) & 0x80) {
-            $bytes = "\0" . $bytes;   // keep it positive
-        }
-        return "\x02" . self::derLen(strlen($bytes)) . $bytes;
-    }
-
-    private static function derSeq(string $content): string
-    {
-        return "\x30" . self::derLen(strlen($content)) . $content;
-    }
-
-    private static function derLen(int $len): string
-    {
-        if ($len < 128) {
-            return chr($len);
-        }
-        $hex = ltrim(pack('N', $len), "\0");
-        return chr(0x80 | strlen($hex)) . $hex;
-    }
-
-    /** base64url → raw bytes (JWT segments use it, without padding). */
-    private static function b64url(string $s): string
-    {
-        return (string)base64_decode(strtr($s, '-_', '+/') . str_repeat('=', (4 - strlen($s) % 4) % 4));
-    }
 }

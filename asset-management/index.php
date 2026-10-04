@@ -1590,6 +1590,12 @@ $translationNamespaces = ['common', 'asset-management'];
                         <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.new.name_hint')); ?></div>
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="naAssetTag"><?php echo htmlspecialchars(t('asset-management.field.asset_tag')); ?></label>
+                        <input type="text" class="search-box" id="naAssetTag" maxlength="64" autocomplete="off"
+                               placeholder="<?php echo htmlspecialchars(t('asset-management.new.asset_tag_ph_auto')); ?>">
+                        <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.new.asset_tag_hint')); ?></div>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="naType"><?php echo htmlspecialchars(t('asset-management.field.type')); ?></label>
                         <select class="search-box" id="naType"></select>
                     </div>
@@ -3246,6 +3252,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     body: JSON.stringify({
                         tenant_id:       coGroup.hidden ? null : (parseInt(coVal, 10) || null),
                         hostname:        document.getElementById('naName').value.trim(),
+                        asset_tag:       document.getElementById('naAssetTag')?.value.trim() || '',
                         asset_type_id:   document.getElementById('naType').value,
                         asset_status_id: document.getElementById('naStatus').value,
                         location_id:     document.getElementById('naLocation').value,
@@ -3290,7 +3297,10 @@ $translationNamespaces = ['common', 'asset-management'];
                               fieldWarning ? 'error' : 'success');
                     return;
                 }
-                showToast(fieldWarning || window.t('asset-management.new.created'),
+                const successMsg = data.asset_tag
+                    ? window.t('asset-management.new.created_with_tag', { tag: data.asset_tag })
+                    : window.t('asset-management.new.created');
+                showToast(fieldWarning || successMsg,
                           fieldWarning ? 'error' : 'success');
                 await loadAssets();
                 selectAsset(data.id);
@@ -4386,7 +4396,8 @@ $translationNamespaces = ['common', 'asset-management'];
             // localise here. Legacy rows hold an English label (with spaces/capitals)
             // — those don't match a key, so we show them as-is.
             const FIELD_KEYS = ['type','status','location','supplier','purchase_date',
-                'purchase_cost','order_number','warranty_expiry','lease_expiry','assigned_user'];
+                'purchase_cost','order_number','warranty_expiry','lease_expiry','assigned_user',
+                'hostname','asset_created','asset_discovered','hostname_reused'];
 
             history.forEach(entry => {
                 const noneEm = `<em style="color:#999;">${window.t('asset-management.common.none')}</em>`;
@@ -4404,7 +4415,7 @@ $translationNamespaces = ['common', 'asset-management'];
                         <span class="history-arrow">&rarr;</span>
                         <span class="history-value-new">${newVal}</span>
                     </td>
-                    <td class="history-meta">${escapeHtml(entry.analyst_name || window.t('asset-management.common.unknown'))}</td>
+                    <td class="history-meta">${escapeHtml(entry.analyst_name || window.t(entry.analyst_id ? 'asset-management.common.unknown' : 'asset-management.history.automatic'))}</td>
                 </tr>`;
             });
 

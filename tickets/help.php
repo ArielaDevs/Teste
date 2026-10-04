@@ -516,6 +516,10 @@ try {
                     </div>
                     <p><?php echo t('tickets.help.csat.survey_store'); ?></p>
 
+                    <p style="margin-top: 20px;"><?php echo t('tickets.help.csat.chat_heading'); ?></p>
+                    <p><?php echo t('tickets.help.csat.chat_body'); ?></p>
+                    <p class="help-note"><?php echo t('tickets.help.csat.chat_rules'); ?></p>
+
                     <p style="margin-top: 20px;"><?php echo t('tickets.help.csat.analytics_heading'); ?></p>
                     <p><?php echo t('tickets.help.csat.analytics_body'); ?></p>
                     <p><?php echo t('tickets.help.csat.analytics_filters'); ?></p>
@@ -1130,13 +1134,15 @@ try {
                     <p class="help-note">
                         Teams delivers only to an <strong>https://</strong> address, so the public URL on the Messaging tab must be one. The same goes for images you send:
                         they are fetched from that address by Microsoft, so the path <code>/api/messaging/media.php</code> must be reachable from the internet.
-                        Full walkthrough with screenshots: <code>docs/messaging-teams-setup.md</code> in the repository.
+                        Only people in <strong>your own Microsoft 365 organisation</strong> (the Tenant ID above) can open tickets through the bot.
+                        Full walkthrough: the <a href="https://github.com/edmozley/freeitsm/wiki/Microsoft-Teams" target="_blank" rel="noopener">Microsoft Teams</a> wiki page.
                     </p>
 
                     <h4>Mattermost</h4>
                     <p>
                         Mattermost support works through a <strong>support channel</strong>. Customers post there, and each post opens a ticket.
-                        Replies come back to the customer as a <strong>direct message</strong> from the bot. Add a channel under
+                        Replies go <strong>in the thread</strong> under the customer's post, the same way Slack works, so the customer simply answers in the
+                        thread and the conversation carries on. Anyone in the support channel can read the thread. Add a channel under
                         <strong>Settings &rarr; Messaging</strong> with provider <strong>Mattermost</strong>; the form lists the steps.
                     </p>
                     <ol>
@@ -1150,8 +1156,8 @@ try {
                         <li>Copy the webhook's <strong>token</strong> (Mattermost creates it) into <strong>Outgoing webhook token</strong>, then save and test the connection.</li>
                     </ol>
                     <p class="help-note">
-                        Limits: one support channel per configuration. Replies come as direct messages, not in the customer's thread. Files that customers
-                        post are not downloaded (the outgoing webhook does not include them). The full guide is <code>docs/messaging-mattermost-setup.md</code>.
+                        Limits: one support channel per configuration. Files that customers post are not downloaded (the outgoing webhook does not
+                        include them). Full guide: the <a href="https://github.com/edmozley/freeitsm/wiki/Mattermost" target="_blank" rel="noopener">Mattermost</a> wiki page.
                     </p>
 
                     <h4>Sending files</h4>

@@ -2531,10 +2531,16 @@ CREATE TABLE IF NOT EXISTS `ticket_csat_responses` (
     `comment`            TEXT NULL,
     `analyst_id`         INT NULL,
     `created_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- PR #166: a request asked IN A CHAT records which chat (channel + the
+    -- customer's from_address), so a reply there can only ever answer a request
+    -- sent to that customer on that channel. NULL = an emailed survey.
+    `channel_id`         INT NULL,
+    `channel_from`       VARCHAR(255) NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_ticket_csat_token` (`token`),
     KEY `ix_ticket_csat_ticket_id` (`ticket_id`),
     KEY `ix_ticket_csat_responded` (`responded_datetime`),
+    KEY `ix_ticket_csat_channel` (`channel_id`, `channel_from`),
     CONSTRAINT `fk_ticket_csat_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_ticket_csat_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2720,6 +2726,7 @@ CREATE TABLE IF NOT EXISTS `assets` (
     KEY `idx_assets_tenant` (`tenant_id`),
     -- Lookup only. See the asset_tag comment for why this one is NOT unique.
     KEY `idx_assets_tag` (`tenant_id`, `asset_tag`),
+    KEY `idx_assets_tenant_service_tag` (`tenant_id`, `service_tag`),
     -- This one IS safe to make unique: the token is install-wide and never NULL
     -- once minted, so there is no NULL-distinctness trap.
     UNIQUE KEY `uq_assets_qr_token` (`qr_token`),
@@ -2727,6 +2734,18 @@ CREATE TABLE IF NOT EXISTS `assets` (
     CONSTRAINT `fk_assets_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL
     -- fk_assets_supplier (supplier_id -> suppliers.id) is added in db_verify.php:
     -- the suppliers table is defined later in this file, so the FK can't be inline here.
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Counters for generated asset tags (PR #164) - the same shape, and claimed the
+-- same way, as ticket_number_counters: one atomic upsert, never read-then-write.
+-- counter_key is 'asset' (counting once across companies) or 'asset:co<id>'
+-- (each company on its own; 0 = the Default company, so the key is never NULL).
+-- next_value holds the LAST number issued. See includes/services/asset_tags.php.
+CREATE TABLE IF NOT EXISTS `asset_tag_counters` (
+    `counter_key`       VARCHAR(64) NOT NULL,
+    `next_value`        BIGINT NOT NULL DEFAULT 1,
+    `updated_datetime`  DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`counter_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Who is holding an asset.
@@ -2785,7 +2804,8 @@ CREATE TABLE IF NOT EXISTS `asset_checkout_log` (
 CREATE TABLE IF NOT EXISTS `asset_history` (
     `id`                INT NOT NULL AUTO_INCREMENT,
     `asset_id`          INT NOT NULL,
-    `analyst_id`        INT NOT NULL,
+    -- NULL = automated action (Intune sync, agent inventory, workflow) without a human analyst
+    `analyst_id`        INT NULL,
     `field_name`        VARCHAR(100) NOT NULL,
     `old_value`         VARCHAR(500) NULL,
     `new_value`         VARCHAR(500) NULL,
@@ -6294,6 +6314,24 @@ INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
     ('date_format', 'd_mon_y'),
     ('time_format', '24h');
+
+-- Asset reconciliation: default list of generic/placeholder serial numbers to ignore
+-- intune_sync_hostnames is ON for a new install (there is nothing to rename yet)
+-- and OFF on an upgrade (db_verify seeds '0'), so an upgrade renames nothing.
+INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
+    ('intune_company_id', NULL),
+    ('intune_sync_hostnames', '1'),
+    -- PR #166: a new install asks chat customers in their chat (an upgrade gets '0').
+    ('csat_in_channel', '1'),
+    ('asset_reconciliation_ignored_serials', 'TO BE FILLED BY O.E.M.\nDEFAULT STRING\nNONE\nSYSTEM SERIAL NUMBER\nNOT SPECIFIED\n123456789');
+
+-- Asset tag auto-generation (PR #164). Off, so a new install behaves as before
+-- until somebody switches it on. The format uses ticket numbering's tokens.
+INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
+    ('asset_tag_autogen_enabled', '0'),
+    ('asset_tag_format', 'AST-{#####}'),
+    ('asset_tag_start', '1'),
+    ('asset_tag_scope', 'per_company');
 
 CREATE TABLE IF NOT EXISTS `trusted_devices` (
     `id`                 INT NOT NULL AUTO_INCREMENT,

@@ -705,6 +705,8 @@ return [
     'csat_channel' => [
         'prompt' => 'How would you rate the service you received? Tap a number from 1 (poor) to 5 (excellent), or reply with a single digit.',
         'thanks' => 'Thank you for your feedback!',
+        // Replaces the Telegram buttons under the question once it is answered.
+        'rated'  => 'You rated this {rating} out of 5 - thank you.',
     ],
 
     'telegram_bot' => [
@@ -1969,6 +1971,8 @@ return [
             'delay_help'          => 'Wait this many minutes after close before sending. <code>0</code> = immediate. Useful if you want the user to verify the fix actually held before being asked to rate it.',
             'one_per_ticket'      => 'One survey per ticket',
             'one_per_ticket_help' => 'If on, a reopened-then-closed ticket only gets another survey when an analyst manually triggers it &mdash; stops survey-spamming a flaky ticket.',
+            'in_channel'          => 'Ask chat customers in their chat',
+            'in_channel_help'     => 'A customer who wrote in on WhatsApp, Telegram, Slack, Teams or Mattermost is asked in that chat &mdash; buttons where the app has them, &ldquo;reply 1 to 5&rdquo; where it does not &mdash; instead of by email. WhatsApp only while its 24-hour window is open; otherwise, and if a chat message fails, the email survey is used.',
             'scale_stars'         => 'Stars',
             'scale_emojis'        => 'Emojis',
             'scale_help'          => 'Both options store the same 1&ndash;5 number, so dashboards and averages work the same either way &mdash; this only changes how the survey page itself looks.',
@@ -2934,6 +2938,9 @@ return [
             'survey_stars'     => '<strong>Stars</strong> &mdash; classic fill-on-hover trailing behaviour. Hovering star #3 fills #1+#2+#3 in gold. Click to lock.',
             'survey_emojis'    => '<strong>Emojis</strong> &mdash; 5 faces 😡 🙁 😐 🙂 😀 start greyscale at 40% opacity; the hovered or selected one returns to full colour at 1.25&times; scale. Click to lock.',
             'survey_store'     => 'Both modes store the same 1&ndash;5 number so dashboards and averages work identically regardless of which style is in use. The survey URL is one-shot &mdash; once the user submits, the same link refuses re-submission.',
+            'chat_heading'     => '<strong>Asking chat customers in their chat</strong>',
+            'chat_body'        => 'With <strong>Ask chat customers in their chat</strong> ticked, a customer who wrote in on WhatsApp, Telegram, Slack, Microsoft Teams or Mattermost is asked in that chat instead of by email &mdash; five buttons on Telegram, Teams and Mattermost, &ldquo;reply with a single digit&rdquo; elsewhere. Their answer goes into the same results as an emailed survey.',
+            'chat_rules'       => 'WhatsApp is only asked while its 24-hour reply window is open; outside it, or if the chat message cannot be sent, the email survey is used instead. A digit counts as a rating only straight after the question &mdash; in the same chat, within a week, and before the customer has written anything else &mdash; so &ldquo;3&rdquo; in answer to an analyst&rsquo;s question stays a message. Off after upgrading; on for a new install.',
             'analytics_heading'=> '<strong>The analytics page</strong>',
             'analytics_body'   => 'Click the ⭐ <strong>CSAT</strong> nav button (between Rota and Settings) to open the analytics dashboard at <code>tickets/csat/</code>. Window selectable: 7 / 30 / 90 / 365 days.',
             'card_kpi_title'   => 'KPI tiles',

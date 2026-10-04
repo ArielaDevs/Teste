@@ -18,6 +18,7 @@ require_once __DIR__ . '/../ticket_snooze.php';
 require_once __DIR__ . '/../uploads.php';   // uploadStoreBytes() — see F1
 require_once __DIR__ . '/../csat.php';      // csatPendingRequestForChat(), rating helpers
 require_once __DIR__ . '/../i18n.php';      // I18n::tFor() — Telegram bot replies in the customer's own language_code
+require_once __DIR__ . '/../ticket_numbering.php';
 
 /**
  * Ingest one normalised inbound message for a (decrypted) channel row.
@@ -51,9 +52,11 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     $mediaItems = is_array($msg['media'] ?? null) ? $msg['media'] : [];
     $hasMedia = !empty($mediaItems);
 
-    // CSAT: a 1–5 rating is an answer to a survey, not a new ticket message.
-    // Two shapes reach here: a rating-button press (Telegram callback_query), and
-    // a bare digit typed in reply to a text rating request on any channel.
+    // CSAT (PR #166): a 1-5 rating is an answer to a survey, not a new ticket
+    // message. Two shapes reach here: a rating-button press (Telegram, Teams,
+    // Mattermost), and a bare digit typed in reply to a text request. A digit
+    // only counts while csatPendingRequestForChat() says a request in THIS chat
+    // is waiting for one - otherwise "3" is an answer to an analyst's question.
     $csatReply = null;
     if (!empty($msg['csat'])) {
         $csatReply = [
@@ -61,6 +64,8 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
             'rating'      => (int) $msg['csat']['rating'],
             'button'      => true,
             'callback_id' => (string) ($msg['csat']['callback_id'] ?? ''),
+            'message_id'   => (string) ($msg['csat']['message_id'] ?? ''),
+            'message_text' => (string) ($msg['csat']['message_text'] ?? ''),
         ];
     } elseif (!$hasMedia && preg_match('/^[1-5]$/', $body)) {
         $pending = csatPendingRequestForChat($conn, (int) $channel['id'], $from);
@@ -69,7 +74,8 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         }
     }
     if ($csatReply !== null) {
-        return messagingRecordCsatReply($conn, $channel, $from, $csatReply);
+        $replyAddress = messagingReplyAddress((string) ($channel['channel_type'] ?? ''), ['from_address' => $from, 'to_recipients' => (string) ($msg['to'] ?? '')]);
+        return messagingRecordCsatReply($conn, $channel, $from, $replyAddress, $csatReply);
     }
 
     if ($body === '' && !$hasMedia) {
@@ -83,9 +89,10 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     // is normally the same number, but "normally" is not a good enough reason to
     // change what a working WhatsApp install writes to the database. Only Slack,
     // where the sender and the destination are genuinely different things (you
-    // answer into a channel and a thread, not to a person), reads it.
+    // answer into a channel and a thread, not to a person), reads it - and since
+    // PR #166 Teams and Mattermost, which are threaded the same way.
     $replyAddress = (string) ($channel['phone_number'] ?? '');
-    if ($channelType === 'slack') {
+    if (in_array($channelType, MESSAGING_THREADED_CHANNELS, true)) {
         $replyAddress = trim((string) ($msg['to'] ?? ''));
     }
 
@@ -135,8 +142,10 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     $subject   = null;
 
     if (!$ticketId) {
-        $ticketNumber = messagingGenerateTicketNumber($conn);
+        // The company is decided BEFORE the number: per-company numbering and
+        // {COMPANY} both need it.
         $tenantId     = resolveTicketTenantForChannel($conn, $channel['id'], $from);
+        $ticketNumber = messagingGenerateTicketNumber($conn, $tenantId);
         $originId     = getChannelOriginId($conn, $channelType);
         $subject      = buildChannelSubject($channelType, $displayName, $body);
 
@@ -244,15 +253,6 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         }
     }
 
-    // Teams: the regional serviceUrl the bot must answer through. It arrives on
-    // every activity; remember the latest so replies go to the right region.
-    if ($channelType === 'teams' && strpos((string) ($msg['to'] ?? ''), 'https://') === 0
-        && (string) ($channel['channel_ref'] ?? '') !== (string) $msg['to']) {
-        try {
-            $conn->prepare("UPDATE messaging_channels SET channel_ref = ? WHERE id = ?")
-                 ->execute([substr((string) $msg['to'], 0, 190), (int) $channel['id']]);
-        } catch (Exception $e) { /* a stale serviceUrl only delays the fix; never fail ingest */ }
-    }
 
     // Keep the channel's own last-inbound stamp current (diagnostics / settings).
     try {
@@ -284,7 +284,12 @@ function findOpenChannelTicket(PDO $conn, string $from, string $channelType, str
     // a message to company B's bot threaded into the person's open ticket from
     // company A's bot - another company's ticket. (WhatsApp is left exactly as it
     // was: its sender rule predates this and is not part of the Telegram change.)
-    $byBot = ($channelType === 'telegram' && $channelId !== null);
+    //
+    // TRAP: a new channel type whose sender id is not unique per channel must be
+    //   added here. Mattermost (PR #166) is one: a user id is the same in every
+    //   configuration on one server, so two companies' support channels would
+    //   share a person's thread - another company's ticket - without this.
+    $byBot = (in_array($channelType, ['telegram', 'mattermost', 'teams'], true) && $channelId !== null);
 
     $sql = "SELECT t.id
             FROM tickets t
@@ -674,7 +679,7 @@ function messagingUserLabel(PDO $conn, int $userId): string
  * and has not been answered yet, so a replayed or forged button press changes
  * nothing. Never creates or touches a ticket.
  */
-function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, array $reply): array
+function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, string $replyAddress, array $reply): array
 {
     require_once __DIR__ . '/../csat.php';
     require_once __DIR__ . '/../i18n.php';
@@ -695,9 +700,27 @@ function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, arr
             ? I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks')
             : '';
         $provider->answerCallbackQuery($reply['callback_id'], $thanks);
+
+        // Replace the buttons with the rating that STANDS - the one just
+        // recorded, or, on a second press of an old question, the first one.
+        // Only for this chat's own survey; an unanswered (or not ours) one
+        // keeps its buttons.
+        $stood = csatResponseBelongsToChat($conn, $reply['response_id'], (int) $channel['id'], $chatId)
+            ? csatStoredRating($conn, $reply['response_id'])
+            : null;
+        if ($stood !== null && ($reply['message_id'] ?? '') !== '') {
+            $provider->closeRatingRequest(
+                $chatId,
+                $reply['message_id'],
+                (string) ($reply['message_text'] ?? ''),
+                I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.rated', ['rating' => $stood])
+            );
+        }
     } elseif ($recorded && $provider) {
         try {
-            $provider->sendMessage($chatId, I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks'));
+            // The reply address, not the sender: on Slack, Teams and Mattermost
+            // the thanks belongs in the conversation (messagingReplyAddress()).
+            $provider->sendMessage($replyAddress, I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks'));
         } catch (Exception $e) {
             error_log('CSAT thanks failed for chat ' . $chatId . ': ' . $e->getMessage());
         }
@@ -837,21 +860,20 @@ function buildChannelSubject(string $channelType, string $displayName, string $b
     return "$label: $snippet";
 }
 
-/** Unique ticket number in the existing XXX-NNN-NNNNN format. */
-function messagingGenerateTicketNumber(PDO $conn): string
+/**
+ * The number for a ticket opened by a chat (WhatsApp, Telegram, Slack, Teams,
+ * Mattermost, web chat).
+ *
+ * TRAP: never make a ticket number here, or anywhere else, by hand. This used
+ *   to roll its own XXX-NNN-NNNNN, so on an install set to TICKET-{######}
+ *   every chat ticket still came out as JNL-471-47705 (GH #71 moved three
+ *   generators onto TicketNumbering and missed this one, plus catalogue
+ *   approvals, merge and split). Pass the ticket's company: per-company
+ *   numbering and {COMPANY} need it.
+ */
+function messagingGenerateTicketNumber(PDO $conn, ?int $tenantId = null): string
 {
-    for ($attempt = 0; $attempt < 10; $attempt++) {
-        $letters = chr(rand(65, 90)) . chr(rand(65, 90)) . chr(rand(65, 90));
-        $n1 = rand(0, 9) . rand(0, 9) . rand(0, 9);
-        $n2 = rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9);
-        $ticketNumber = "$letters-$n1-$n2";
-        $check = $conn->prepare("SELECT COUNT(*) FROM tickets WHERE ticket_number = ?");
-        $check->execute([$ticketNumber]);
-        if (!$check->fetchColumn()) {
-            return $ticketNumber;
-        }
-    }
-    throw new Exception('Failed to generate unique ticket number');
+    return TicketNumbering::next($conn, null, $tenantId);
 }
 
 /**

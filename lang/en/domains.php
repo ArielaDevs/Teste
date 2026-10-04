@@ -951,6 +951,15 @@ return [
             'p3'    => 'Calendar entries have no company, so domain and certificate dates put in the Calendar are visible to everybody who can open it, as contract and warranty dates already are.',
             'p4'    => 'Connections keep to the company too: a CMDB item or a ticket can only be linked to a domain in the same company. Service Status services and knowledge articles are not company records, so a domain links to them under their own permissions.',
         ],
+        'people' => [
+            'nav'   => 'Owner, technical contact, customer',
+            'title' => 'Owner, technical contact and customer',
+            'intro' => 'Three different questions about a domain, each with its own field.',
+            'p1'    => '**Owner** is the analyst responsible. The renewal reminders, the bell notifications and any task or ticket raised at the renewal window go to them.',
+            'p2'    => '**Technical contact** is who looks after the DNS and hosting: one of your analysts, or a contact at a supplier such as the web agency or host. One or the other, picked from one list in the edit dialog.',
+            'p3'    => '**Customer** is who you look after the domain for: a person in the domain\'s own company, or a supplier, optionally with one of its contacts. Type two letters in the edit dialog and it offers both. Leave it empty if the domain is your own.',
+            'p4'    => 'The technical contact and the customer link to their page in People, which lists every domain they are named on.',
+        ],
         'api' => [
             'nav'   => 'REST API',
             'title' => 'REST API',

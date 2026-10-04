@@ -84,6 +84,12 @@ final class Cap
     const ASSETS_INTUNE    = 'assets.intune';      // credentials
     const ASSETS_PROXMOX   = 'assets.proxmox';     // Proxmox VE servers, credentials and syncs
     const ASSETS_VCLOUD    = 'assets.vcloud';      // VMware Cloud Director servers, credentials and syncs
+    // PR #164. Numbering and the label designer are separate grants: whoever
+    // designs a sticker is not necessarily allowed to change how every future
+    // asset is numbered.
+    const ASSETS_RECONCILIATION = 'assets.reconciliation';
+    const ASSETS_TAGS           = 'assets.tags';
+    const ASSETS_LABELS         = 'assets.labels';
 
     // ---- Contracts ---------------------------------------------------------
     const CONTRACTS_MANAGE             = 'contracts.manage';              // umbrella

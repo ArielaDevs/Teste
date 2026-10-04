@@ -194,8 +194,8 @@ function webchatOpenTicket(PDO $conn, array $conversation, array $channel, strin
     $email  = trim((string) ($conversation['visitor_email'] ?? ''));
     $name   = trim((string) ($conversation['visitor_name'] ?? ''));
     $userId       = webchatGetOrCreateUser($conn, $email, $name);
-    $ticketNumber = messagingGenerateTicketNumber($conn);
     $tenantId     = ($channel['tenant_id'] ?? null) !== null ? (int) $channel['tenant_id'] : null;
+    $ticketNumber = messagingGenerateTicketNumber($conn, $tenantId);
     $originId     = getChannelOriginId($conn, 'webchat');
 
     $sql = "INSERT INTO tickets (

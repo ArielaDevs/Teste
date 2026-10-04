@@ -246,15 +246,13 @@ function splitTicket(PDO $conn, int $actorId, int $ticketId, int $fromEmailId, b
  * definition unfinished, even if the original had been resolved.
  */
 function splitCreateTicket(PDO $conn, array $source, array $moving, int $actorId, ?string $newSubject): int {
-    for ($attempt = 0; $attempt < 10; $attempt++) {
-        $letters = chr(rand(65, 90)) . chr(rand(65, 90)) . chr(rand(65, 90));
-        $number  = $letters . '-' . rand(100, 999) . '-' . str_pad((string)rand(0, 99999), 5, '0', STR_PAD_LEFT);
-        $check = $conn->prepare("SELECT COUNT(*) FROM tickets WHERE ticket_number = ?");
-        $check->execute([$number]);
-        if (!(int)$check->fetchColumn()) break;
-        $number = null;
-    }
-    if (empty($number)) throw new Exception('Failed to generate a ticket number');
+    // TRAP: the install's numbering, never a number made here - see
+    //   messagingGenerateTicketNumber() for what went wrong when it was.
+    $number = TicketNumbering::next(
+        $conn,
+        !empty($source['ticket_type_id']) ? (int)$source['ticket_type_id'] : null,
+        !empty($source['tenant_id'])      ? (int)$source['tenant_id']      : null
+    );
 
     // Subject: the analyst's if they gave one, else the first moved message's, else
     // the source's. The first moved message is usually the customer saying what the
