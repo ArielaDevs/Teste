@@ -41,7 +41,9 @@ try {
     $vcPass = $settings['vcenter_password'] ?? '';
 
     if (empty($vcServer) || empty($vcUser) || empty($vcPass)) {
-        echo json_encode(['success' => false, 'error' => 'vCenter settings not configured. Go to Settings to configure vCenter connection.']);
+        // not_configured lets the Servers page tell "no vCenter here" (normal on a
+        // Proxmox-only install) from "vCenter failed".
+        echo json_encode(['success' => false, 'not_configured' => true, 'error' => 'vCenter settings not configured. Go to Settings to configure vCenter connection.']);
         exit;
     }
 

@@ -43,7 +43,9 @@ function getContributors(): array
                       . 'bot replies in each customer\'s own language, and sending pictures and documents '
                       . 'over Telegram and WhatsApp alike - with every new string translated into thirteen '
                       . 'languages. Then Microsoft Teams and Mattermost channels, and asking chat customers '
-                      . 'for their rating with buttons in the chat itself (PR #166, 3.1.0).',
+                      . 'for their rating with buttons in the chat itself (PR #166, 3.1.0). Then the '
+                      . 'Servers list from Proxmox VE and VMware Cloud Director, several servers of each, '
+                      . 'read-only and careful never to delete what a failed read could not see (PR #167, 3.1.0).',
         ],
         [
             'name'   => 'Santhosh Srinivasan (Sandy)',

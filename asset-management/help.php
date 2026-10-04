@@ -79,7 +79,7 @@ $translationNamespaces = ['common', 'asset-management'];
             </a>
             <a href="#reconciliation" class="help-nav-link" data-section="reconciliation">
                 <span class="help-nav-num">7</span>
-                <?php echo htmlspecialchars(t('asset-management.help.reconciliation.nav')); ?>
+                <?php /* the string already holds &amp; - escaping it again showed "&amp;amp;" */ echo t('asset-management.help.reconciliation.nav'); ?>
             </a>
             <a href="#asset-tags" class="help-nav-link" data-section="asset-tags">
                 <span class="help-nav-num">8</span>
@@ -87,36 +87,44 @@ $translationNamespaces = ['common', 'asset-management'];
             </a>
             <a href="#asset-labels" class="help-nav-link" data-section="asset-labels">
                 <span class="help-nav-num">9</span>
-                <?php echo htmlspecialchars(t('asset-management.help.asset_labels.nav')); ?>
+                <?php echo t('asset-management.help.asset_labels.nav'); ?>
             </a>
             <a href="#servers" class="help-nav-link" data-section="servers">
                 <span class="help-nav-num">10</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_servers')); ?>
             </a>
-            <a href="#dashboard" class="help-nav-link" data-section="dashboard">
+            <a href="#proxmox" class="help-nav-link" data-section="proxmox">
                 <span class="help-nav-num">11</span>
+                <?php echo htmlspecialchars(t('asset-management.help.proxmox.nav')); ?>
+            </a>
+            <a href="#vcloud" class="help-nav-link" data-section="vcloud">
+                <span class="help-nav-num">12</span>
+                <?php echo htmlspecialchars(t('asset-management.help.vcloud.nav')); ?>
+            </a>
+            <a href="#dashboard" class="help-nav-link" data-section="dashboard">
+                <span class="help-nav-num">13</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_dashboard')); ?>
             </a>
             <a href="#who-holds-what" class="help-nav-link" data-section="who-holds-what">
-                <span class="help-nav-num">12</span>
+                <span class="help-nav-num">14</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_users')); ?>
             </a>
             <a href="#linked-tickets" class="help-nav-link" data-section="linked-tickets">
-                <span class="help-nav-num">13</span>
+                <span class="help-nav-num">15</span>
                 Tickets on an asset
             </a>
             <a href="#linked-contracts" class="help-nav-link" data-section="linked-contracts">
-                <span class="help-nav-num">14</span> Contracts covering an asset
+                <span class="help-nav-num">16</span> Contracts covering an asset
             </a>
             <a href="#right-click" class="help-nav-link" data-section="right-click">
-                <span class="help-nav-num">15</span> Right-click an asset
+                <span class="help-nav-num">17</span> Right-click an asset
             </a>
             <a href="#companies" class="help-nav-link" data-section="companies">
-                <span class="help-nav-num">16</span>
+                <span class="help-nav-num">18</span>
                 <?php echo htmlspecialchars(t('asset-management.help.companies.nav')); ?>
             </a>
             <a href="#tips" class="help-nav-link" data-section="tips">
-                <span class="help-nav-num">15</span>
+                <span class="help-nav-num">19</span>
                 <?php echo htmlspecialchars(t('asset-management.help.nav_tips')); ?>
             </a>
         </div>
@@ -497,7 +505,7 @@ $translationNamespaces = ['common', 'asset-management'];
                         <div class="help-step">
                             <div class="help-step-num">2</div>
                             <div>
-                                <strong>Click Sync vCenter</strong> &mdash; on the Servers tab, click the sync button. FreeITSM connects to vCenter's REST API and imports all VMs.
+                                <strong>Click Sync hypervisors</strong> &mdash; on the Servers tab, click the sync button. FreeITSM syncs vCenter, then every active Proxmox VE and VMware Cloud Director server (sections 11 and 12), and shows one result line for each.
                             </div>
                         </div>
                         <div class="help-step">
@@ -509,10 +517,86 @@ $translationNamespaces = ['common', 'asset-management'];
                     </div>
                 </div>
 
+                <!-- Section 11: proxmox (PR #167) -->
+                <div class="help-section" id="proxmox">
+                    <div class="help-section-header">
+                        <span class="help-section-num">11</span>
+                        <h3><?php echo htmlspecialchars(t('asset-management.help.proxmox.heading')); ?></h3>
+                    </div>
+                    <p><?php echo t('asset-management.help.proxmox.intro'); ?></p>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.proxmox.user_heading')); ?></h4>
+                    <ol>
+                        <li><?php echo t('asset-management.help.proxmox.user_1'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.user_2'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.user_3'); ?></li>
+                    </ol>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.proxmox.token_heading')); ?></h4>
+                    <ol>
+                        <li><?php echo t('asset-management.help.proxmox.token_1'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.token_2'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.token_3'); ?></li>
+                    </ol>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.proxmox.fill_heading')); ?></h4>
+                    <ul>
+                        <li><?php echo t('asset-management.help.proxmox.fill_host'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.fill_user'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.fill_secret'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.fill_verify'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.fill_interval'); ?></li>
+                    </ul>
+                    <p><?php echo t('asset-management.help.proxmox.test'); ?></p>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.proxmox.ips_heading')); ?></h4>
+                    <p><?php echo t('asset-management.help.proxmox.ips'); ?></p>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.proxmox.removal_heading')); ?></h4>
+                    <p><?php echo t('asset-management.help.proxmox.removal'); ?></p>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.proxmox.trouble_heading')); ?></h4>
+                    <ul>
+                        <li><?php echo t('asset-management.help.proxmox.trouble_401'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.trouble_reach'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.trouble_cert'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.trouble_node'); ?></li>
+                        <li><?php echo t('asset-management.help.proxmox.trouble_guard'); ?></li>
+                    </ul>
+                    <p class="help-note"><?php echo t('asset-management.help.proxmox.more'); ?></p>
+                </div>
+
+                <!-- Section 12: vcloud (PR #167) -->
+                <div class="help-section" id="vcloud">
+                    <div class="help-section-header">
+                        <span class="help-section-num">12</span>
+                        <h3><?php echo htmlspecialchars(t('asset-management.help.vcloud.heading')); ?></h3>
+                    </div>
+                    <p><?php echo t('asset-management.help.vcloud.intro'); ?></p>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.vcloud.user_heading')); ?></h4>
+                    <ul>
+                        <li><?php echo t('asset-management.help.vcloud.user_1'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.user_2'); ?></li>
+                    </ul>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.vcloud.fill_heading')); ?></h4>
+                    <ul>
+                        <li><?php echo t('asset-management.help.vcloud.fill_host'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.fill_org'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.fill_user'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.fill_version'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.fill_verify'); ?></li>
+                    </ul>
+                    <p><?php echo t('asset-management.help.vcloud.test'); ?></p>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.vcloud.removal_heading')); ?></h4>
+                    <p><?php echo t('asset-management.help.vcloud.removal'); ?></p>
+                    <h4><?php echo htmlspecialchars(t('asset-management.help.vcloud.trouble_heading')); ?></h4>
+                    <ul>
+                        <li><?php echo t('asset-management.help.vcloud.trouble_401'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.trouble_reach'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.trouble_partial'); ?></li>
+                        <li><?php echo t('asset-management.help.vcloud.trouble_guard'); ?></li>
+                    </ul>
+                    <p class="help-note"><?php echo t('asset-management.help.vcloud.more'); ?></p>
+                </div>
+
                 <!-- Section 7: Dashboard -->
                 <div class="help-section" id="dashboard">
                     <div class="help-section-header">
-                        <span class="help-section-num">11</span>
+                        <span class="help-section-num">13</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_dashboard')); ?></h3>
                     </div>
                     <p>The dashboard lets you visualise your asset estate with customisable Chart.js widgets. Each analyst has their own dashboard &mdash; choose the charts that matter to you.</p>
@@ -543,7 +627,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 <!-- Section 9: Who holds what + the handover document (discussion #56) -->
                 <div class="help-section" id="who-holds-what">
                     <div class="help-section-header">
-                        <span class="help-section-num">12</span>
+                        <span class="help-section-num">14</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.users_heading')); ?></h3>
                     </div>
                     <p><?php echo htmlspecialchars(t('asset-management.help.users_intro')); ?></p>
@@ -587,7 +671,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
                 <div class="help-section" id="linked-tickets">
                     <div class="help-section-header">
-                        <span class="help-section-num">13</span>
+                        <span class="help-section-num">15</span>
                         <h3>Tickets raised against an asset</h3>
                     </div>
                     <p>Every asset has a <strong>Tickets</strong> tab listing what has been reported against it &mdash; open tickets first, then everything that came before. Click any row to open the ticket.</p>
@@ -603,7 +687,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
                 <div class="help-section" id="linked-contracts">
                     <div class="help-section-header">
-                        <span class="help-section-num">14</span>
+                        <span class="help-section-num">16</span>
                         <h3>Contracts covering an asset</h3>
                     </div>
                     <p>Every asset has a <strong>Contracts</strong> tab listing the agreements that cover it &mdash; the mobile service agreement behind a handset, the internet agreement behind a router, the maintenance contract behind a server. Each row shows the supplier, when the contract ends, and when notice has to be given. Click one to open the contract.</p>
@@ -623,7 +707,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
 <div class="help-section" id="right-click">
                     <div class="help-section-header">
-                        <span class="help-section-num">15</span>
+                        <span class="help-section-num">17</span>
                         <h3>Right-click an asset</h3>
                     </div>
                     <p>Right-clicking any asset in the list opens a menu of the things you most often want to do to one piece of equipment, without opening it and without hunting through the detail panel.</p>
@@ -646,7 +730,7 @@ $translationNamespaces = ['common', 'asset-management'];
          language while the translation score still reads 100%. */ ?>
                 <div class="help-section" id="companies">
                     <div class="help-section-header">
-                        <span class="help-section-num">16</span>
+                        <span class="help-section-num">18</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.companies.heading')); ?></h3>
                     </div>
                     <p><?php echo t('asset-management.help.companies.intro'); ?></p>
@@ -663,7 +747,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
 <div class="help-section" id="tips">
                     <div class="help-section-header">
-                        <span class="help-section-num">17</span>
+                        <span class="help-section-num">19</span>
                         <h3><?php echo htmlspecialchars(t('asset-management.help.nav_tips')); ?></h3>
                     </div>
                     <div class="help-cards">

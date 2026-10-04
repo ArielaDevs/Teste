@@ -700,7 +700,7 @@ $translationNamespaces = ['common', 'asset-management'];
                             <polyline points="1 20 1 14 7 14"></polyline>
                             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                         </svg>
-                        <?php echo htmlspecialchars(t('asset-management.servers.sync_vcenter')); ?>
+                        <?php echo htmlspecialchars(t('asset-management.servers.sync_hypervisors')); ?>
                     </button>
                 </div>
             </div>
@@ -711,6 +711,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     <thead>
                         <tr>
                             <th onclick="sortTable('name')"><?php echo htmlspecialchars(t('asset-management.servers.col_name')); ?> <span class="sort-arrow">&#9650;</span></th>
+                            <th onclick="sortTable('source_name')"><?php echo htmlspecialchars(t('asset-management.servers.col_source')); ?> <span class="sort-arrow">&#9650;</span></th>
                             <th onclick="sortTable('power_state')"><?php echo htmlspecialchars(t('asset-management.servers.col_status')); ?> <span class="sort-arrow">&#9650;</span></th>
                             <th onclick="sortTable('num_cpu')"><?php echo htmlspecialchars(t('asset-management.servers.col_vcpu')); ?> <span class="sort-arrow">&#9650;</span></th>
                             <th onclick="sortTable('memory_gb')"><?php echo htmlspecialchars(t('asset-management.servers.col_memory')); ?> <span class="sort-arrow">&#9650;</span></th>
@@ -722,7 +723,7 @@ $translationNamespaces = ['common', 'asset-management'];
                         </tr>
                     </thead>
                     <tbody id="serversBody">
-                        <tr><td colspan="9" style="text-align: center; padding: 40px; color: #888;"><?php echo htmlspecialchars(t('asset-management.common.loading')); ?></td></tr>
+                        <tr><td colspan="10" style="text-align: center; padding: 40px; color: #888;"><?php echo htmlspecialchars(t('asset-management.common.loading')); ?></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -865,7 +866,7 @@ $translationNamespaces = ['common', 'asset-management'];
             if (filteredServers.length === 0) {
                 if (allServers.length === 0) {
                     tbody.innerHTML = `
-                        <tr><td colspan="9">
+                        <tr><td colspan="10">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
@@ -874,11 +875,11 @@ $translationNamespaces = ['common', 'asset-management'];
                                     <line x1="6" y1="18" x2="6.01" y2="18"></line>
                                 </svg>
                                 <h3>${window.t('asset-management.servers.empty_heading')}</h3>
-                                <p>${window.t('asset-management.servers.empty_body')}</p>
+                                <p>${window.t('asset-management.servers.empty_body_hypervisors')}</p>
                             </div>
                         </td></tr>`;
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 30px; color: #888;">${window.t('asset-management.servers.no_match')}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 30px; color: #888;">${window.t('asset-management.servers.no_match')}</td></tr>`;
                 }
                 return;
             }
@@ -886,6 +887,7 @@ $translationNamespaces = ['common', 'asset-management'];
             tbody.innerHTML = filteredServers.map((s, i) => `
                 <tr onclick="showDetail(${i})">
                     <td><span class="server-name">${escapeHtml(s.name)}</span></td>
+                    <td><span class="status-badge" style="background:${s.source === 'vcenter' || !s.source ? 'var(--surface-2)' : 'var(--accent-soft)'};color:${s.source === 'vcenter' || !s.source ? 'var(--text-muted)' : 'var(--accent)'};">${escapeHtml(s.source_name || 'vCenter')}</span></td>
                     <td>
                         <span class="status-badge ${s.power_state}">
                             <span class="status-dot ${s.power_state}"></span>
@@ -905,7 +907,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
         function showEmptyState(message) {
             document.getElementById('serversBody').innerHTML = `
-                <tr><td colspan="9" style="text-align: center; padding: 30px; color: #888;">${escapeHtml(message)}</td></tr>`;
+                <tr><td colspan="10" style="text-align: center; padding: 30px; color: #888;">${escapeHtml(message)}</td></tr>`;
         }
 
         function formatGuestOS(os) {
@@ -919,6 +921,11 @@ $translationNamespaces = ['common', 'asset-management'];
             );
         }
 
+        /**
+         * "Sync hypervisors": every source at once. vCenter first (its one configured
+         * server), then every active Proxmox and Director server (sync_hypervisors.php).
+         * One source failing does not stop the others; the message lists each result.
+         */
         async function syncVCenter() {
             const btn = document.getElementById('syncBtn');
             const msgEl = document.getElementById('syncMessage');
@@ -928,18 +935,48 @@ $translationNamespaces = ['common', 'asset-management'];
             msgEl.className = 'sync-message';
             msgEl.style.display = 'none';
 
-            try {
-                const response = await fetch(API_BASE + 'get_vcenter.php');
-                const data = await response.json();
+            const lines = [];
+            let anyFailed = false;
 
-                if (data.success) {
-                    msgEl.textContent = data.message;
-                    msgEl.className = 'sync-message success';
-                    loadServers(); // Refresh the table
-                } else {
-                    msgEl.textContent = window.t('asset-management.servers.sync_failed', { error: data.error });
-                    msgEl.className = 'sync-message error';
+            try {
+                // vCenter first. An install with no vCenter at all says so in
+                // not_configured, and that is not a failure when other sources
+                // exist - the PR showed a red "not configured" on every sync of a
+                // Proxmox-only install.
+                const vc = await fetch(API_BASE + 'get_vcenter.php').then(r => r.json()).catch(() => ({ success: false }));
+                const vcNotConfigured = !vc.success && vc.not_configured;
+                if (vc.success) {
+                    lines.push('vCenter: ' + vc.message);
+                } else if (!vcNotConfigured) {
+                    anyFailed = true;
+                    lines.push('vCenter: ' + (vc.error || window.t('asset-management.servers.sync_no_connect')));
                 }
+
+                // Then every active Proxmox and Director server, in one call on
+                // module access - see api/assets/sync_hypervisors.php for why it is
+                // not the per-server settings endpoints.
+                const hv = await fetch(API_BASE + 'sync_hypervisors.php', { method: 'POST' })
+                    .then(r => r.json()).catch(() => ({ success: false }));
+                if (hv.success) {
+                    for (const r of hv.results) {
+                        if (r.status !== 'ok') anyFailed = true;
+                        lines.push((r.source === 'proxmox' ? 'Proxmox ' : 'vCloud ') + r.name + ': ' + r.message);
+                    }
+                } else {
+                    anyFailed = true;
+                    lines.push(hv.error || window.t('asset-management.servers.sync_no_connect'));
+                }
+                if (!lines.length && vcNotConfigured) {
+                    anyFailed = true;
+                    lines.push('vCenter: ' + vc.error);   // nothing is set up at all: say so
+                }
+                if (!lines.length) {
+                    lines.push(window.t('asset-management.servers.sync_none'));
+                }
+
+                msgEl.innerHTML = lines.map(l => escapeHtml(l)).join('<br>');
+                msgEl.className = 'sync-message ' + (anyFailed ? 'error' : 'success');
+                loadServers(); // Refresh the table
             } catch (error) {
                 console.error('Sync error:', error);
                 msgEl.textContent = window.t('asset-management.servers.sync_no_connect');

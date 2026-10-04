@@ -145,6 +145,25 @@ return [
             'setting_keys' => ['intune_tenant_id', 'intune_client_id', 'intune_client_secret', 'intune_verify_ssl', 'intune_app_batch_size', 'intune_company_id', 'intune_sync_hostnames'],
         ],
         [
+            // Several Proxmox VE servers. Their credentials live in proxmox_connections,
+            // not system_settings, so there are no setting_keys for this tab.
+            'id'           => 'proxmox',
+            'cap'          => Cap::ASSETS_PROXMOX,
+            'label_key'    => 'asset-management.settings.tab_proxmox',
+            'grant'        => 'Configure Proxmox VE servers, including their credentials, and run syncs',
+            'sensitive'    => true,
+            'setting_keys' => [],
+        ],
+        [
+            // Several VMware Cloud Director servers. Credentials live in vcloud_connections.
+            'id'           => 'vcloud',
+            'cap'          => Cap::ASSETS_VCLOUD,
+            'label_key'    => 'asset-management.settings.tab_vcloud',
+            'grant'        => 'Configure VMware Cloud Director servers, including their credentials, and run syncs',
+            'sensitive'    => true,
+            'setting_keys' => [],
+        ],
+        [
             // A per-analyst display preference — where your sidebar sits. Not
             // administration, so there is nothing here to grant and nobody to gate.
             'id'        => 'left-panel',
