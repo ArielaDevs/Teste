@@ -82,6 +82,12 @@ final class Cap
     const ASSETS_HANDOVER  = 'assets.handover';    // designing the handover document
     const ASSETS_VCENTER   = 'assets.vcenter';     // credentials
     const ASSETS_INTUNE    = 'assets.intune';      // credentials
+    // PR #164. Numbering and the label designer are separate grants: whoever
+    // designs a sticker is not necessarily allowed to change how every future
+    // asset is numbered.
+    const ASSETS_RECONCILIATION = 'assets.reconciliation';
+    const ASSETS_TAGS           = 'assets.tags';
+    const ASSETS_LABELS         = 'assets.labels';
 
     // ---- Contracts ---------------------------------------------------------
     const CONTRACTS_MANAGE             = 'contracts.manage';              // umbrella

@@ -48,7 +48,7 @@ try {
     // hand. The agent-synced hardware ones (cpu_name, bios_version, memory…) are
     // deliberately absent: typing them in would be overwritten by the next sync
     // on anything that does report for itself.
-    $allowed = ['hostname', 'asset_type_id', 'asset_status_id', 'location_id',
+    $allowed = ['hostname', 'asset_tag', 'asset_type_id', 'asset_status_id', 'location_id',
                 'manufacturer', 'model', 'service_tag',
                 'supplier_id', 'purchase_date', 'purchase_cost', 'order_number', 'warranty_expiry',
                 'lease_expiry'];
@@ -117,6 +117,10 @@ try {
     // database explicitly does NOT guard (see the assets.asset_tag comment).
     // It is the first box on the asset page, so it is one click away.
 
+    $stmtTag = $conn->prepare("SELECT asset_tag FROM assets WHERE id = ?");
+    $stmtTag->execute([$assetId]);
+    $createdAssetTag = $stmtTag->fetchColumn() ?: null;
+
     wf_emit('asset', 'created', $assetId, $in['hostname'] ?? '');
     // Whether it landed in the company on screen, so the form can open it there
     // or, if it went elsewhere, say where rather than opening a record the list
@@ -124,6 +128,7 @@ try {
     echo json_encode([
         'success'        => true,
         'id'             => $assetId,
+        'asset_tag'      => $createdAssetTag,
         'in_active'      => $tenantId === getActiveTenantId($conn, $analystId),
         'company_name'   => (getTenantById($conn, $tenantId)['name'] ?? ''),
     ]);
