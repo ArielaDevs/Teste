@@ -34,6 +34,12 @@ class MattermostProvider extends MessagingProvider
     public function verifyWebhook(string $rawBody, array $headers, array $params, string $url): bool
     {
         $expected = (string)($this->channel['verify_token'] ?? '');
+        // A CSAT button press carries its own signature instead of the webhook token
+        // (Mattermost sends the action context back as JSON). See sendRatingRequest().
+        $json = json_decode($rawBody, true);
+        if (is_array($json) && is_array($json['context'] ?? null) && isset($json['context']['csat_response_id'])) {
+            return $expected !== '' && $this->csatSignature($json['context']) === (string)($json['context']['sig'] ?? '');
+        }
         $presented = $this->webhookField($rawBody, $params, 'token');
         // No token configured means the webhook was never finished — refuse, as Telegram does.
         if ($expected === '' || $presented === '') {
@@ -44,6 +50,32 @@ class MattermostProvider extends MessagingProvider
 
     public function parseInbound(string $rawBody, array $params): array
     {
+        // A CSAT button press: the context we attached to the button, sent back by Mattermost.
+        $json = json_decode($rawBody, true);
+        if (is_array($json) && is_array($json['context'] ?? null) && isset($json['context']['csat_response_id'])) {
+            $c = $json['context'];
+            $userId = (string)($json['user_id'] ?? '');
+            $postId = (string)($json['post_id'] ?? '');
+            if ($userId === '' || $postId === '') {
+                return [];
+            }
+            return [[
+                'from'            => $userId,
+                'to'              => (string)($json['channel_id'] ?? ''),
+                'body'            => '',
+                'profile_name'    => '',
+                'provider_msg_id' => 'mmact:' . $postId,
+                'media'           => [],
+                'timestamp'       => null,
+                'language_code'   => '',
+                'csat'            => [
+                    'response_id' => (int)$c['csat_response_id'],
+                    'rating'      => (int)($c['csat_rating'] ?? 0),
+                    'callback_id' => '',
+                ],
+            ]];
+        }
+
         $channelId = $this->webhookField($rawBody, $params, 'channel_id');
         $postId    = $this->webhookField($rawBody, $params, 'post_id');
         $userId    = $this->webhookField($rawBody, $params, 'user_id');
@@ -74,6 +106,45 @@ class MattermostProvider extends MessagingProvider
     public function sendMessage(string $to, string $body): string
     {
         return $this->postToCustomer($to, ['message' => $body]);
+    }
+
+    /**
+     * The rating question as a direct message with five buttons. Each button calls
+     * this install's webhook with its context. The context is signed with the
+     * webhook token, so a button press cannot be forged.
+     */
+    public function sendRatingRequest(string $to, string $text, int $responseId): string
+    {
+        $url = $this->buttonCallbackUrl();
+        $actions = [];
+        for ($n = 1; $n <= 5; $n++) {
+            $context = ['csat_response_id' => $responseId, 'csat_rating' => $n];
+            $context['sig'] = $this->csatSignature($context);
+            $actions[] = [
+                'id'          => 'csat' . $responseId . 'x' . $n,
+                'name'        => (string)$n,
+                'integration' => ['url' => $url, 'context' => $context],
+            ];
+        }
+        return $this->postToCustomer($to, [
+            'message' => $text,
+            'props'   => ['attachments' => [['text' => '', 'actions' => $actions]]],
+        ]);
+    }
+
+    /** HMAC over the response id and rating, keyed by the webhook token. */
+    private function csatSignature(array $context): string
+    {
+        $key = (string)($this->channel['verify_token'] ?? '');
+        return hash_hmac('sha256', ((int)($context['csat_response_id'] ?? 0)) . ':' . ((int)($context['csat_rating'] ?? 0)), $key);
+    }
+
+    /** This channel's webhook URL, the one Mattermost calls back for button presses. */
+    private function buttonCallbackUrl(): string
+    {
+        require_once __DIR__ . '/../../includes/functions.php';
+        $conn = connectToDatabase();
+        return messagingWebhookUrl($conn, (int)$this->channel['id']);
     }
 
     /** Upload the file, then post it to the customer with the file attached. */

@@ -91,6 +91,26 @@ class TeamsProvider extends MessagingProvider
             return [];
         }
 
+        // A press on a CSAT rating button (see sendRatingRequest()). Only ours are read.
+        $csatValue = $a['value']['csat'] ?? null;
+        if (is_array($csatValue) && isset($csatValue['r'], $csatValue['v'])) {
+            $r = (int)$csatValue['r'];
+            $v = (int)$csatValue['v'];
+            if ($r > 0 && $v >= 1 && $v <= 5) {
+                return [[
+                    'from'            => $convId,
+                    'to'              => $serviceUrl,
+                    'body'            => '',
+                    'profile_name'    => trim((string)($a['from']['name'] ?? '')),
+                    'provider_msg_id' => 'teams:' . $activityId,
+                    'media'           => [],
+                    'timestamp'       => null,
+                    'language_code'   => '',
+                    'csat'            => ['response_id' => $r, 'rating' => $v, 'callback_id' => ''],
+                ]];
+            }
+        }
+
         // Adaptive card button presses arrive with empty text and their payload in value.
         $text = (string)($a['text'] ?? '');
         if (is_array($a['value'] ?? null) && isset($a['value']['text'])) {
@@ -117,6 +137,35 @@ class TeamsProvider extends MessagingProvider
             'timestamp'       => isset($a['timestamp']) ? (int)strtotime((string)$a['timestamp']) : null,
             'language_code'   => '',
         ]];
+    }
+
+    /**
+     * The rating question as an Adaptive Card with five buttons, 1 to 5. A press
+     * comes back as a message whose value carries csat.r (response id) and csat.v (rating).
+     */
+    public function sendRatingRequest(string $to, string $text, int $responseId): string
+    {
+        $actions = [];
+        for ($n = 1; $n <= 5; $n++) {
+            $actions[] = [
+                'type'  => 'Action.Submit',
+                'title' => (string)$n,
+                'data'  => ['csat' => ['r' => $responseId, 'v' => $n]],
+            ];
+        }
+        return $this->postActivity($to, [
+            'type'        => 'message',
+            'attachments' => [[
+                'contentType' => 'application/vnd.microsoft.card.adaptive',
+                'content'     => [
+                    '$schema' => 'http://adaptivecards.io/schemas/adaptive-card.json',
+                    'type'    => 'AdaptiveCard',
+                    'version' => '1.4',
+                    'body'    => [['type' => 'TextBlock', 'text' => $text, 'wrap' => true]],
+                    'actions' => $actions,
+                ],
+            ]],
+        ]);
     }
 
     public function sendMessage(string $to, string $body): string
