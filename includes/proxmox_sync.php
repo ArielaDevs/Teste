@@ -5,19 +5,25 @@
  * each proxmox_connections row is synced on its own, and its rows never mix with
  * another server's (every row is keyed by connection_id).
  *
- * Rules carried over from the NetBox-based sync this replaces (see
- * ~/Desktop/proxmox-vcloud/SKILL.md), kept because each one answers a real incident:
+ * Rules carried over from the NetBox-based sync this replaces (PR #167), kept
+ * because each one answers a real incident:
  *   - a VM's identity is (connection, vmid). Renaming a VM updates it, never duplicates it.
  *   - IPs for a QEMU VM come only from the QEMU guest agent, and only for interfaces
  *     whose MAC is one of the VM's own NICs (so docker0 and veth* are skipped).
  *   - IPs for an LXC container come from ip= on its netN lines; ip=dhcp is skipped.
  *   - a node that did not answer this cycle is not "removed": its VMs are left alone.
+ *   - a VM is removed only from a LIST THAT CAME BACK - the qemu or lxc list of
+ *     one node. See the TRAP in proxmoxSyncConnection().
  *   - SAFETY GUARD: if fewer than half of the known VMs were seen this cycle, nothing
  *     is deleted. A mass deletion has to be confirmed by a healthy cycle, never by a
  *     cycle where requests failed.
+ *
+ * Every request goes through HypervisorHttp (https only, the shared CA bundle).
+ * Read-only: nothing here ever changes anything in Proxmox.
  */
 
 require_once __DIR__ . '/encryption.php';
+require_once __DIR__ . '/hypervisor_http.php';
 
 const PROXMOX_MIN_VMS_FOR_GUARD = 5;
 const PROXMOX_MIN_SEEN_RATIO    = 0.5;
@@ -64,40 +70,29 @@ function proxmoxLogin(array $c): array
 /** One API call. $auth is null for the login call itself. Throws with a readable message. */
 function proxmoxCall(array $c, string $method, string $path, ?array $form = null, ?array $auth = null): array
 {
-    $base = rtrim((string)$c['host'], '/');
-    if (!preg_match('#^https?://#i', $base)) {
-        throw new Exception('The server address must start with https://');
-    }
-    $ch = curl_init($base . $path);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-    $verify = !empty($c['verify_ssl']);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $verify);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verify ? 2 : 0);
     $headers = [];
     if ($auth && isset($auth['header'])) {
         $headers[] = $auth['header'];
     } elseif ($auth) {
-        curl_setopt($ch, CURLOPT_COOKIE, 'PVEAuthCookie=' . $auth['ticket']);
+        $headers[] = 'Cookie: PVEAuthCookie=' . $auth['ticket'];
         if ($method !== 'GET') {
             $headers[] = 'CSRFPreventionToken: ' . $auth['csrf'];
         }
     }
     if ($form !== null) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($form));
+        $headers[] = 'Content-Type: application/x-www-form-urlencoded';
     }
-    if ($headers) {
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    try {
+        [$code, $body] = HypervisorHttp::request(
+            $method,
+            rtrim((string)$c['host'], '/') . $path,
+            $headers,
+            $form !== null ? http_build_query($form) : null,
+            !empty($c['verify_ssl'])
+        );
+    } catch (Exception $e) {
+        throw new Exception('Could not reach the Proxmox server: ' . $e->getMessage());
     }
-    $body = curl_exec($ch);
-    if ($body === false) {
-        $err = curl_error($ch);
-        curl_close($ch);
-        throw new Exception('Could not reach the Proxmox server: ' . $err);
-    }
-    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
     $json = json_decode((string)$body, true);
     if ($code === 401 || $code === 403) {
         throw new Exception('Proxmox refused this request (HTTP ' . $code . '). Check the user and its permissions.');
@@ -122,9 +117,14 @@ function proxmoxTryGet(array $c, array $auth, string $path)
 function proxmoxTestConnection(array $c): string
 {
     $auth = proxmoxLogin($c);
-    $nodes = proxmoxTryGet($c, $auth, '/nodes');
+    // TRAP: proxmoxCall, not proxmoxTryGet - the real reason must reach the
+    //   admin. With a token there is no separate login call, so the node list is
+    //   the first request; swallowing its error turned "could not reach the
+    //   server" into "check the user's permissions" (found at merge, by Testing
+    //   a server that does not exist).
+    $nodes = proxmoxCall($c, 'GET', '/api2/json/nodes', null, $auth)['data'] ?? null;
     if (!is_array($nodes)) {
-        throw new Exception('Logged in, but the node list could not be read. Check the user\'s permissions (Sys.Audit on /).');
+        throw new Exception('Connected, but the node list could not be read. Check the user\'s permissions (Sys.Audit on /).');
     }
     return 'Connected. ' . count($nodes) . ' node(s) visible.';
 }
@@ -139,7 +139,7 @@ function proxmoxSyncConnection(PDO $conn, int $connectionId): array
     $summary = ['status' => 'ok', 'message' => '', 'vms' => 0, 'nodes' => 0, 'removed' => 0, 'skipped_nodes' => [], 'guard' => false];
     try {
         $auth = proxmoxLogin($c);
-        $nodeList = proxmoxTryGet($c, $auth, '/nodes');
+        $nodeList = proxmoxCall($c, 'GET', '/api2/json/nodes', null, $auth)['data'] ?? null;   // its error is the message
         if (!is_array($nodeList)) {
             throw new Exception('The node list could not be read.');
         }
@@ -152,7 +152,7 @@ function proxmoxSyncConnection(PDO $conn, int $connectionId): array
             }
         }
 
-        $scannedNodes = [];
+        $readLists = [];   // "node|qemu" or "node|lxc" => true, for each list that came back
         $seen = [];   // vmid => true, VMs found this cycle on nodes that answered
         $pending = [];
 
@@ -176,14 +176,13 @@ function proxmoxSyncConnection(PDO $conn, int $connectionId): array
                 $summary['skipped_nodes'][] = $nodeName;   // offline: its VMs are not "removed", just unknown
                 continue;
             }
-            $scannedNodes[] = $nodeName;
-
             foreach (['qemu' => 'qemu', 'lxc' => 'lxc'] as $type => $segment) {
                 $list = proxmoxTryGet($c, $auth, '/nodes/' . rawurlencode($nodeName) . '/' . $segment);
                 if (!is_array($list)) {
                     $summary['skipped_nodes'][] = $nodeName . '/' . $segment;
                     continue;
                 }
+                $readLists[$nodeName . '|' . $type] = true;
                 foreach ($list as $vm) {
                     $vmid = (int)($vm['vmid'] ?? 0);
                     if ($vmid <= 0) {
@@ -211,15 +210,29 @@ function proxmoxSyncConnection(PDO $conn, int $connectionId): array
             $summary['vms']++;
         }
 
-        // Remove VMs that really are gone: only on nodes that answered, and only if the guard passes.
-        if ($scannedNodes) {
-            $in = implode(',', array_fill(0, count($scannedNodes), '?'));
-            $stmt = $conn->prepare("SELECT vmid FROM proxmox_vms WHERE connection_id = ? AND node_name IN ($in)");
-            $stmt->execute(array_merge([$connectionId], $scannedNodes));
-            $known = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        // Remove VMs that really are gone, and only if the guard passes.
+        //
+        // TRAP: "gone" means missing from a LIST THAT CAME BACK - one node's qemu
+        //   list or its lxc list - never merely "on a node that answered". The PR
+        //   scoped removal by node, so a node that was online but whose qemu list
+        //   failed (a timeout, a permission on that node) still counted as read,
+        //   and every VM on it was deleted. The guard did not catch it either: it
+        //   compared all VMs seen across the cluster with the known ones, so one
+        //   small node failing in a big cluster stayed under the 50% line.
+        //   The rows are upserted above first, so a VM that moved to another
+        //   node is already recorded there before this looks.
+        if ($readLists) {
+            $stmt = $conn->prepare("SELECT vmid, node_name, vm_type FROM proxmox_vms WHERE connection_id = ?");
+            $stmt->execute([$connectionId]);
+            $known = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if (isset($readLists[$row['node_name'] . '|' . $row['vm_type']])) {
+                    $known[] = (int)$row['vmid'];
+                }
+            }
             $stale = array_values(array_diff($known, array_keys($seen)));
             $knownCount = count($known);
-            $seenCount  = count($seen);
+            $seenCount  = $knownCount - count($stale);   // of the ones we could check, how many are still there
             $guardFires = $knownCount >= PROXMOX_MIN_VMS_FOR_GUARD && $seenCount < $knownCount * PROXMOX_MIN_SEEN_RATIO;
             if ($guardFires) {
                 $summary['guard'] = true;
@@ -397,4 +410,82 @@ function proxmoxDiskGb(array $cfg, string $type): ?float
         }
     }
     return $found ? round($total, 2) : null;
+}
+
+/**
+ * Save a server from the settings form. Returns its id.
+ *
+ * Moved here from api/assets/proxmox_connections.php at merge time so that the
+ * rules are in one place, and tests/hypervisor-sync.php runs the real ones.
+ *
+ * TRAP: the password field holds the API token SECRET (or the user's password).
+ *   It is stored only through encryptValue(), never returned to the browser
+ *   (proxmoxConnectionOut() says has_password and nothing more), and a blank or
+ *   all-asterisks value on edit keeps the stored one.
+ */
+function proxmoxSaveConnection(PDO $conn, array $in): int
+{
+    $id       = (int)($in['id'] ?? 0);
+    $name     = trim((string)($in['name'] ?? ''));
+    $username = trim((string)($in['username'] ?? ''));
+    $password = (string)($in['password'] ?? '');
+    $verify   = !empty($in['verify_ssl']) ? 1 : 0;
+    $active   = !empty($in['is_active']) ? 1 : 0;
+    $interval = max(5, min(10080, (int)($in['sync_interval_minutes'] ?? 60)));
+
+    if ($name === '' || mb_strlen($name) > 100) {
+        throw new Exception('Give the server a name (up to 100 characters).');
+    }
+    $host = HypervisorHttp::validateHost((string)($in['host'] ?? ''), 'https://pve.example.com:8006');
+    if ($username === '' || mb_strlen($username) > 100) {
+        throw new Exception('A Proxmox user or API token is required, for example monitor@pve or monitor@pve!freeitsm.');
+    }
+    if (strpos($username, '!') !== false && !preg_match('/^[^\s@!]+@[^\s!]+![^\s!]+$/', $username)) {
+        throw new Exception('An API token ID must look like monitor@pve!freeitsm.');
+    }
+    $current = null;
+    if ($id > 0) {
+        $exists = $conn->prepare("SELECT password_enc FROM proxmox_connections WHERE id = ?");
+        $exists->execute([$id]);
+        $current = $exists->fetch(PDO::FETCH_ASSOC);
+        if (!$current) {
+            throw new Exception('Proxmox server not found');
+        }
+    }
+    $keep = ($password === '' || preg_match('/^\*+$/', $password));
+    if ($id === 0 && $keep) {
+        throw new Exception('A password or API token secret is required for a new server.');
+    }
+    $passwordEnc = $keep ? ($current['password_enc'] ?? null) : encryptValue($password);
+
+    if ($id > 0) {
+        $conn->prepare(
+            "UPDATE proxmox_connections SET name = ?, host = ?, username = ?, password_enc = ?, verify_ssl = ?,
+                is_active = ?, sync_interval_minutes = ? WHERE id = ?"
+        )->execute([$name, $host, $username, $passwordEnc, $verify, $active, $interval, $id]);
+        return $id;
+    }
+    $conn->prepare(
+        "INSERT INTO proxmox_connections (name, host, username, password_enc, verify_ssl, is_active, sync_interval_minutes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )->execute([$name, $host, $username, $passwordEnc, $verify, $active, $interval]);
+    return (int)$conn->lastInsertId();
+}
+
+/** A server as the browser may see it: never the password, only whether there is one. */
+function proxmoxConnectionOut(array $r): array
+{
+    return [
+        'id'                    => (int)$r['id'],
+        'name'                  => $r['name'],
+        'host'                  => $r['host'],
+        'username'              => $r['username'],
+        'has_password'          => !empty($r['password_enc']),
+        'verify_ssl'            => (bool)$r['verify_ssl'],
+        'is_active'             => (bool)$r['is_active'],
+        'sync_interval_minutes' => (int)$r['sync_interval_minutes'],
+        'last_sync_datetime'    => $r['last_sync_datetime'],
+        'last_sync_status'      => $r['last_sync_status'],
+        'last_sync_message'     => $r['last_sync_message'],
+    ];
 }

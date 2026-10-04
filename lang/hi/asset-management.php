@@ -77,7 +77,7 @@ return [
         'field_host' => 'सर्वर पता',
         'field_user' => 'उपयोगकर्ता या API टोकन',
         'field_password' => 'पासवर्ड या API टोकन सीक्रेट',
-        'token_help' => 'API टोकन के लिए उसका ID (user@realm!tokenid) लिखें और सीक्रेट पासवर्ड फ़ील्ड में पेस्ट करें। देखें docs/proxmox-setup.md।',
+        'token_help' => 'API टोकन के लिए उसका ID (user@realm!tokenid) लिखें और सीक्रेट पासवर्ड फ़ील्ड में पेस्ट करें। देखें https://github.com/edmozley/freeitsm/wiki/Proxmox-VE।',
         'field_interval' => 'हर (मिनट) सिंक करें',
         'field_verify' => 'SSL प्रमाणपत्र सत्यापित करें',
         'field_active' => 'सक्रिय',

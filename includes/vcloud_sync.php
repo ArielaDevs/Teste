@@ -16,9 +16,15 @@
  *   - a VM is removed only after a COMPLETE inventory read. A page that failed means
  *     the list is partial, so nothing is removed that cycle.
  *   - SAFETY GUARD: fewer than half of the known VMs seen means nothing is deleted.
+ *   - edge gateways follow the same rule: removed only after every page was read.
+ *
+ * Every request goes through HypervisorHttp (https only, the shared CA bundle).
+ * Each sync and test logs its session out again (vcdLogout()). Read-only:
+ * nothing here ever changes anything in Director.
  */
 
 require_once __DIR__ . '/encryption.php';
+require_once __DIR__ . '/hypervisor_http.php';
 
 const VCD_MIN_VMS_FOR_GUARD = 5;
 const VCD_MIN_SEEN_RATIO    = 0.5;
@@ -42,42 +48,20 @@ function vcdLoadConnection(PDO $conn, int $connectionId): array
  */
 function vcdHttp(array $c, string $method, string $path, array $headers, ?string $bearer = null, ?string $basic = null): array
 {
-    $base = rtrim((string)$c['host'], '/');
-    if (!preg_match('#^https?://#i', $base)) {
-        throw new Exception('The server address must start with https://');
-    }
-    $token = '';
-    $ch = curl_init($base . $path);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-    $verify = !empty($c['verify_ssl']);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $verify);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verify ? 2 : 0);
-    curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $line) use (&$token) {
-        if (stripos($line, 'X-VMWARE-VCLOUD-ACCESS-TOKEN:') === 0) {
-            $token = trim(substr($line, strlen('X-VMWARE-VCLOUD-ACCESS-TOKEN:')));
-        }
-        return strlen($line);
-    });
     $sendHeaders = $headers;
     if ($bearer !== null) {
         $sendHeaders[] = 'Authorization: Bearer ' . $bearer;
     } elseif ($basic !== null) {
         $sendHeaders[] = 'Authorization: Basic ' . $basic;
     }
-    if ($sendHeaders) {
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $sendHeaders);
+    try {
+        [$code, $body, $respHeaders] = HypervisorHttp::request(
+            $method, rtrim((string)$c['host'], '/') . $path, $sendHeaders, null, !empty($c['verify_ssl']), 120
+        );
+    } catch (Exception $e) {
+        throw new Exception('Could not reach the vCloud Director server: ' . $e->getMessage());
     }
-    $body = curl_exec($ch);
-    if ($body === false) {
-        $err = curl_error($ch);
-        curl_close($ch);
-        throw new Exception('Could not reach the vCloud Director server: ' . $err);
-    }
-    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    return [$code, (string)$body, $token];
+    return [$code, (string)$body, (string)($respHeaders['x-vmware-vcloud-access-token'] ?? '')];
 }
 
 function vcdAcceptJson(string $version): array
@@ -102,6 +86,22 @@ function vcdLogin(array $c): string
         throw new Exception('vCloud Director did not return a session (HTTP ' . $code . ').');
     }
     return $token;
+}
+
+/**
+ * End the session again. Best-effort.
+ *
+ * Added at merge time: the PR logged in on every test and every sync and never
+ * logged out, so each scheduled run left a live session behind on the Director
+ * side until it timed out - one more per server per interval.
+ */
+function vcdLogout(array $c, string $token): void
+{
+    try {
+        vcdHttp($c, 'DELETE', '/cloudapi/1.0.0/sessions/current', vcdAcceptJson($c['api_version']), $token);
+    } catch (Exception $e) {
+        // Nothing to do: the session times out on its own.
+    }
 }
 
 /** A GET that returns the body on success, or null on any failure (per-item problems never stop a sync). */
@@ -137,6 +137,7 @@ function vcdTest(array $c): string
     $token = vcdLogin($c);
     $edges = vcdTryGet($c, $token, '/cloudapi/1.0.0/edgeGateways?pageSize=1', vcdAcceptJson($c['api_version']));
     $vms = vcdXml(vcdTryGet($c, $token, '/api/query?type=vm&format=records&page=1&pageSize=1', vcdAcceptXml($c['api_version'])));
+    vcdLogout($c, $token);
     if (!$vms) {
         throw new Exception('Logged in, but the VM inventory could not be read. Check the user\'s rights in its organization.');
     }
@@ -152,6 +153,7 @@ function vcdSyncConnection(PDO $conn, int $connectionId): array
     $c = vcdLoadConnection($conn, $connectionId);
     $v = $c['api_version'];
     $summary = ['status' => 'ok', 'message' => '', 'vms' => 0, 'edges' => 0, 'removed' => 0, 'guard' => false, 'incomplete' => false];
+    $token = '';
     try {
         $token = vcdLogin($c);
 
@@ -159,6 +161,7 @@ function vcdSyncConnection(PDO $conn, int $connectionId): array
         $seen = [];
         $pending = [];
         $complete = true;
+        $read = 0;
         for ($page = 1; $page < 10000; $page++) {
             $xml = vcdXml(vcdTryGet($c, $token, '/api/query?type=vm&format=records&page=' . $page . '&pageSize=' . VCD_PAGE_SIZE, vcdAcceptXml($v)));
             if ($xml === null) {
@@ -173,8 +176,15 @@ function vcdSyncConnection(PDO $conn, int $connectionId): array
                     $pending[] = $details;
                 }
             }
+            // TRAP: count what ARRIVED, never page x the size we asked for. The
+            //   PR stopped when page * 128 >= total, but Director caps a page at
+            //   its own maximum (restapi.queryservice.maxPageSize, which an admin
+            //   can lower). On such a system page 1 came back short, the loop
+            //   stopped, the list counted as complete - and every VM after the
+            //   first page was deleted.
+            $read += count($records);
             $total = (int)($xml['total'] ?? 0);
-            if (count($records) === 0 || $page * VCD_PAGE_SIZE >= $total) {
+            if (count($records) === 0 || $read >= $total) {
                 break;
             }
         }
@@ -218,9 +228,25 @@ function vcdSyncConnection(PDO $conn, int $connectionId): array
         }
 
         // ---- edge gateways ----
-        $edgeJson = vcdTryGet($c, $token, '/cloudapi/1.0.0/edgeGateways?pageSize=' . VCD_PAGE_SIZE, vcdAcceptJson($v));
-        $edges = $edgeJson !== null ? json_decode($edgeJson, true) : null;
-        if (is_array($edges) && is_array($edges['values'] ?? null)) {
+        // TRAP: every page, and remove only after all of them came back. The PR
+        //   read one page of 128 and then deleted every gateway not on it, so an
+        //   install with more than 128 lost the rest on every sync.
+        $edgeValues = [];
+        $edgesComplete = false;
+        for ($page = 1; $page < 1000; $page++) {
+            $edgeJson = vcdTryGet($c, $token, '/cloudapi/1.0.0/edgeGateways?page=' . $page . '&pageSize=' . VCD_PAGE_SIZE, vcdAcceptJson($v));
+            $edgePage = $edgeJson !== null ? json_decode($edgeJson, true) : null;
+            if (!is_array($edgePage) || !is_array($edgePage['values'] ?? null)) {
+                break;   // unreadable: keep what we have, remove nothing
+            }
+            $edgeValues = array_merge($edgeValues, $edgePage['values']);
+            if ($page >= (int)($edgePage['pageCount'] ?? 1) || !$edgePage['values']) {
+                $edgesComplete = true;
+                break;
+            }
+        }
+        $edges = ['values' => $edgeValues];
+        if ($edgeValues || $edgesComplete) {
             $edgeUpsert = $conn->prepare(
                 "INSERT INTO vcloud_edge_gateways (connection_id, gateway_id, name, org_vdc, status, uplink_ips, details_json, last_seen_datetime)
                  VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
@@ -244,13 +270,15 @@ function vcdSyncConnection(PDO $conn, int $connectionId): array
                     json_encode(['uplinks' => $e['edgeGatewayUplinks'] ?? []], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)]);
                 $summary['edges']++;
             }
-            if ($seenEdges) {
+            if ($edgesComplete && $seenEdges) {
                 $placeholders = implode(',', array_fill(0, count($seenEdges), '?'));
                 $gone = $conn->prepare("DELETE FROM vcloud_edge_gateways WHERE connection_id = ? AND gateway_id NOT IN ($placeholders)");
                 $gone->execute(array_merge([$connectionId], $seenEdges));
             }
         }
 
+        vcdLogout($c, $token);
+        $token = '';
         if ($summary['message'] === '') {
             $summary['message'] = $summary['vms'] . ' VMs, ' . $summary['edges'] . ' edge gateway(s).'
                 . ($summary['removed'] ? ' Removed ' . $summary['removed'] . ' that no longer exist.' : '');
@@ -258,6 +286,9 @@ function vcdSyncConnection(PDO $conn, int $connectionId): array
     } catch (Exception $e) {
         $summary['status'] = 'error';
         $summary['message'] = $e->getMessage();
+        if ($token !== '') {
+            vcdLogout($c, $token);
+        }
     }
 
     $conn->prepare(
@@ -344,5 +375,89 @@ function vcdVmRecord(array $c, string $token, SimpleXMLElement $rec): ?array
         'mac_addresses'=> $macs ? implode(', ', array_values(array_unique($macs))) : null,
         'details_json' => json_encode(['vm_detail' => ['disks' => $disks, 'nics' => $nics], 'guest_networking' => []],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+    ];
+}
+
+/**
+ * Save a server from the settings form. Returns its id.
+ *
+ * Moved here from api/assets/vcloud_connections.php at merge time, so the rules
+ * are in one place and tests/hypervisor-sync.php runs the real ones.
+ *
+ * TRAP: the password is stored only through encryptValue(), never returned to
+ *   the browser (vcdConnectionOut() says has_password and nothing more), and a
+ *   blank or all-asterisks value on edit keeps the stored one.
+ */
+function vcdSaveConnection(PDO $conn, array $in): int
+{
+    $id       = (int)($in['id'] ?? 0);
+    $name     = trim((string)($in['name'] ?? ''));
+    $org      = trim((string)($in['org'] ?? ''));
+    $username = trim((string)($in['username'] ?? ''));
+    $password = (string)($in['password'] ?? '');
+    $version  = trim((string)($in['api_version'] ?? '38.0')) ?: '38.0';
+    $verify   = !empty($in['verify_ssl']) ? 1 : 0;
+    $active   = !empty($in['is_active']) ? 1 : 0;
+    $interval = max(5, min(10080, (int)($in['sync_interval_minutes'] ?? 60)));
+
+    if ($name === '' || mb_strlen($name) > 100) {
+        throw new Exception('Give the server a name (up to 100 characters).');
+    }
+    $host = HypervisorHttp::validateHost((string)($in['host'] ?? ''), 'https://vcd.example.com');
+    if ($org === '' || mb_strlen($org) > 100) {
+        throw new Exception('The organization is required. Use the organization name, or System for a provider administrator.');
+    }
+    if ($username === '' || mb_strlen($username) > 100 || strpos($username, ':') !== false) {
+        throw new Exception('A user name is required (without a colon).');
+    }
+    if (!preg_match('/^\d+\.\d+$/', $version)) {
+        throw new Exception('The API version must look like 38.0 (vCD 10.5) or 36.2 (vCD 10.3).');
+    }
+    $current = null;
+    if ($id > 0) {
+        $exists = $conn->prepare("SELECT password_enc FROM vcloud_connections WHERE id = ?");
+        $exists->execute([$id]);
+        $current = $exists->fetch(PDO::FETCH_ASSOC);
+        if (!$current) {
+            throw new Exception('vCloud Director server not found');
+        }
+    }
+    $keep = ($password === '' || preg_match('/^\*+$/', $password));
+    if ($id === 0 && $keep) {
+        throw new Exception('A password is required for a new server.');
+    }
+    $passwordEnc = $keep ? ($current['password_enc'] ?? null) : encryptValue($password);
+
+    if ($id > 0) {
+        $conn->prepare(
+            "UPDATE vcloud_connections SET name = ?, host = ?, org = ?, username = ?, password_enc = ?, api_version = ?,
+                verify_ssl = ?, is_active = ?, sync_interval_minutes = ? WHERE id = ?"
+        )->execute([$name, $host, $org, $username, $passwordEnc, $version, $verify, $active, $interval, $id]);
+        return $id;
+    }
+    $conn->prepare(
+        "INSERT INTO vcloud_connections (name, host, org, username, password_enc, api_version, verify_ssl, is_active, sync_interval_minutes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    )->execute([$name, $host, $org, $username, $passwordEnc, $version, $verify, $active, $interval]);
+    return (int)$conn->lastInsertId();
+}
+
+/** A server as the browser may see it: never the password, only whether there is one. */
+function vcdConnectionOut(array $r): array
+{
+    return [
+        'id'                    => (int)$r['id'],
+        'name'                  => $r['name'],
+        'host'                  => $r['host'],
+        'org'                   => $r['org'],
+        'username'              => $r['username'],
+        'api_version'           => $r['api_version'],
+        'has_password'          => !empty($r['password_enc']),
+        'verify_ssl'            => (bool)$r['verify_ssl'],
+        'is_active'             => (bool)$r['is_active'],
+        'sync_interval_minutes' => (int)$r['sync_interval_minutes'],
+        'last_sync_datetime'    => $r['last_sync_datetime'],
+        'last_sync_status'      => $r['last_sync_status'],
+        'last_sync_message'     => $r['last_sync_message'],
     ];
 }

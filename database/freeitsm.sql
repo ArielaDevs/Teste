@@ -1958,7 +1958,7 @@ CREATE TABLE IF NOT EXISTS `vcloud_edge_gateways` (
     `last_seen_datetime` DATETIME NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_vcloud_edge` (`connection_id`, `gateway_id`),
-    CONSTRAINT `fk_vcloud_edge_connection` FOREIGN KEY (`connection_id`) REFERENCES `vcloud_connections` (`id`) ON DELETE CASCADE
+    CONSTRAINT `fk_vcloud_edge_gateways_connection` FOREIGN KEY (`connection_id`) REFERENCES `vcloud_connections` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------

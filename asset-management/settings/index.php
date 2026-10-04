@@ -1479,8 +1479,8 @@ $translationNamespaces = ['common', 'asset-management'];
                         <thead>
                             <tr>
                                 <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_name')); ?></th>
-                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_name')); ?></th>
-                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_node')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_vapp')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_vdc')); ?></th>
                                 <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_status')); ?></th>
                                 <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_resources')); ?></th>
                                 <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_network')); ?></th>
@@ -1489,10 +1489,24 @@ $translationNamespaces = ['common', 'asset-management'];
                         <tbody id="vcloudVmsBody"></tbody>
                     </table>
                 </div>
+                <h4 style="margin:18px 0 8px;"><?php echo htmlspecialchars(t('asset-management.vcloud.edges_title')); ?></h4>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_name')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_vdc')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.vm_status')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.vcloud.edge_uplinks')); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody id="vcloudEdgesBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- Proxmox server form -->
+        <!-- vCloud Director server form -->
         <div class="modal" id="vcloudModal">
             <div class="modal-content" style="max-width: 560px;">
                 <div class="modal-header" id="vcloudModalTitle"><?php echo htmlspecialchars(t('asset-management.vcloud.add')); ?></div>
@@ -4745,8 +4759,8 @@ $translationNamespaces = ['common', 'asset-management'];
 
     <?php /* Loaded last so it can wrap this page's globals; inert on desktop. */ ?>
     <script>window.assetTypeIcons = <?php echo json_encode($assetTypeIcons, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
-    <script src="../../assets/js/proxmox-settings.js?v=1"></script>
-    <script src="../../assets/js/vcloud-settings.js?v=1"></script>
+    <script src="../../assets/js/proxmox-settings.js?v=2"></script>
+    <script src="../../assets/js/vcloud-settings.js?v=2"></script>
     <script src="../../assets/js/network-mapper-icons.js?v=3"></script>
     <script src="../../assets/js/mobile.js?v=70"></script>
 </body>

@@ -140,6 +140,32 @@ return [
         'check'    => ['rows', 'servers'],
     ],
     [
+        // PR #167
+        'id'       => 'assets.proxmox_synced',
+        'module'   => 'assets',
+        'tier'     => 'extra',
+        'category' => 'integrations',
+        'title'    => 'Proxmox VE virtual machines synced',
+        'what'     => 'One or more Proxmox VE servers, read with an API token, filling the Servers page with their VMs and containers, IP and MAC addresses.',
+        'why'      => 'An estate on Proxmox sits beside vCenter in one list, and a VM is only removed when Proxmox itself no longer has it - never because a node was down.',
+        'done'     => 'At least one VM or container has been synced from Proxmox.',
+        'link'     => 'asset-management/settings/?tab=proxmox',
+        'check'    => ['rows', 'proxmox_vms'],
+    ],
+    [
+        // PR #167
+        'id'       => 'assets.vcloud_synced',
+        'module'   => 'assets',
+        'tier'     => 'extra',
+        'category' => 'integrations',
+        'title'    => 'Cloud Director virtual machines synced',
+        'what'     => 'One or more VMware Cloud Director servers, read per organization, filling the Servers page with their VMs and listing their edge gateways.',
+        'why'      => 'Hosted and provider estates appear in the same Servers list as everything on-premises, with each VM\'s network cards, addresses and disks.',
+        'done'     => 'At least one VM has been synced from Cloud Director.',
+        'link'     => 'asset-management/settings/?tab=vcloud',
+        'check'    => ['rows', 'vcloud_vms'],
+    ],
+    [
         'id'       => 'assets.intune',
         'module'   => 'assets',
         'tier'     => 'extra',

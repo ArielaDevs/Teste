@@ -77,7 +77,7 @@ return [
         'field_host' => 'സെർവർ വിലാസം',
         'field_user' => 'ഉപയോക്താവ് അല്ലെങ്കിൽ API ടോക്കൺ',
         'field_password' => 'പാസ്‌വേഡ് അല്ലെങ്കിൽ API ടോക്കൺ രഹസ്യം',
-        'token_help' => 'API ടോക്കണിന് അതിന്റെ ID (user@realm!tokenid) നൽകി രഹസ്യം പാസ്‌വേഡ് ഫീൽഡിൽ ഒട്ടിക്കുക. docs/proxmox-setup.md കാണുക.',
+        'token_help' => 'API ടോക്കണിന് അതിന്റെ ID (user@realm!tokenid) നൽകി രഹസ്യം പാസ്‌വേഡ് ഫീൽഡിൽ ഒട്ടിക്കുക. https://github.com/edmozley/freeitsm/wiki/Proxmox-VE കാണുക.',
         'field_interval' => 'എല്ലാ (മിനിറ്റ്) സിങ്ക് ചെയ്യുക',
         'field_verify' => 'SSL സർട്ടിഫിക്കറ്റ് പരിശോധിക്കുക',
         'field_active' => 'സജീവം',

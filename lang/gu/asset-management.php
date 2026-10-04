@@ -77,7 +77,7 @@ return [
         'field_host' => 'સર્વર સરનામું',
         'field_user' => 'વપરાશકર્તા અથવા API ટોકન',
         'field_password' => 'પાસવર્ડ અથવા API ટોકન સિક્રેટ',
-        'token_help' => 'API ટોકન માટે તેનો ID (user@realm!tokenid) લખો અને સિક્રેટ પાસવર્ડ ફીલ્ડમાં પેસ્ટ કરો. docs/proxmox-setup.md જુઓ.',
+        'token_help' => 'API ટોકન માટે તેનો ID (user@realm!tokenid) લખો અને સિક્રેટ પાસવર્ડ ફીલ્ડમાં પેસ્ટ કરો. https://github.com/edmozley/freeitsm/wiki/Proxmox-VE જુઓ.',
         'field_interval' => 'દર (મિનિટ) સિંક કરો',
         'field_verify' => 'SSL પ્રમાણપત્ર ચકાસો',
         'field_active' => 'સક્રિય',

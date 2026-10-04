@@ -16,8 +16,8 @@
     }
 
     function statusBadge(s) {
-        const map = { ok: ['#e8f5e9', '#2e7d32'], warning: ['#fff3e0', '#ef6c00'], error: ['#fef2f2', '#b91c1c'] };
-        const c = map[s] || ['#f3f4f6', '#555'];
+        const map = { ok: ['var(--success-bg)', 'var(--success-text)'], warning: ['var(--warning-bg)', 'var(--warning-text)'], error: ['var(--danger-bg)', 'var(--danger-text)'] };
+        const c = map[s] || ['var(--surface-2)', 'var(--text-muted)'];
         const label = s ? T('status_' + s) : T('status_never');
         return `<span class="status-badge" style="background:${c[0]};color:${c[1]};">${escapeHtml(label)}</span>`;
     }
@@ -27,7 +27,7 @@
         if (!body) return;
         try {
             const data = await call('proxmox_connections.php');
-            if (!data.success) { body.innerHTML = `<tr><td colspan="5" style="color:#b91c1c;">${escapeHtml(data.error || '')}</td></tr>`; return; }
+            if (!data.success) { body.innerHTML = `<tr><td colspan="5" style="color:var(--danger-text);">${escapeHtml(data.error || '')}</td></tr>`; return; }
             servers = data.connections;
             if (!servers.length) {
                 body.innerHTML = `<tr><td colspan="5" style="text-align:center;">${escapeHtml(T('none_yet'))}</td></tr>`;
@@ -48,7 +48,7 @@
                     </td>
                 </tr>`).join('');
         } catch (e) {
-            body.innerHTML = `<tr><td colspan="5" style="color:#b91c1c;">${escapeHtml(T('load_failed'))}</td></tr>`;
+            body.innerHTML = `<tr><td colspan="5" style="color:var(--danger-text);">${escapeHtml(T('load_failed'))}</td></tr>`;
         }
     };
 
@@ -131,7 +131,7 @@
         body.innerHTML = `<tr><td colspan="6" style="text-align:center;">${escapeHtml(T('working'))}</td></tr>`;
         panel.style.display = '';
         const data = await call('proxmox_vms.php?connection_id=' + encodeURIComponent(id));
-        if (!data.success) { body.innerHTML = `<tr><td colspan="6" style="color:#b91c1c;">${escapeHtml(data.error || '')}</td></tr>`; return; }
+        if (!data.success) { body.innerHTML = `<tr><td colspan="6" style="color:var(--danger-text);">${escapeHtml(data.error || '')}</td></tr>`; return; }
         if (!data.vms.length) { body.innerHTML = `<tr><td colspan="6" style="text-align:center;">${escapeHtml(T('no_vms'))}</td></tr>`; return; }
         body.innerHTML = data.vms.map(v => `
             <tr>

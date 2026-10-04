@@ -77,7 +77,7 @@ return [
         'field_host' => 'Адреса сервера',
         'field_user' => 'Користувач або API-токен',
         'field_password' => 'Пароль або секрет API-токена',
-        'token_help' => 'Для API-токена введіть його ID (користувач@realm!tokenid), а секрет вставте в поле пароля. Див. docs/proxmox-setup.md.',
+        'token_help' => 'Для API-токена введіть його ID (користувач@realm!tokenid), а секрет вставте в поле пароля. Див. https://github.com/edmozley/freeitsm/wiki/Proxmox-VE.',
         'field_interval' => 'Синхронізувати кожні (хв)',
         'field_verify' => 'Перевіряти SSL-сертифікат',
         'field_active' => 'Активний',

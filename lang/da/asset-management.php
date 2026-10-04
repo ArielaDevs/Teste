@@ -77,7 +77,7 @@ return [
         'field_host' => 'Serveradresse',
         'field_user' => 'Bruger eller API-token',
         'field_password' => 'Adgangskode eller API-token-hemmelighed',
-        'token_help' => 'Til et API-token indtastes dets ID (bruger@realm!tokenid), og hemmeligheden indsættes i adgangskodefeltet. Se docs/proxmox-setup.md.',
+        'token_help' => 'Til et API-token indtastes dets ID (bruger@realm!tokenid), og hemmeligheden indsættes i adgangskodefeltet. Se https://github.com/edmozley/freeitsm/wiki/Proxmox-VE.',
         'field_interval' => 'Synk hvert (minutter)',
         'field_verify' => 'Verificer SSL-certifikat',
         'field_active' => 'Aktiv',

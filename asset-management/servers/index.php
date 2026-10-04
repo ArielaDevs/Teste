@@ -875,7 +875,7 @@ $translationNamespaces = ['common', 'asset-management'];
                                     <line x1="6" y1="18" x2="6.01" y2="18"></line>
                                 </svg>
                                 <h3>${window.t('asset-management.servers.empty_heading')}</h3>
-                                <p>${window.t('asset-management.servers.empty_body')}</p>
+                                <p>${window.t('asset-management.servers.empty_body_hypervisors')}</p>
                             </div>
                         </td></tr>`;
                 } else {
@@ -887,7 +887,7 @@ $translationNamespaces = ['common', 'asset-management'];
             tbody.innerHTML = filteredServers.map((s, i) => `
                 <tr onclick="showDetail(${i})">
                     <td><span class="server-name">${escapeHtml(s.name)}</span></td>
-                    <td><span class="status-badge" style="background:${s.source === 'proxmox' ? '#e8f0fe' : '#f3f4f6'};color:${s.source === 'proxmox' ? '#1a56db' : '#374151'};">${escapeHtml(s.source_name || 'vCenter')}</span></td>
+                    <td><span class="status-badge" style="background:${s.source === 'vcenter' || !s.source ? 'var(--surface-2)' : 'var(--accent-soft)'};color:${s.source === 'vcenter' || !s.source ? 'var(--text-muted)' : 'var(--accent)'};">${escapeHtml(s.source_name || 'vCenter')}</span></td>
                     <td>
                         <span class="status-badge ${s.power_state}">
                             <span class="status-dot ${s.power_state}"></span>
@@ -923,8 +923,8 @@ $translationNamespaces = ['common', 'asset-management'];
 
         /**
          * "Sync hypervisors": every source at once. vCenter first (its one configured
-         * server), then each active Proxmox server on its own. One source failing does
-         * not stop the others; the message lists each result.
+         * server), then every active Proxmox and Director server (sync_hypervisors.php).
+         * One source failing does not stop the others; the message lists each result.
          */
         async function syncVCenter() {
             const btn = document.getElementById('syncBtn');
@@ -939,53 +939,36 @@ $translationNamespaces = ['common', 'asset-management'];
             let anyFailed = false;
 
             try {
-                const vc = await fetch(API_BASE + 'get_vcenter.php').then(r => r.json()).catch(() => ({ success: false, error: 'network' }));
+                // vCenter first. An install with no vCenter at all says so in
+                // not_configured, and that is not a failure when other sources
+                // exist - the PR showed a red "not configured" on every sync of a
+                // Proxmox-only install.
+                const vc = await fetch(API_BASE + 'get_vcenter.php').then(r => r.json()).catch(() => ({ success: false }));
+                const vcNotConfigured = !vc.success && vc.not_configured;
                 if (vc.success) {
                     lines.push('vCenter: ' + vc.message);
-                } else {
+                } else if (!vcNotConfigured) {
                     anyFailed = true;
                     lines.push('vCenter: ' + (vc.error || window.t('asset-management.servers.sync_no_connect')));
                 }
 
-                const px = await fetch(API_BASE + 'proxmox_connections.php').then(r => r.json()).catch(() => ({ success: false }));
-                const vcl = await fetch(API_BASE + 'vcloud_connections.php').then(r => r.json()).catch(() => ({ success: false }));
-                const vcServers = (vcl.success && Array.isArray(vcl.connections)) ? vcl.connections.filter(c => c.is_active) : [];
-                for (const server of vcServers) {
-                    try {
-                        const r = await fetch(API_BASE + 'vcloud_sync.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: server.id, action: 'sync' }),
-                        }).then(res => res.json());
-                        if (r.success) {
-                            lines.push('vCloud ' + server.name + ': ' + r.summary.message);
-                        } else {
-                            anyFailed = true;
-                            lines.push('vCloud ' + server.name + ': ' + (r.error || 'error'));
-                        }
-                    } catch (e) {
-                        anyFailed = true;
-                        lines.push('vCloud ' + server.name + ': ' + window.t('asset-management.servers.sync_no_connect'));
+                // Then every active Proxmox and Director server, in one call on
+                // module access - see api/assets/sync_hypervisors.php for why it is
+                // not the per-server settings endpoints.
+                const hv = await fetch(API_BASE + 'sync_hypervisors.php', { method: 'POST' })
+                    .then(r => r.json()).catch(() => ({ success: false }));
+                if (hv.success) {
+                    for (const r of hv.results) {
+                        if (r.status !== 'ok') anyFailed = true;
+                        lines.push((r.source === 'proxmox' ? 'Proxmox ' : 'vCloud ') + r.name + ': ' + r.message);
                     }
+                } else {
+                    anyFailed = true;
+                    lines.push(hv.error || window.t('asset-management.servers.sync_no_connect'));
                 }
-                const servers = (px.success && Array.isArray(px.connections)) ? px.connections.filter(c => c.is_active) : [];
-                for (const server of servers) {
-                    try {
-                        const r = await fetch(API_BASE + 'proxmox_sync.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: server.id, action: 'sync' }),
-                        }).then(res => res.json());
-                        if (r.success) {
-                            lines.push('Proxmox ' + server.name + ': ' + r.summary.message);
-                        } else {
-                            anyFailed = true;
-                            lines.push('Proxmox ' + server.name + ': ' + (r.error || 'error'));
-                        }
-                    } catch (e) {
-                        anyFailed = true;
-                        lines.push('Proxmox ' + server.name + ': ' + window.t('asset-management.servers.sync_no_connect'));
-                    }
+                if (!lines.length && vcNotConfigured) {
+                    anyFailed = true;
+                    lines.push('vCenter: ' + vc.error);   // nothing is set up at all: say so
                 }
                 if (!lines.length) {
                     lines.push(window.t('asset-management.servers.sync_none'));

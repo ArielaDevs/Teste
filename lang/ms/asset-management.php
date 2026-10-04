@@ -77,7 +77,7 @@ return [
         'field_host' => 'Alamat pelayan',
         'field_user' => 'Pengguna atau token API',
         'field_password' => 'Kata laluan atau rahsia token API',
-        'token_help' => 'Untuk token API, masukkan IDnya (user@realm!tokenid) dan tampal rahsianya dalam medan kata laluan. Lihat docs/proxmox-setup.md.',
+        'token_help' => 'Untuk token API, masukkan IDnya (user@realm!tokenid) dan tampal rahsianya dalam medan kata laluan. Lihat https://github.com/edmozley/freeitsm/wiki/Proxmox-VE.',
         'field_interval' => 'Segerak setiap (minit)',
         'field_verify' => 'Sahkan sijil SSL',
         'field_active' => 'Aktif',

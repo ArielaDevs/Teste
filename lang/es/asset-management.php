@@ -77,7 +77,7 @@ return [
         'field_host' => 'Dirección del servidor',
         'field_user' => 'Usuario o token de API',
         'field_password' => 'Contraseña o secreto del token de API',
-        'token_help' => 'Para un token de API, escriba su ID (usuario@realm!tokenid) y pegue el secreto en el campo de contraseña. Vea docs/proxmox-setup.md.',
+        'token_help' => 'Para un token de API, escriba su ID (usuario@realm!tokenid) y pegue el secreto en el campo de contraseña. Vea https://github.com/edmozley/freeitsm/wiki/Proxmox-VE.',
         'field_interval' => 'Sincronizar cada (minutos)',
         'field_verify' => 'Verificar certificado SSL',
         'field_active' => 'Activo',
