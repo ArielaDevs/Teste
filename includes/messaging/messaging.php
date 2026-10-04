@@ -22,6 +22,7 @@ require_once __DIR__ . '/MetaCloudProvider.php';
 require_once __DIR__ . '/SlackProvider.php';
 require_once __DIR__ . '/FreeitsmProvider.php';
 require_once __DIR__ . '/TelegramProvider.php';
+require_once __DIR__ . '/TeamsProvider.php';
 require_once __DIR__ . '/../encryption.php';
 
 /** The 24h provider service window, in seconds. */
@@ -46,6 +47,8 @@ function messagingProvider(array $channel): MessagingProvider
             return new SlackProvider($channel);
         case 'telegram':
             return new TelegramProvider($channel);
+        case 'teams':
+            return new TeamsProvider($channel);
         default:
             throw new Exception('Unknown messaging provider: ' . ($channel['provider'] ?? '?'));
     }
@@ -226,6 +229,11 @@ function normaliseChannelIdentifier(string $raw, string $channelType = 'whatsapp
         return preg_match('/^[UW][A-Z0-9]{2,}$/', $s) ? $s : '';
     }
 
+    if ($channelType === 'teams') {
+        // A Teams conversation id (a:…, 19:…@thread…): letters, digits and : _ - . @ =.
+        return preg_match('/^[A-Za-z0-9:_.@=-]{3,190}$/', $s) ? $s : '';
+    }
+
     if ($channelType === 'telegram') {
         // A Telegram chat id — a bare (optionally negative, for group chats)
         // integer. NOT a phone number: running it through the digit-stripping
@@ -374,7 +382,7 @@ function messagingBuildTranscript(PDO $conn, int $ticketId): string
  */
 function channelHasServiceWindow(string $channelType): bool
 {
-    return !in_array($channelType, ['webchat', 'slack', 'telegram'], true);
+    return !in_array($channelType, ['webchat', 'slack', 'telegram', 'teams'], true);
 }
 
 function channelWindowOpen(?string $lastInboundAt): bool

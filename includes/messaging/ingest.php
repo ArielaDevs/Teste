@@ -244,6 +244,16 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         }
     }
 
+    // Teams: the regional serviceUrl the bot must answer through. It arrives on
+    // every activity; remember the latest so replies go to the right region.
+    if ($channelType === 'teams' && strpos((string) ($msg['to'] ?? ''), 'https://') === 0
+        && (string) ($channel['channel_ref'] ?? '') !== (string) $msg['to']) {
+        try {
+            $conn->prepare("UPDATE messaging_channels SET channel_ref = ? WHERE id = ?")
+                 ->execute([substr((string) $msg['to'], 0, 190), (int) $channel['id']]);
+        } catch (Exception $e) { /* a stale serviceUrl only delays the fix; never fail ingest */ }
+    }
+
     // Keep the channel's own last-inbound stamp current (diagnostics / settings).
     try {
         $conn->prepare("UPDATE messaging_channels SET last_inbound_datetime = UTC_TIMESTAMP() WHERE id = ?")
@@ -776,7 +786,11 @@ function messagingFindUsersByPhone(PDO $conn, string $phone, ?int $tenantId): ar
  */
 function getOrCreateChannelUser(PDO $conn, string $from, string $displayName, string $channelType): ?int
 {
-    $pseudoEmail = ltrim($from, '+') . '@' . $channelType . '.local';
+    // Teams conversation ids contain : @ and . — keep the address a plain local part.
+    $local = $channelType === 'teams'
+        ? preg_replace('/[^A-Za-z0-9_-]/', '_', $from)
+        : ltrim($from, '+');
+    $pseudoEmail = $local . '@' . $channelType . '.local';
     try {
         $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([$pseudoEmail]);

@@ -1111,6 +1111,28 @@ try {
                         changes who they are.
                     </p>
 
+                    <h4>Microsoft Teams</h4>
+                    <p>
+                        Teams chats are one-to-one with the bot. You create the bot once in your Microsoft 365 tenant (Azure), then add a channel under
+                        <strong>Settings &rarr; Messaging</strong> with provider <strong>Microsoft Teams</strong>. The form walks you through the steps.
+                    </p>
+                    <ol>
+                        <li>In the <strong>Azure portal</strong> (portal.azure.com), open <strong>Microsoft Entra ID &rarr; App registrations &rarr; New registration</strong>.
+                            Choose <strong>Accounts in this organizational directory only (Single tenant)</strong>. No redirect URI is needed.</li>
+                        <li>Copy the <strong>Application (client) ID</strong> into <strong>Bot App ID</strong>, and the <strong>Directory (tenant) ID</strong> into <strong>Tenant ID</strong>.</li>
+                        <li><strong>Certificates &amp; secrets &rarr; New client secret</strong>. Copy the secret's <strong>Value</strong> (not its ID) into <strong>App secret</strong>. Azure shows it once.</li>
+                        <li>Create an <strong>Azure Bot</strong> resource: type of app <strong>Single Tenant</strong>, use the existing app registration (same App ID).
+                            Set its <strong>Messaging endpoint</strong> to the webhook URL shown in the channel list, and enable the <strong>Microsoft Teams</strong> channel.</li>
+                        <li>Make a <code>manifest.json</code> for the Teams app with <code>bots[0].botId</code> set to the App ID, package it with its two icons, and upload it in the
+                            <strong>Teams Admin Center &rarr; Manage apps</strong>. Allow it for the users who should be able to chat with the bot.</li>
+                        <li><strong>Permissions:</strong> none. FreeITSM talks to the Bot Framework only, so do <strong>not</strong> add Microsoft Graph permissions.</li>
+                    </ol>
+                    <p class="help-note">
+                        Teams delivers only to an <strong>https://</strong> address, so the public URL on the Messaging tab must be one. The same goes for images you send:
+                        they are fetched from that address by Microsoft, so the path <code>/api/messaging/media.php</code> must be reachable from the internet.
+                        Full walkthrough with screenshots: <code>docs/messaging-teams-setup.md</code> in the repository.
+                    </p>
+
                     <h4>Sending files</h4>
                     <p>
                         On a Telegram or WhatsApp ticket, <strong>Attach</strong> in the reply box sends a picture or document to the customer; anything

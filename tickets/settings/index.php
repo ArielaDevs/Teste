@@ -2659,6 +2659,7 @@ $translationNamespaces = ['common', 'tickets'];
                             <option value="twilio">Twilio</option>
                             <option value="meta"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_meta')); ?></option>
                             <option value="telegram"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_telegram')); ?></option>
+                            <option value="teams"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_teams')); ?></option>
                         </select>
                     </div>
 
@@ -2722,6 +2723,35 @@ $translationNamespaces = ['common', 'tickets'];
                             <button type="button" class="btn btn-secondary" onclick="generateTelegramSecret()" style="white-space:nowrap; padding:8px 12px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.generate')); ?></button>
                         </div>
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_help')); ?></small>
+                    </div>
+
+                    <!-- Microsoft Teams (Bot Framework) credentials -->
+                    <div class="form-group provider-teams">
+                        <label for="channelTeamsAppId"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_app_id')); ?> *</label>
+                        <input type="text" id="channelTeamsAppId" placeholder="00000000-0000-0000-0000-000000000000">
+                    </div>
+                    <div class="form-group provider-teams">
+                        <label for="channelTeamsTenantId"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_tenant_id')); ?> *</label>
+                        <input type="text" id="channelTeamsTenantId" placeholder="00000000-0000-0000-0000-000000000000">
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_tenant_help')); ?></small>
+                    </div>
+                    <div class="form-group provider-teams" style="grid-column: span 2;">
+                        <label for="channelTeamsAppSecret"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_app_secret')); ?> *</label>
+                        <input type="password" id="channelTeamsAppSecret" placeholder="••••••••">
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_secret_help')); ?></small>
+                    </div>
+
+                    <!-- Teams setup steps: the Azure side has to exist before the App ID and secret above do. -->
+                    <div class="form-group provider-teams" style="grid-column: span 2; background:var(--bg-secondary, #f5f7fa); border:1px solid var(--border-color, #e0e0e0); border-radius:8px; padding:12px 14px;">
+                        <label style="font-weight:600; display:block; margin-bottom:6px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_setup_title')); ?></label>
+                        <ol style="margin:0 0 4px 18px; padding:0; font-size:13px; color:var(--text-muted, #555); line-height:1.6;">
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step1')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step2')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step3')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step4')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step5')); ?></li>
+                        </ol>
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_help_more')); ?> <code>docs/messaging-teams-setup.md</code></small>
                     </div>
 
                     <!-- How to connect: only meaningful once the secret is set and (for the
@@ -4312,6 +4342,8 @@ $translationNamespaces = ['common', 'tickets'];
                     ? ' <span class="status-badge" style="background:#e3f2fd;color:#1565c0;">Meta</span>'
                     : c.provider === 'telegram'
                     ? ' <span class="status-badge" style="background:#e1f5fe;color:#0288d1;">Telegram</span>'
+                    : c.provider === 'teams'
+                    ? ' <span class="status-badge" style="background:#ede7f6;color:#4527a0;">Teams</span>'
                     : ' <span class="status-badge" style="background:#e8f5e9;color:#2e7d32;">Twilio</span>';
                 const activeBadge = c.is_active ? '' : ' <span class="status-badge status-inactive">Inactive</span>';
                 const credBadge = c.has_credentials
@@ -4362,8 +4394,9 @@ $translationNamespaces = ['common', 'tickets'];
             document.querySelectorAll('.provider-twilio').forEach(el => el.style.display = (p === 'twilio') ? '' : 'none');
             document.querySelectorAll('.provider-meta').forEach(el => el.style.display = (p === 'meta') ? '' : 'none');
             document.querySelectorAll('.provider-telegram').forEach(el => el.style.display = (p === 'telegram') ? '' : 'none');
-            // Telegram has no WhatsApp-style phone number; the field is meaningless there.
-            document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram') ? 'none' : '');
+            document.querySelectorAll('.provider-teams').forEach(el => el.style.display = (p === 'teams') ? '' : 'none');
+            // Telegram and Teams have no WhatsApp-style phone number; the field is meaningless there.
+            document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram' || p === 'teams') ? 'none' : '');
             if (p === 'telegram') updateTelegramSetupCommand();
         }
 
@@ -4437,7 +4470,7 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('channelActive').checked = channel ? !!channel.is_active : true;
             // Secrets are write-only; show a masked placeholder on edit if configured.
             const mask = (channel && channel.has_credentials) ? '********' : '';
-            ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken'].forEach(idv => document.getElementById(idv).value = mask);
+            ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken','channelTeamsAppSecret'].forEach(idv => document.getElementById(idv).value = mask);
             ['channelAccountSid','channelPhoneNumberId','channelVerifyToken','channelRelaySecret','channelTelegramSecret'].forEach(idv => document.getElementById(idv).value = '');
             document.getElementById('channelGraphVersion').value = channel ? (channel.graph_version || '') : '';
 
@@ -4550,7 +4583,10 @@ $translationNamespaces = ['common', 'tickets'];
                 access_token: document.getElementById('channelAccessToken').value,
                 app_secret: document.getElementById('channelAppSecret').value,
                 graph_version: document.getElementById('channelGraphVersion').value.trim(),
-                bot_token: document.getElementById('channelBotToken').value
+                bot_token: document.getElementById('channelBotToken').value,
+                teams_app_id: document.getElementById('channelTeamsAppId').value.trim(),
+                teams_tenant_id: document.getElementById('channelTeamsTenantId').value.trim(),
+                teams_app_secret: document.getElementById('channelTeamsAppSecret').value
             };
             if (!payload.name) { showToast('Name is required', 'error'); return; }
             try {
