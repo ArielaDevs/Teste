@@ -390,21 +390,19 @@ that was no longer true. Edit the file, then `gh release edit vX.Y.Z --notes-fil
 
 ---
 
-## 7. Not built yet
+## 7. What discussion #92 asked for, and where it stands
 
-Three things discussion #92 asks for that do not exist. Do not describe them as done.
+Updated at 3.1.0: two of the three are built. This section used to list all three as
+missing, which by then would have sent a reader looking for things that existed.
 
-- **A version number in the application.** Thomas asked for this first - he wants to open
-  Settings and read which version he is on. It needs one source of truth
-  (`includes/version.php`, a single `FREEITSM_VERSION` constant), shown on the System
-  screen and included in Debug Tools output, and bumped as step 2 above. It must live in a
-  file the application *ships*, never in `config.php` - that file belongs to the operator
-  and Docker copies over it (#129).
-- **Docker image tags.** This is the part Thomas cares about most. `docker-compose.yml`
-  currently says `build: .`, so there is no way to pin a version and no way to roll back
-  without digging through git history. A GitHub Actions workflow that builds and pushes
-  `edmozley/freeitsm:1.4.0` and `:latest` on every `v*` tag would let operators write
-  `image: edmozley/freeitsm:1.4.0` and roll back by editing one line. There are currently
-  no workflows in `.github/` at all.
-- **A `CHANGELOG.md` in the repository.** `CHANGELOG.local.md` is not published. Release
-  notes on GitHub may be enough - decide before the first release rather than after.
+- **A version number in the application - built.** `includes/version.php` holds the one
+  `FREEITSM_VERSION` constant, read through `freeitsmVersion()`. It is shown on the System
+  screen and stamped on Debug Tools output. Bump it in step 2 of section 5. It lives in a
+  file the application ships, never in `config.php` (#129).
+- **Docker image tags - built.** `.github/workflows/docker-publish.yml` builds on every
+  `v*` tag and pushes `ghcr.io/edmozley/freeitsm:X.Y.Z`, `:X.Y`, `:X` and `:latest`, so an
+  operator can pin a version and roll back by editing one line. Check the run is green
+  after pushing a tag.
+- **A `CHANGELOG.md` in the repository - not built, and not needed.** The GitHub Release
+  notes and the website's release page, both from `releases/X.Y.Z.md`, are the public
+  record. `CHANGELOG.local.md` stays private.
