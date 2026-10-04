@@ -388,6 +388,29 @@ function messagingBuildTranscript(PDO $conn, int $ticketId): string
  * and the API disagree, the composer greys out a reply the API would accept, or
  * offers one it will refuse, and it reads as a broken integration.
  */
+/**
+ * Where a reply to a customer goes, given their latest inbound row
+ * (from_address + to_recipients).
+ *
+ * On a phone-like channel - WhatsApp, Telegram, web chat - you answer the
+ * sender, so the sender IS the address. On a threaded one you answer into the
+ * conversation the message came from, which ingest stored as to_recipients:
+ *   slack       "C08HELP:1719500000.000100"   channel + thread
+ *   teams       "<serviceUrl>|<conversationId>" - the serviceUrl is per conversation
+ *   mattermost  "<channelId>:<postId>"          the post to thread under
+ * Replying to the sender there would DM the person instead of answering where
+ * everybody else is reading. ONE function, so the composer and the in-chat CSAT
+ * request (PR #166) can never disagree about where an answer goes.
+ */
+const MESSAGING_THREADED_CHANNELS = ['slack', 'teams', 'mattermost'];
+
+function messagingReplyAddress(string $channelType, array $row): string
+{
+    return in_array($channelType, MESSAGING_THREADED_CHANNELS, true)
+        ? trim((string)($row['to_recipients'] ?? ''))
+        : (string)($row['from_address'] ?? '');
+}
+
 function channelHasServiceWindow(string $channelType): bool
 {
     return !in_array($channelType, ['webchat', 'slack', 'telegram', 'teams', 'mattermost'], true);

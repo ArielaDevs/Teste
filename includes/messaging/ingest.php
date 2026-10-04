@@ -51,9 +51,11 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     $mediaItems = is_array($msg['media'] ?? null) ? $msg['media'] : [];
     $hasMedia = !empty($mediaItems);
 
-    // CSAT: a 1–5 rating is an answer to a survey, not a new ticket message.
-    // Two shapes reach here: a rating-button press (Telegram callback_query), and
-    // a bare digit typed in reply to a text rating request on any channel.
+    // CSAT (PR #166): a 1-5 rating is an answer to a survey, not a new ticket
+    // message. Two shapes reach here: a rating-button press (Telegram, Teams,
+    // Mattermost), and a bare digit typed in reply to a text request. A digit
+    // only counts while csatPendingRequestForChat() says a request in THIS chat
+    // is waiting for one - otherwise "3" is an answer to an analyst's question.
     $csatReply = null;
     if (!empty($msg['csat'])) {
         $csatReply = [
@@ -69,7 +71,8 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         }
     }
     if ($csatReply !== null) {
-        return messagingRecordCsatReply($conn, $channel, $from, $csatReply);
+        $replyAddress = messagingReplyAddress((string) ($channel['channel_type'] ?? ''), ['from_address' => $from, 'to_recipients' => (string) ($msg['to'] ?? '')]);
+        return messagingRecordCsatReply($conn, $channel, $from, $replyAddress, $csatReply);
     }
 
     if ($body === '' && !$hasMedia) {
@@ -83,9 +86,10 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     // is normally the same number, but "normally" is not a good enough reason to
     // change what a working WhatsApp install writes to the database. Only Slack,
     // where the sender and the destination are genuinely different things (you
-    // answer into a channel and a thread, not to a person), reads it.
+    // answer into a channel and a thread, not to a person), reads it - and since
+    // PR #166 Teams and Mattermost, which are threaded the same way.
     $replyAddress = (string) ($channel['phone_number'] ?? '');
-    if ($channelType === 'slack') {
+    if (in_array($channelType, MESSAGING_THREADED_CHANNELS, true)) {
         $replyAddress = trim((string) ($msg['to'] ?? ''));
     }
 
@@ -244,15 +248,6 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         }
     }
 
-    // Teams: the regional serviceUrl the bot must answer through. It arrives on
-    // every activity; remember the latest so replies go to the right region.
-    if ($channelType === 'teams' && strpos((string) ($msg['to'] ?? ''), 'https://') === 0
-        && (string) ($channel['channel_ref'] ?? '') !== (string) $msg['to']) {
-        try {
-            $conn->prepare("UPDATE messaging_channels SET channel_ref = ? WHERE id = ?")
-                 ->execute([substr((string) $msg['to'], 0, 190), (int) $channel['id']]);
-        } catch (Exception $e) { /* a stale serviceUrl only delays the fix; never fail ingest */ }
-    }
 
     // Keep the channel's own last-inbound stamp current (diagnostics / settings).
     try {
@@ -284,7 +279,12 @@ function findOpenChannelTicket(PDO $conn, string $from, string $channelType, str
     // a message to company B's bot threaded into the person's open ticket from
     // company A's bot - another company's ticket. (WhatsApp is left exactly as it
     // was: its sender rule predates this and is not part of the Telegram change.)
-    $byBot = ($channelType === 'telegram' && $channelId !== null);
+    //
+    // TRAP: a new channel type whose sender id is not unique per channel must be
+    //   added here. Mattermost (PR #166) is one: a user id is the same in every
+    //   configuration on one server, so two companies' support channels would
+    //   share a person's thread - another company's ticket - without this.
+    $byBot = (in_array($channelType, ['telegram', 'mattermost', 'teams'], true) && $channelId !== null);
 
     $sql = "SELECT t.id
             FROM tickets t
@@ -674,7 +674,7 @@ function messagingUserLabel(PDO $conn, int $userId): string
  * and has not been answered yet, so a replayed or forged button press changes
  * nothing. Never creates or touches a ticket.
  */
-function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, array $reply): array
+function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, string $replyAddress, array $reply): array
 {
     require_once __DIR__ . '/../csat.php';
     require_once __DIR__ . '/../i18n.php';
@@ -697,7 +697,9 @@ function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, arr
         $provider->answerCallbackQuery($reply['callback_id'], $thanks);
     } elseif ($recorded && $provider) {
         try {
-            $provider->sendMessage($chatId, I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks'));
+            // The reply address, not the sender: on Slack, Teams and Mattermost
+            // the thanks belongs in the conversation (messagingReplyAddress()).
+            $provider->sendMessage($replyAddress, I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks'));
         } catch (Exception $e) {
             error_log('CSAT thanks failed for chat ' . $chatId . ': ' . $e->getMessage());
         }

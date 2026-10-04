@@ -207,19 +207,23 @@ try {
     $verifyToken = $verifyPlain === '' ? null : encryptValue($verifyPlain);
     $relaySecret = $relayPlain === ''  ? null : encryptValue($relayPlain);
 
-    // channel_ref: Mattermost's support channel id. NULL for every other provider.
-    $channelRef = $provider === 'mattermost' ? $mmChannelId : null;
+    // channel_ref: Mattermost's support channel id.
+    // TRAP: only write channel_ref for a provider that owns it here. Other
+    //   providers keep their own value in it (Slack's workspace id), and a save
+    //   that blanked it for them would quietly break a working channel.
+    $setRef = $provider === 'mattermost';
 
     if ($id) {
         $sql = "UPDATE messaging_channels SET
                     name = ?, channel_type = ?, provider = ?, phone_number = ?,
                     credentials = ?, verify_token = ?, ingress_mode = ?,
-                    relay_secret = ?, tenant_id = ?, is_active = ?, channel_ref = ?
+                    relay_secret = ?, tenant_id = ?, is_active = ?" . ($setRef ? ", channel_ref = ?" : "") . "
                 WHERE id = ?";
-        $conn->prepare($sql)->execute([
-            $name, $channelType, $provider, $phone, $credsEncrypted, $verifyToken,
-            $ingress, $relaySecret, $tenantId, $isActive, $channelRef, (int) $id,
-        ]);
+        $args = [$name, $channelType, $provider, $phone, $credsEncrypted, $verifyToken,
+                 $ingress, $relaySecret, $tenantId, $isActive];
+        if ($setRef) $args[] = $mmChannelId;
+        $args[] = (int) $id;
+        $conn->prepare($sql)->execute($args);
         echo json_encode(['success' => true, 'id' => (int) $id, 'message' => 'Channel saved']);
     } else {
         $sql = "INSERT INTO messaging_channels
@@ -228,7 +232,7 @@ try {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $conn->prepare($sql)->execute([
             $name, $channelType, $provider, $phone, $credsEncrypted, $verifyToken,
-            $ingress, $relaySecret, $tenantId, $isActive, $channelRef,
+            $ingress, $relaySecret, $tenantId, $isActive, $setRef ? $mmChannelId : null,
         ]);
         echo json_encode(['success' => true, 'id' => (int) $conn->lastInsertId(), 'message' => 'Channel created']);
     }

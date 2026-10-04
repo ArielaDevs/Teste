@@ -42,7 +42,8 @@ function getContributors(): array
                       . 'connection, matching a chat to the right person by the phone number they share, '
                       . 'bot replies in each customer\'s own language, and sending pictures and documents '
                       . 'over Telegram and WhatsApp alike - with every new string translated into thirteen '
-                      . 'languages.',
+                      . 'languages. Then Microsoft Teams and Mattermost channels, and asking chat customers '
+                      . 'for their rating with buttons in the chat itself (PR #166, 3.1.0).',
         ],
         [
             'name'   => 'Santhosh Srinivasan (Sandy)',

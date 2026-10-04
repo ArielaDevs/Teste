@@ -182,16 +182,7 @@ class TelegramProvider extends MessagingProvider
         return (string) ($json['result']['message_id'] ?? '');
     }
 
-    /**
-     * Ask the chat to share their phone number, via Telegram's native
-     * "Share phone number" button (a reply keyboard with request_contact,
-     * not an inline button — that's what makes Telegram hand back a verified
-     * contact object rather than free-typed, unverifiable text).
-     *
-     * One-time keyboard: it disappears from their client after one tap, so it
-     * doesn't linger once the identity gate (ingest.php) has what it needs.
-     */
-    /** A rating press: one normalised entry carrying 'csat' for ingest.php. */
+    /** A rating press (PR #166): one normalised entry carrying 'csat' for ingest.php. */
     private function parseRatingPress(array $cb): array
     {
         $data = (string)($cb['data'] ?? '');
@@ -269,6 +260,15 @@ class TelegramProvider extends MessagingProvider
         }
     }
 
+    /**
+     * Ask the chat to share their phone number, via Telegram's native
+     * "Share phone number" button (a reply keyboard with request_contact,
+     * not an inline button — that's what makes Telegram hand back a verified
+     * contact object rather than free-typed, unverifiable text).
+     *
+     * One-time keyboard: it disappears from their client after one tap, so it
+     * doesn't linger once the identity gate (ingest.php) has what it needs.
+     */
     public function requestContact(string $chatId, string $promptText, string $buttonText = 'Share phone number'): string
     {
         $token = $this->channel['credentials']['bot_token'] ?? '';

@@ -1653,6 +1653,9 @@ return [
         'comment'            => 'TEXT NULL',
         'analyst_id'         => 'INT NULL',
         'created_at'         => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        // PR #166 - which chat a rating request was asked in (NULL = emailed).
+        'channel_id'         => 'INT NULL',
+        'channel_from'       => 'VARCHAR(255) NULL',
     ],
 
     'ticket_rota_shifts' => [

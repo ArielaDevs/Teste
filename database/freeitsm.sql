@@ -2424,10 +2424,16 @@ CREATE TABLE IF NOT EXISTS `ticket_csat_responses` (
     `comment`            TEXT NULL,
     `analyst_id`         INT NULL,
     `created_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- PR #166: a request asked IN A CHAT records which chat (channel + the
+    -- customer's from_address), so a reply there can only ever answer a request
+    -- sent to that customer on that channel. NULL = an emailed survey.
+    `channel_id`         INT NULL,
+    `channel_from`       VARCHAR(255) NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_ticket_csat_token` (`token`),
     KEY `ix_ticket_csat_ticket_id` (`ticket_id`),
     KEY `ix_ticket_csat_responded` (`responded_datetime`),
+    KEY `ix_ticket_csat_channel` (`channel_id`, `channel_from`),
     CONSTRAINT `fk_ticket_csat_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_ticket_csat_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -6208,6 +6214,8 @@ INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
     ('intune_company_id', NULL),
     ('intune_sync_hostnames', '1'),
+    -- PR #166: a new install asks chat customers in their chat (an upgrade gets '0').
+    ('csat_in_channel', '1'),
     ('asset_reconciliation_ignored_serials', 'TO BE FILLED BY O.E.M.\nDEFAULT STRING\nNONE\nSYSTEM SERIAL NUMBER\nNOT SPECIFIED\n123456789');
 
 -- Asset tag auto-generation (PR #164). Off, so a new install behaves as before

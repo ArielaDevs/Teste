@@ -142,6 +142,7 @@ return [
     ['ticket_csat_responses', 'uq_ticket_csat_token', 'unique', '(`token`)'],
     ['ticket_csat_responses', 'ix_ticket_csat_ticket_id', 'key', '(`ticket_id`)'],
     ['ticket_csat_responses', 'ix_ticket_csat_responded', 'key', '(`responded_datetime`)'],
+    ['ticket_csat_responses', 'ix_ticket_csat_channel', 'key', '(`channel_id`,`channel_from`)'],
     ['rota_locations', 'uq_rota_locations_name', 'unique', '(`name`)'],
     ['ticket_rota_entries', 'uq_analyst_date', 'unique', '(`analyst_id`,`rota_date`)'],
     ['ticket_rota_entries', 'ix_rota_entries_location_id', 'key', '(`location_id`)'],

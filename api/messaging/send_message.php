@@ -67,12 +67,11 @@ try {
     // inbound row's to_recipients ("C08HELP:1719500000.000100"). Replying to the
     // sender there would send a DM to the person instead of answering in the
     // thread everyone else is reading.
-    $recipient = $conv['from_address'];
-    if ($channelType === 'slack') {
-        $recipient = trim((string) ($conv['to_recipients'] ?? ''));
-        if ($recipient === '') {
-            throw new Exception('This ticket has no Slack thread to reply to.');
-        }
+    // Teams and Mattermost (PR #166) are threaded the same way - see
+    // messagingReplyAddress(), the one place this rule lives.
+    $recipient = messagingReplyAddress($channelType, $conv);
+    if ($recipient === '') {
+        throw new Exception('This ticket has no conversation to reply into.');
     }
     $channel = loadMessagingChannel($conn, (int) $conv['channel_id']);
     if (!$channel) {

@@ -1969,6 +1969,8 @@ return [
             'delay_help'          => 'Wait this many minutes after close before sending. <code>0</code> = immediate. Useful if you want the user to verify the fix actually held before being asked to rate it.',
             'one_per_ticket'      => 'One survey per ticket',
             'one_per_ticket_help' => 'If on, a reopened-then-closed ticket only gets another survey when an analyst manually triggers it &mdash; stops survey-spamming a flaky ticket.',
+            'in_channel'          => 'Ask chat customers in their chat',
+            'in_channel_help'     => 'A customer who wrote in on WhatsApp, Telegram, Slack, Teams or Mattermost is asked in that chat &mdash; buttons where the app has them, &ldquo;reply 1 to 5&rdquo; where it does not &mdash; instead of by email. WhatsApp only while its 24-hour window is open; otherwise, and if a chat message fails, the email survey is used.',
             'scale_stars'         => 'Stars',
             'scale_emojis'        => 'Emojis',
             'scale_help'          => 'Both options store the same 1&ndash;5 number, so dashboards and averages work the same either way &mdash; this only changes how the survey page itself looks.',
