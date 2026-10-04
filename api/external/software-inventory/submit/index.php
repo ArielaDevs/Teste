@@ -117,35 +117,25 @@ function logApiResponse($conn, $hostId, $message) {
 $hostId = null;
 
 try {
-    // Try to find existing host — scoped to this key's company (NULL-safe match).
-    $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ?");
-    $stmt->execute([$hostname, $keyTenant]);
-    $hostRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Which asset is this machine? This agent only sends a hostname, so it
+    // matches on that - but through the same rules as every other inventory
+    // source (PR #164), and a new machine is written the same way. Scoped to
+    // this key's company (NULL-safe match).
+    require_once __DIR__ . '/../../../../includes/services/assets.php';
+    $agentCtx = ActorContext::system('Software inventory agent');
+    $reconcileRes = AssetsService::reconcileAsset($conn, $agentCtx, ['hostname' => $hostname], $keyTenant, 'software inventory');
 
-    if ($hostRow && isset($hostRow['id'])) {
+    if ($reconcileRes['asset_id'] !== null) {
         // Host exists -> update last_seen
-        $hostId = (int)$hostRow['id'];
+        $hostId = (int)$reconcileRes['asset_id'];
 
         $stmt = $conn->prepare("UPDATE assets SET last_seen = UTC_TIMESTAMP() WHERE id = ?");
         $stmt->execute([$hostId]);
     } else {
-        // Host does not exist -> insert (stamped with this key's company)
-        $stmt = $conn->prepare("INSERT INTO assets (hostname, tenant_id, first_seen, last_seen) VALUES (?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
-        $stmt->execute([$hostname, $keyTenant]);
-
-        // Re-select to get id (scoped to this key's company)
-        $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ?");
-        $stmt->execute([$hostname, $keyTenant]);
-        $hostRow2 = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$hostRow2 || !isset($hostRow2['id'])) {
-            http_response_code(500);
-            echo json_encode(['error' => 'Could not obtain host id after insert']);
-            exit;
-        }
-        $hostId = (int)$hostRow2['id'];
+        // Host does not exist -> create it (stamped with this key's company)
+        $hostId = AssetsService::createDiscoveredAsset($conn, $agentCtx, ['hostname' => mb_substr($hostname, 0, 50)], $keyTenant, 'the software inventory agent');
     }
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Failed to process host: ' . $e->getMessage()]);
     exit;

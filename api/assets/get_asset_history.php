@@ -34,6 +34,7 @@ try {
     $sql = "SELECT
                 ah.id,
                 ah.asset_id,
+                ah.analyst_id,
                 ah.field_name,
                 ah.old_value,
                 ah.new_value,

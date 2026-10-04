@@ -152,6 +152,7 @@ return [
     ['assets', 'idx_assets_supplier', 'key', '(`supplier_id`)'],
     ['assets', 'idx_assets_tenant', 'key', '(`tenant_id`)'],
     ['assets', 'idx_assets_tag', 'key', '(`tenant_id`,`asset_tag`)'],
+    ['assets', 'idx_assets_tenant_service_tag', 'key', '(`tenant_id`,`service_tag`)'],
     ['assets', 'uq_assets_qr_token', 'unique', '(`qr_token`)'],
     ['users_assets', 'uq_user_asset', 'unique', '(`user_id`,`asset_id`)'],
     ['users_assets', 'uq_analyst_asset', 'unique', '(`analyst_id`,`asset_id`)'],
