@@ -63,7 +63,7 @@ try {
     if ($name === '') {
         throw new Exception('Name is required');
     }
-    if (!in_array($provider, ['twilio', 'meta', 'slack', 'telegram', 'teams'], true)) {
+    if (!in_array($provider, ['twilio', 'meta', 'slack', 'telegram', 'teams', 'mattermost'], true)) {
         throw new Exception('Unknown provider');
     }
     // Slack and Telegram are each always their own channel type; nothing else
@@ -80,6 +80,16 @@ try {
         $channelType = 'teams';
     } elseif ($channelType === 'teams') {
         throw new Exception('Only the Teams provider can create a Teams channel');
+    } elseif ($provider === 'mattermost') {
+        $channelType = 'mattermost';
+    } elseif ($channelType === 'mattermost') {
+        throw new Exception('Only the Mattermost provider can create a Mattermost channel');
+    }
+
+    // Mattermost: the support channel id is the reply/filter target, not a secret.
+    $mmChannelId = trim((string)($data['mm_channel_id'] ?? ''));
+    if ($provider === 'mattermost' && !preg_match('/^[a-z0-9]{26}$/', $mmChannelId)) {
+        throw new Exception('The Mattermost channel ID must be 26 letters and digits (copy it from the channel\'s details).');
     }
 
     $conn = connectToDatabase();
@@ -137,6 +147,10 @@ try {
         }
     } elseif ($provider === 'telegram') {
         if (provided($data['bot_token'] ?? '')) $creds['bot_token'] = trim($data['bot_token']);
+    } elseif ($provider === 'mattermost') {
+        $serverIn = rtrim(trim((string)($data['mm_server_url'] ?? '')), '/');
+        if ($serverIn !== '') $creds['server_url'] = $serverIn; else unset($creds['server_url']);
+        if (provided($data['mm_bot_token'] ?? '')) $creds['bot_token'] = trim($data['mm_bot_token']);
     } elseif ($provider === 'teams') {
         // Azure Bot App ID and tenant are identifiers; only the secret is write-only.
         $appIdIn = trim((string)($data['teams_app_id'] ?? ''));
@@ -179,28 +193,42 @@ try {
             throw new Exception('The bot token is required - copy it from @BotFather.');
         }
     }
+    if ($provider === 'mattermost') {
+        if ($verifyPlain === '') {
+            throw new Exception('An outgoing webhook token is required for Mattermost - copy it from the webhook you created, or click Generate.');
+        }
+        if (!preg_match('/^[A-Za-z0-9]{8,64}$/', $verifyPlain)) {
+            throw new Exception('The webhook token must be 8-64 letters and digits.');
+        }
+        if (!$id && !provided($data['mm_bot_token'] ?? '')) {
+            throw new Exception('The bot access token is required.');
+        }
+    }
     $verifyToken = $verifyPlain === '' ? null : encryptValue($verifyPlain);
     $relaySecret = $relayPlain === ''  ? null : encryptValue($relayPlain);
+
+    // channel_ref: Mattermost's support channel id. NULL for every other provider.
+    $channelRef = $provider === 'mattermost' ? $mmChannelId : null;
 
     if ($id) {
         $sql = "UPDATE messaging_channels SET
                     name = ?, channel_type = ?, provider = ?, phone_number = ?,
                     credentials = ?, verify_token = ?, ingress_mode = ?,
-                    relay_secret = ?, tenant_id = ?, is_active = ?
+                    relay_secret = ?, tenant_id = ?, is_active = ?, channel_ref = ?
                 WHERE id = ?";
         $conn->prepare($sql)->execute([
             $name, $channelType, $provider, $phone, $credsEncrypted, $verifyToken,
-            $ingress, $relaySecret, $tenantId, $isActive, (int) $id,
+            $ingress, $relaySecret, $tenantId, $isActive, $channelRef, (int) $id,
         ]);
         echo json_encode(['success' => true, 'id' => (int) $id, 'message' => 'Channel saved']);
     } else {
         $sql = "INSERT INTO messaging_channels
                     (name, channel_type, provider, phone_number, credentials,
-                     verify_token, ingress_mode, relay_secret, tenant_id, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     verify_token, ingress_mode, relay_secret, tenant_id, is_active, channel_ref)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $conn->prepare($sql)->execute([
             $name, $channelType, $provider, $phone, $credsEncrypted, $verifyToken,
-            $ingress, $relaySecret, $tenantId, $isActive,
+            $ingress, $relaySecret, $tenantId, $isActive, $channelRef,
         ]);
         echo json_encode(['success' => true, 'id' => (int) $conn->lastInsertId(), 'message' => 'Channel created']);
     }

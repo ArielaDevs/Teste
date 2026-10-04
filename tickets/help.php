@@ -1133,6 +1133,27 @@ try {
                         Full walkthrough with screenshots: <code>docs/messaging-teams-setup.md</code> in the repository.
                     </p>
 
+                    <h4>Mattermost</h4>
+                    <p>
+                        Mattermost support works through a <strong>support channel</strong>. Customers post there, and each post opens a ticket.
+                        Replies come back to the customer as a <strong>direct message</strong> from the bot. Add a channel under
+                        <strong>Settings &rarr; Messaging</strong> with provider <strong>Mattermost</strong>; the form lists the steps.
+                    </p>
+                    <ol>
+                        <li>As a system admin, enable <strong>Bot Account Creation</strong> and <strong>Outgoing Webhooks</strong> in
+                            <strong>System Console &rarr; Integrations</strong>.</li>
+                        <li><strong>Integrations &rarr; Bot Accounts &rarr; Add Bot Account.</strong> Give it the <strong>Post All</strong> and <strong>Read</strong> permissions.
+                            Copy its <strong>access token</strong> into <strong>Bot access token</strong>. Add the bot to the support channel.</li>
+                        <li>Copy the support channel's <strong>ID</strong> (channel details, 26 characters) into <strong>Support channel ID</strong>, and the server address into <strong>Server address</strong>.</li>
+                        <li><strong>Integrations &rarr; Outgoing Webhooks &rarr; Add.</strong> Choose the support channel, paste the <strong>webhook URL</strong> from the channel list as the callback URL,
+                            and leave the trigger words empty so every post is sent.</li>
+                        <li>Copy the webhook's <strong>token</strong> (Mattermost creates it) into <strong>Outgoing webhook token</strong>, then save and test the connection.</li>
+                    </ol>
+                    <p class="help-note">
+                        Limits: one support channel per configuration. Replies come as direct messages, not in the customer's thread. Files that customers
+                        post are not downloaded (the outgoing webhook does not include them). The full guide is <code>docs/messaging-mattermost-setup.md</code>.
+                    </p>
+
                     <h4>Sending files</h4>
                     <p>
                         On a Telegram or WhatsApp ticket, <strong>Attach</strong> in the reply box sends a picture or document to the customer; anything

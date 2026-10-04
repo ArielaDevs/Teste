@@ -70,6 +70,8 @@ try {
             'is_active'             => (bool) $r['is_active'],
             'has_credentials'       => !empty($creds),
             'graph_version'         => $creds['graph_version'] ?? '',
+            // Mattermost: the server address is not a secret, so the form can pre-fill it.
+            'mm_server_url'         => $creds['server_url'] ?? '',
             // Slack: which channel is watched, and the workspace we last reached.
             // Neither is a secret — the tokens stay behind has_credentials.
             'watch_channel'         => $creds['watch_channel'] ?? '',

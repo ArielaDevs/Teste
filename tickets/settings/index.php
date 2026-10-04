@@ -2660,6 +2660,7 @@ $translationNamespaces = ['common', 'tickets'];
                             <option value="meta"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_meta')); ?></option>
                             <option value="telegram"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_telegram')); ?></option>
                             <option value="teams"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_teams')); ?></option>
+                            <option value="mattermost"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_mattermost')); ?></option>
                         </select>
                     </div>
 
@@ -2739,6 +2740,34 @@ $translationNamespaces = ['common', 'tickets'];
                         <label for="channelTeamsAppSecret"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_app_secret')); ?> *</label>
                         <input type="password" id="channelTeamsAppSecret" placeholder="••••••••">
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_secret_help')); ?></small>
+                    </div>
+
+                    <!-- Mattermost credentials -->
+                    <div class="form-group provider-mattermost" style="grid-column: span 2;">
+                        <label for="channelMmServerUrl"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_server_url')); ?> *</label>
+                        <input type="text" id="channelMmServerUrl" placeholder="https://mattermost.example.com">
+                    </div>
+                    <div class="form-group provider-mattermost">
+                        <label for="channelMmChannelId"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_channel_id')); ?> *</label>
+                        <input type="text" id="channelMmChannelId" placeholder="abcdefghijklmnopqrstuvwxyz" maxlength="26">
+                    </div>
+                    <div class="form-group provider-mattermost">
+                        <label for="channelMmBotToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_bot_token')); ?> *</label>
+                        <input type="password" id="channelMmBotToken" placeholder="••••••••">
+                    </div>
+                    <div class="form-group provider-mattermost" style="grid-column: span 2;">
+                        <label for="channelMmWebhookToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_webhook_token')); ?> *</label>
+                        <input type="password" id="channelMmWebhookToken" placeholder="••••••••">
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_webhook_help')); ?></small>
+                    </div>
+                    <div class="form-group provider-mattermost" style="grid-column: span 2; background:var(--bg-secondary, #f5f7fa); border:1px solid var(--border-color, #e0e0e0); border-radius:8px; padding:12px 14px;">
+                        <label style="font-weight:600; display:block; margin-bottom:6px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_setup_title')); ?></label>
+                        <ol style="margin:0 0 4px 18px; padding:0; font-size:13px; color:var(--text-muted, #555); line-height:1.6;">
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step1')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step2')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step3')); ?></li>
+                        </ol>
+                        <small style="color:var(--text-muted, #666);"><code>docs/messaging-mattermost-setup.md</code></small>
                     </div>
 
                     <!-- Teams setup steps: the Azure side has to exist before the App ID and secret above do. -->
@@ -4344,6 +4373,8 @@ $translationNamespaces = ['common', 'tickets'];
                     ? ' <span class="status-badge" style="background:#e1f5fe;color:#0288d1;">Telegram</span>'
                     : c.provider === 'teams'
                     ? ' <span class="status-badge" style="background:#ede7f6;color:#4527a0;">Teams</span>'
+                    : c.provider === 'mattermost'
+                    ? ' <span class="status-badge" style="background:#e6f4ea;color:#1e7e34;">Mattermost</span>'
                     : ' <span class="status-badge" style="background:#e8f5e9;color:#2e7d32;">Twilio</span>';
                 const activeBadge = c.is_active ? '' : ' <span class="status-badge status-inactive">Inactive</span>';
                 const credBadge = c.has_credentials
@@ -4395,8 +4426,9 @@ $translationNamespaces = ['common', 'tickets'];
             document.querySelectorAll('.provider-meta').forEach(el => el.style.display = (p === 'meta') ? '' : 'none');
             document.querySelectorAll('.provider-telegram').forEach(el => el.style.display = (p === 'telegram') ? '' : 'none');
             document.querySelectorAll('.provider-teams').forEach(el => el.style.display = (p === 'teams') ? '' : 'none');
+            document.querySelectorAll('.provider-mattermost').forEach(el => el.style.display = (p === 'mattermost') ? '' : 'none');
             // Telegram and Teams have no WhatsApp-style phone number; the field is meaningless there.
-            document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram' || p === 'teams') ? 'none' : '');
+            document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram' || p === 'teams' || p === 'mattermost') ? 'none' : '');
             if (p === 'telegram') updateTelegramSetupCommand();
         }
 
@@ -4470,7 +4502,10 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('channelActive').checked = channel ? !!channel.is_active : true;
             // Secrets are write-only; show a masked placeholder on edit if configured.
             const mask = (channel && channel.has_credentials) ? '********' : '';
-            ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken','channelTeamsAppSecret'].forEach(idv => document.getElementById(idv).value = mask);
+            ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken','channelTeamsAppSecret','channelMmBotToken'].forEach(idv => document.getElementById(idv).value = mask);
+            ['channelMmChannelId','channelMmWebhookToken'].forEach(idv => document.getElementById(idv).value = '');
+            document.getElementById('channelMmServerUrl').value = channel ? (channel.mm_server_url || '') : '';
+            document.getElementById('channelMmChannelId').value = channel ? (channel.channel_ref || '') : '';
             ['channelAccountSid','channelPhoneNumberId','channelVerifyToken','channelRelaySecret','channelTelegramSecret'].forEach(idv => document.getElementById(idv).value = '');
             document.getElementById('channelGraphVersion').value = channel ? (channel.graph_version || '') : '';
 
@@ -4574,7 +4609,12 @@ $translationNamespaces = ['common', 'tickets'];
                 // saved into the same column server-side.
                 verify_token: (selectedProvider === 'telegram'
                     ? document.getElementById('channelTelegramSecret').value
+                    : selectedProvider === 'mattermost'
+                    ? document.getElementById('channelMmWebhookToken').value
                     : document.getElementById('channelVerifyToken').value).trim(),
+                mm_server_url: document.getElementById('channelMmServerUrl').value.trim(),
+                mm_channel_id: document.getElementById('channelMmChannelId').value.trim(),
+                mm_bot_token: document.getElementById('channelMmBotToken').value,
                 tenant_id: document.getElementById('channelCompany').value || null,
                 is_active: document.getElementById('channelActive').checked,
                 account_sid: document.getElementById('channelAccountSid').value.trim(),
