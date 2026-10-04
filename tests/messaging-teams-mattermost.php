@@ -201,6 +201,41 @@ if (!$ticket || !$channel) {
         ok('...and a second press on an old copy shows the rating that stands', csatStoredRating($conn, $rTg) === 4 && str_contains($edit['text'] ?? '', '4') && !str_contains($edit['text'] ?? '', ' 1 '), json_encode($edit));
         MessagingProvider::$testTransport = null;
 
+        // ---- who raised it: Teams and Mattermost people matched by email (after PR #166)
+        $conn->prepare("INSERT INTO users (email, display_name, created_at) VALUES ('zzmsg.known@example.test', 'ZZMSG Known Person', UTC_TIMESTAMP())")->execute();
+        $knownId = (int)$conn->lastInsertId();
+        $mmUser = ['email' => 'zzmsg.known@example.test', 'email_verified' => true, 'first_name' => 'Known', 'last_name' => 'Person'];
+        MessagingProvider::$testTransport = function (string $url, array $opts) use (&$mmUser): array {
+            if (str_contains($url, '/api/v4/users/')) return [200, json_encode($mmUser)];
+            if (str_contains($url, 'login.microsoftonline.com')) return [200, '{"access_token":"zz"}'];
+            if (str_contains($url, '/members/')) return [200, json_encode(['id' => '29:zz', 'name' => 'Known Person', 'email' => 'zzmsg.known@example.test'])];
+            return [200, '{}'];
+        };
+        $mk = function (string $type, array $creds) use ($conn): array {
+            $conn->prepare("INSERT INTO messaging_channels (name, channel_type, provider, phone_number, credentials, is_active) VALUES (?, ?, ?, '', NULL, 1)")
+                 ->execute(['ZZMSG ' . $type, $type, $type]);
+            $ch = loadMessagingChannel($conn, (int)$conn->lastInsertId());
+            $ch['credentials'] = $creds;
+            return $ch;
+        };
+        $mmCh = $mk('mattermost', ['server_url' => 'https://mm.test', 'bot_token' => 'zz']);
+        $say = fn(string $from, string $to, string $id, array $extra = []) => $extra + ['from' => $from, 'to' => $to, 'body' => 'ZZMSG printer is down',
+            'profile_name' => 'kp', 'provider_msg_id' => $id, 'media' => [], 'timestamp' => null, 'language_code' => ''];
+        $ticketUser = fn(array $r) => (int)$conn->query("SELECT user_id FROM tickets WHERE id = " . (int)$r['ticket_id'])->fetchColumn();
+        $r = ingestInboundMessage($conn, $mmCh, $say('zzmmuser000000000000000001', 'zzchan:zzpost1', 'mm:zz1'));
+        ok('Mattermost: a verified email we know files the ticket under that person', $ticketUser($r) === $knownId);
+        $mmUser['email_verified'] = false;
+        $r = ingestInboundMessage($conn, $mmCh, $say('zzmmuser000000000000000002', 'zzchan:zzpost2', 'mm:zz2'));
+        ok('TRAP: Mattermost: an UNverified email is not trusted - a contact of its own instead', $ticketUser($r) !== $knownId && $ticketUser($r) > 0);
+        ok('...named with the real name from Mattermost', $conn->query("SELECT display_name FROM users WHERE id = " . $ticketUser($r))->fetchColumn() === 'Known Person');
+        $tmCh = $mk('teams', ['app_id' => 'zz', 'app_secret' => 'zz', 'tenant_id' => 'zz']);
+        $r = ingestInboundMessage($conn, $tmCh, $say('a:zzconvknown', 'https://smba.trafficmanager.net/emea/|a:zzconvknown', 'teams:zz3', ['sender_id' => '29:zz']));
+        ok('Teams: the member\'s email files the ticket under that person', $ticketUser($r) === $knownId);
+        MessagingProvider::$testTransport = function (): array { return [500, '']; };
+        $r = ingestInboundMessage($conn, $mmCh, $say('zzmmuser000000000000000003', 'zzchan:zzpost3', 'mm:zz4'));
+        ok('a failed lookup still raises the ticket, with a contact', !empty($r['ticket_id']) && $ticketUser($r) > 0 && $ticketUser($r) !== $knownId);
+        MessagingProvider::$testTransport = null;
+
         $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('csat_in_channel', '0')
                         ON DUPLICATE KEY UPDATE setting_value = '0'")->execute();
         ok('with "ask in their chat" off, a chat ticket gets the email survey', csatTicketChannel($conn, $ticket) === null);

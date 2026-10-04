@@ -114,6 +114,11 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
         if ($tg['display_name'] !== '') {
             $displayName = $tg['display_name'];
         }
+    } elseif ($channelType === 'teams' || $channelType === 'mattermost') {
+        // Ask the platform who this is, and file the ticket under the person
+        // FreeITSM already knows when their email matches - the Slack rule.
+        // Suggested by the contributor of PR #166; never blocks the ticket.
+        [$userId, $displayName] = resolveDirectoryRequester($conn, $channel, $msg, $from, $displayName);
     } else {
         $userId = getOrCreateChannelUser($conn, $from, $displayName, $channelType);
     }
@@ -341,17 +346,9 @@ function resolveSlackRequester(PDO $conn, array $channel, string $slackUserId): 
         error_log('Slack requester lookup failed for ' . $slackUserId . ': ' . $e->getMessage());
     }
 
-    // A real person we already hold — their tickets, history and company all
-    // line up with the rest of the service desk.
-    if ($email !== '') {
-        try {
-            $stmt = $conn->prepare("SELECT id, display_name FROM users WHERE email = ? LIMIT 1");
-            $stmt->execute([$email]);
-            if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $known = trim((string) ($row['display_name'] ?? ''));
-                return [(int) $row['id'], $known !== '' ? $known : ($name !== '' ? $name : $email)];
-            }
-        } catch (Exception $e) { /* fall through to the pseudo-user */ }
+    $known = messagingKnownPersonByEmail($conn, $email, $name);
+    if ($known !== null) {
+        return $known;
     }
 
     // Name the case rather than leaving it blank.
@@ -380,6 +377,86 @@ function resolveSlackRequester(PDO $conn, array $channel, string $slackUserId): 
     }
 
     return [$userId, $displayName];
+}
+
+/**
+ * The person FreeITSM already holds with this email: [userId, displayName], or
+ * null. A real person's chat tickets then sit with their emailed ones, their
+ * history and their company. Shared by Slack, Teams and Mattermost.
+ *
+ * TRAP: only ever pass an address the PLATFORM vouches for - Slack's profile,
+ *   Microsoft 365's directory, Mattermost's verified flag. The email is the
+ *   whole of the identity here: an address someone merely typed would file
+ *   their chats under whoever owns it. users.email is unique, so a match is
+ *   one person, never a guess between two.
+ */
+function messagingKnownPersonByEmail(PDO $conn, string $email, string $name): ?array
+{
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    try {
+        $stmt = $conn->prepare("SELECT id, display_name FROM users WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $known = trim((string) ($row['display_name'] ?? ''));
+            return [(int) $row['id'], $known !== '' ? $known : ($name !== '' ? $name : $email)];
+        }
+    } catch (Exception $e) { /* the caller falls back to a contact of its own */ }
+    return null;
+}
+
+/**
+ * Who a Teams or Mattermost message is from. Returns [userId|null, displayName].
+ *
+ * Added after PR #166 was merged, on the contributor's suggestion: until then
+ * every Teams and Mattermost person became a contact of their own
+ * ("…@teams.local"), even when FreeITSM already held them by email, so their
+ * chat tickets sat apart from everything else of theirs. Now, as on Slack:
+ *
+ *   1. ask the platform for the person's name and email (lookupUser())
+ *   2. an email FreeITSM already holds -> the ticket is that person's
+ *   3. otherwise the channel's own contact, as before - keyed on the platform
+ *      id, which never changes - with the real name filled in
+ *
+ * Only WHO raised the ticket changes. Which ticket a message joins is still
+ * decided by the platform id (findOpenChannelTicket()), because an id never
+ * changes and an email can. Every failure path still returns a requester.
+ */
+function resolveDirectoryRequester(PDO $conn, array $channel, array $msg, string $from, string $displayName): array
+{
+    $channelType = (string) ($channel['channel_type'] ?? '');
+    $info = ['name' => '', 'email' => ''];
+    try {
+        $provider = messagingProvider($channel);
+        if ($provider instanceof TeamsProvider) {
+            $info = $provider->lookupUser((string) ($msg['to'] ?? ''), (string) ($msg['sender_id'] ?? ''));
+        } elseif ($provider instanceof MattermostProvider) {
+            $info = $provider->lookupUser($from);
+        }
+    } catch (Throwable $e) {
+        error_log(ucfirst($channelType) . ' requester lookup failed for ' . $from . ': ' . $e->getMessage());
+    }
+    $name  = trim((string) ($info['name'] ?? ''));
+    $email = trim((string) ($info['email'] ?? ''));
+
+    $known = messagingKnownPersonByEmail($conn, $email, $name);
+    if ($known !== null) {
+        return $known;
+    }
+
+    $label  = $name !== '' ? $name : $displayName;
+    $userId = getOrCreateChannelUser($conn, $from, $label, $channelType);
+    // Let the name heal, as on Slack: a contact first created with only the
+    // raw platform id as its name takes the real one. A name an analyst has
+    // edited is not the raw id, so it is never overwritten.
+    if ($userId && $name !== '') {
+        try {
+            $conn->prepare("UPDATE users SET display_name = ? WHERE id = ? AND display_name = ?")
+                 ->execute([$name, $userId, $from]);
+        } catch (Exception $e) { /* cosmetic */ }
+    }
+    return [$userId, $label];
 }
 
 /**

@@ -276,6 +276,34 @@ class MattermostProvider extends MessagingProvider
         return is_array($json) ? $json : [];
     }
 
+    /**
+     * Who a Mattermost user is: ['name' => …, 'email' => …], either may be ''.
+     * Used to file their tickets under the person FreeITSM already knows -
+     * see messagingResolveRequesterByEmail() in ingest.php. Never throws.
+     *
+     * TRAP: the email is returned ONLY when Mattermost says it is verified.
+     *   A server can allow sign-up without proving the address, and an
+     *   unverified email is just text anyone typed: someone registering as
+     *   ceo@yourcompany.com would have their chats filed under the real CEO.
+     *   An empty email (the server hides addresses from this bot) is normal -
+     *   the person simply gets a named contact instead.
+     */
+    public function lookupUser(string $userId): array
+    {
+        try {
+            $u = $this->api('GET', 'users/' . rawurlencode($userId));
+            $name = trim(trim((string)($u['first_name'] ?? '')) . ' ' . trim((string)($u['last_name'] ?? '')));
+            if ($name === '') {
+                $name = (string)($u['username'] ?? '');
+            }
+            $email = !empty($u['email_verified']) ? trim((string)($u['email'] ?? '')) : '';
+            return ['name' => $name, 'email' => $email];
+        } catch (Throwable $e) {
+            error_log('Mattermost user lookup failed for ' . $userId . ': ' . $e->getMessage());
+            return ['name' => '', 'email' => ''];
+        }
+    }
+
     /** The bot's own user id, or '' if Mattermost cannot be asked right now (then nothing is dropped). */
     private function botIdOrEmpty(): string
     {

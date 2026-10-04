@@ -200,6 +200,7 @@ class TeamsProvider extends MessagingProvider
         return [[
             'from'            => $convId,
             'to'              => $serviceUrl . '|' . $convId,   // the reply address - see the file header
+            'sender_id'       => (string)($a['from']['id'] ?? ''),   // for lookupUser(): who, not which chat
             'body'            => $text,
             'profile_name'    => trim((string)($a['from']['name'] ?? '')),
             'provider_msg_id' => 'teams:' . $activityId,
@@ -337,6 +338,46 @@ class TeamsProvider extends MessagingProvider
             throw new Exception('Microsoft rejected the Teams credentials: ' . ($json['error_description'] ?? ('HTTP ' . $code)));
         }
         return self::$tokenCache[$key] = (string)$json['access_token'];
+    }
+
+    /**
+     * Who a Teams user is: ['name' => …, 'email' => …], either may be ''.
+     * Bot Framework's "get conversation member" - the bot's own token, no
+     * Microsoft Graph permission. Used to file their tickets under the person
+     * FreeITSM already knows (messagingResolveRequesterByEmail()). Never throws.
+     *
+     * The email comes from the organisation's own Microsoft 365 directory, and
+     * verifyWebhook() only lets in people from the channel's own tenant, so it
+     * is an address the organisation issued. `email` first; the sign-in name
+     * (userPrincipalName) only when it is shaped like an address, which in most
+     * tenants it is the same thing.
+     */
+    public function lookupUser(string $to, string $memberId): array
+    {
+        try {
+            [$serviceUrl, $conversationId] = self::splitAddress($to);
+            if ($memberId === '' || $conversationId === '' || !self::hostAllowed($serviceUrl, self::SERVICE_HOSTS)) {
+                return ['name' => '', 'email' => ''];
+            }
+            $url = rtrim($serviceUrl, '/') . '/v3/conversations/' . rawurlencode($conversationId)
+                 . '/members/' . rawurlencode($memberId);
+            [$code, $resp] = $this->httpRequest($url, [
+                'method'  => 'GET',
+                'headers' => ['Authorization: Bearer ' . $this->accessToken()],
+            ]);
+            $m = json_decode((string)$resp, true);
+            if ($code < 200 || $code >= 300 || !is_array($m)) {
+                throw new Exception('HTTP ' . $code);
+            }
+            $email = trim((string)($m['email'] ?? ''));
+            if ($email === '' && filter_var((string)($m['userPrincipalName'] ?? ''), FILTER_VALIDATE_EMAIL)) {
+                $email = (string)$m['userPrincipalName'];
+            }
+            return ['name' => trim((string)($m['name'] ?? '')), 'email' => $email];
+        } catch (Throwable $e) {
+            error_log('Teams member lookup failed for ' . $memberId . ': ' . $e->getMessage());
+            return ['name' => '', 'email' => ''];
+        }
     }
 
     private function postActivity(string $to, array $activity): string
