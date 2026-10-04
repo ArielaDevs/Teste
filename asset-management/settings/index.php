@@ -1101,29 +1101,25 @@ $translationNamespaces = ['common', 'asset-management'];
                             <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_enable_hint')); ?></div>
                         </div>
 
+                        <div class="form-group">
+                            <label class="form-label" for="tagFormat"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_format_label')); ?></label>
+                            <input type="text" class="form-input" id="tagFormat" maxlength="64" value="AST-{#####}" autocomplete="off" spellcheck="false" oninput="updateTagPreview()" style="font-family:monospace;">
+                            <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_format_hint')); ?></div>
+                        </div>
+
                         <div class="form-row" style="display:flex; gap:16px; flex-wrap:wrap;">
                             <div class="form-group" style="flex:1; min-width:180px;">
-                                <label class="form-label" for="tagPrefix"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_prefix_label')); ?></label>
-                                <input type="text" class="form-input" id="tagPrefix" maxlength="20" placeholder="AST-" value="AST-" oninput="updateTagPreview()">
-                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_prefix_hint')); ?></div>
-                            </div>
-
-                            <div class="form-group" style="flex:1; min-width:180px;">
-                                <label class="form-label" for="tagSuffix"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_suffix_label')); ?></label>
-                                <input type="text" class="form-input" id="tagSuffix" maxlength="20" placeholder="" oninput="updateTagPreview()">
-                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_suffix_hint')); ?></div>
-                            </div>
-
-                            <div class="form-group" style="flex:1; min-width:140px;">
-                                <label class="form-label" for="tagPadding"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_padding_label')); ?></label>
-                                <input type="number" class="form-input" id="tagPadding" min="1" max="12" value="5" oninput="updateTagPreview()">
-                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_padding_hint')); ?></div>
-                            </div>
-
-                            <div class="form-group" style="flex:1; min-width:180px;">
-                                <label class="form-label" for="tagNextNumber"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_initial_number_label')); ?></label>
+                                <label class="form-label" for="tagNextNumber"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_next_label')); ?></label>
                                 <input type="number" class="form-input" id="tagNextNumber" min="1" value="1" oninput="updateTagPreview()">
-                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_initial_number_hint')); ?></div>
+                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_next_hint')); ?></div>
+                            </div>
+                            <div class="form-group" style="flex:1; min-width:180px;">
+                                <label class="form-label" for="tagScope"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_scope_label')); ?></label>
+                                <select class="form-input" id="tagScope">
+                                    <option value="per_company"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_scope_per_company')); ?></option>
+                                    <option value="global"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_scope_global')); ?></option>
+                                </select>
+                                <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_scope_hint')); ?></div>
                             </div>
                         </div>
 
@@ -1131,12 +1127,9 @@ $translationNamespaces = ['common', 'asset-management'];
                             <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #667); margin-bottom:4px;">
                                 <?php echo htmlspecialchars(t('asset-management.settings.asset_tags_preview_label')); ?>
                             </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                                <span style="font-size:18px; font-family:monospace; font-weight:700; color:var(--accent, #0056b3);" id="tagFormatPreview">AST-00001</span>
-                                <span style="font-size:12px; color:var(--text-muted, #778);" id="tagStatusNotice"><?php echo htmlspecialchars(t('asset-management.settings.asset_tags_preview_text')); ?></span>
-                            </div>
+                            <div style="font-size:16px; font-family:monospace; font-weight:700; color:var(--accent, #0056b3);" id="tagFormatPreview">AST-00001</div>
+                            <ul id="tagProblems" style="margin:8px 0 0; padding-left:18px; color:var(--danger, #c0392b); font-size:13px;" hidden></ul>
                         </div>
-
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary" id="tagSaveBtn"><?php echo htmlspecialchars(t('asset-management.common.save')); ?></button>
                         </div>
@@ -1147,7 +1140,7 @@ $translationNamespaces = ['common', 'asset-management'];
         <?php endif; ?>
         <?php if (settingsTabVisible($visibleTabs, 'asset-labels')): ?>
         <!-- Asset Labels & QR Tab -->
-        <div class="tab-content<?php echo $activeTabId === 'asset-labels' ? ' active' : ''; ?>" id="asset-labels-tab" data-capability="<?php echo Cap::ASSETS_TAGS; ?>">
+        <div class="tab-content<?php echo $activeTabId === 'asset-labels' ? ' active' : ''; ?>" id="asset-labels-tab" data-capability="<?php echo Cap::ASSETS_LABELS; ?>">
             <div class="settings-section">
                 <div class="settings-section-header">
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1409,6 +1402,16 @@ $translationNamespaces = ['common', 'asset-management'];
                                 <button type="button" class="password-toggle" onclick="toggleIntuneSecret()"><?php echo htmlspecialchars(t('asset-management.settings.show')); ?></button>
                             </div>
                             <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.intune_secret_hint')); ?></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="display:flex; align-items:center; gap:10px;">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="intuneSyncHostnames">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span><?php echo htmlspecialchars(t('asset-management.settings.intune_sync_hostnames_label')); ?></span>
+                            </label>
+                            <div class="form-hint"><?php echo htmlspecialchars(t('asset-management.settings.intune_sync_hostnames_hint')); ?></div>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="intuneAppBatchSize"><?php echo htmlspecialchars(t('asset-management.settings.batch_size_label')); ?></label>
@@ -1884,7 +1887,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 if (addedCount === 0) {
                     const opt = document.createElement('option');
                     opt.value = '';
-                    opt.textContent = window.t('asset-management.settings.no_more_fields', 'No more fields available');
+                    opt.textContent = window.t('asset-management.settings.no_more_fields');
                     opt.disabled = true;
                     opt.selected = true;
                     selectEl.appendChild(opt);
@@ -1938,7 +1941,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 statusEl.innerHTML = '<span style="color:#2e7d32; font-weight:500;">✓ Logo configured</span> <span style="color:#888;">(' + escapeHtml(name) + ')</span>';
                 if (removeBtn) removeBtn.style.display = 'inline-block';
             } else {
-                statusEl.textContent = 'No logo uploaded';
+                statusEl.textContent = window.t('asset-management.labels.no_logo');
                 if (removeBtn) removeBtn.style.display = 'none';
             }
         }
@@ -1947,7 +1950,7 @@ $translationNamespaces = ['common', 'asset-management'];
             const file = e.target.files?.[0];
             if (file) {
                 if (file.size > 2 * 1024 * 1024) {
-                    showToast(window.t('system.branding.logo_too_large', 'File is too large (maximum 2 MB).'), 'error');
+                    showToast(window.t('asset-management.labels.logo_too_large'), 'error');
                     e.target.value = '';
                     return;
                 }
@@ -1980,16 +1983,6 @@ $translationNamespaces = ['common', 'asset-management'];
                 '12': { w: 63.5, h: 72.0, qr: 38, tagPt: 13.0, subDivisor: 3.2 }
             };
 
-            const printCatalogueMap = {
-                'asset_tag': 'Asset Tag',
-                'hostname': 'Hostname',
-                'service_tag': 'Serial',
-                'manufacturer': 'Manufacturer',
-                'model': 'Model',
-                'company': 'Company',
-                'location': 'Location',
-                'asset_type': 'Type'
-            };
 
             const sampleCatalogue = {
                 'asset_tag': 'AST-00042',
@@ -2041,15 +2034,12 @@ $translationNamespaces = ['common', 'asset-management'];
                             tagDiv.textContent = 'AST-00042';
                             txtContainer.appendChild(tagDiv);
                         } else {
-                            let fieldTitle = (window.printLabelFieldsMap && window.printLabelFieldsMap[fk]) ? window.printLabelFieldsMap[fk] : printCatalogueMap[fk];
-                            if (!fieldTitle) {
-                                let rawTitle = availableLabelFieldsMap[fk] || fk;
-                                fieldTitle = rawTitle.replace(/\s*\([^)]*Custom Field[^)]*\)/gi, '').trim();
-                            }
+                            // The printed names come from the server, translated (PR #164).
+                            const fieldTitle = (window.printLabelFieldsMap && window.printLabelFieldsMap[fk]) || availableLabelFieldsMap[fk] || fk;
 
                             let sampleVal = sampleCatalogue[fk];
                             if (!sampleVal) {
-                                sampleVal = fk.indexOf('cf_') === 0 ? 'FAR-88092' : ('Sample ' + fieldTitle);
+                                sampleVal = fk.indexOf('cf_') === 0 ? 'FAR-88092' : window.t('asset-management.labels.sample_value', { field: fieldTitle });
                             }
 
                             const displayText = showLabels ? (fieldTitle + ': ' + sampleVal) : sampleVal;
@@ -2138,7 +2128,7 @@ $translationNamespaces = ['common', 'asset-management'];
                 try {
                     data = JSON.parse(text);
                 } catch (parseErr) {
-                    showToast(window.t('asset-management.settings.save_settings_failed', 'Save failed') + ': ' + text.substring(0, 100), 'error');
+                    showToast(window.t('asset-management.settings.save_settings_failed') + ': ' + text.substring(0, 100), 'error');
                     return;
                 }
                 if (data.success) {
@@ -2439,40 +2429,54 @@ $translationNamespaces = ['common', 'asset-management'];
             if (e.target === this && modalMouseDownTarget === this) closeModal();
         });
 
-        // Integration settings (vCenter + InTune). Secret fields are left empty;
-        // the placeholder tells the user one is already saved. The save endpoint
-        // treats blank/asterisk values as "keep existing", so leaving them
-        // alone preserves the stored secret.
+        // Asset tag numbering (PR #164). The preview is drawn by the server -
+        // the same validateFormat() and renderer that save and generate use, so
+        // what the preview accepts is what will be saved.
         async function loadAssetTagSettings() {
-            const prefixEl = document.getElementById('tagPrefix');
-            if (!prefixEl) return;
+            if (!document.getElementById('tagFormat')) return;
             try {
                 const res = await fetch(API_BASE + 'get_asset_tag_settings.php');
                 const data = await res.json();
                 if (data.success && data.settings) {
                     const s = data.settings;
                     document.getElementById('tagAutogenEnabled').checked = !!s.enabled;
-                    document.getElementById('tagPrefix').value = s.prefix || 'AST-';
-                    document.getElementById('tagSuffix').value = s.suffix || '';
-                    document.getElementById('tagPadding').value = s.padding || 5;
+                    document.getElementById('tagFormat').value = s.format || 'AST-{#####}';
                     document.getElementById('tagNextNumber').value = s.next_number || 1;
-                    updateTagPreview();
+                    document.getElementById('tagNextNumber').min = s.next_number || 1;
+                    document.getElementById('tagScope').value = s.scope || 'per_company';
+                    showTagPreview(s.examples || [], []);
                 }
             } catch (err) {
                 console.error('Failed to load asset tag settings', err);
             }
         }
 
-        function updateTagPreview() {
-            const prefix = (document.getElementById('tagPrefix')?.value || '');
-            const suffix = (document.getElementById('tagSuffix')?.value || '');
-            const padding = Math.max(1, Math.min(12, parseInt(document.getElementById('tagPadding')?.value, 10) || 5));
-            const num = Math.max(1, parseInt(document.getElementById('tagNextNumber')?.value, 10) || 1);
-            const previewEl = document.getElementById('tagFormatPreview');
-            if (!previewEl) return;
+        function showTagPreview(examples, problems) {
+            const preview = document.getElementById('tagFormatPreview');
+            const list = document.getElementById('tagProblems');
+            preview.textContent = examples.length ? examples.join('   ') : '-';
+            list.replaceChildren(...problems.map(p => { const li = document.createElement('li'); li.textContent = p; return li; }));
+            list.hidden = problems.length === 0;
+        }
 
-            const padded = String(num).padStart(padding, '0');
-            previewEl.textContent = prefix + padded + suffix;
+        let tagPreviewTimer = null, tagPreviewSeq = 0;
+        function updateTagPreview() {
+            clearTimeout(tagPreviewTimer);
+            tagPreviewTimer = setTimeout(async () => {
+                const seq = ++tagPreviewSeq;
+                try {
+                    const res = await fetch(API_BASE + 'asset_tag_preview.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            format: document.getElementById('tagFormat').value.trim(),
+                            start: parseInt(document.getElementById('tagNextNumber').value, 10) || 1
+                        })
+                    });
+                    const data = await res.json();
+                    if (seq === tagPreviewSeq && data.success) showTagPreview(data.examples || [], data.problems || []);
+                } catch (err) { /* the save will say what is wrong */ }
+            }, 250);
         }
 
         async function saveAssetTagsSettings(e) {
@@ -2485,10 +2489,8 @@ $translationNamespaces = ['common', 'asset-management'];
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         enabled: document.getElementById('tagAutogenEnabled').checked,
-                        prefix: document.getElementById('tagPrefix').value.trim(),
-                        suffix: document.getElementById('tagSuffix').value.trim(),
-                        padding: parseInt(document.getElementById('tagPadding').value, 10) || 5,
-                        initial_number: parseInt(document.getElementById('tagNextNumber').value, 10) || 1,
+                        format: document.getElementById('tagFormat').value.trim(),
+                        scope: document.getElementById('tagScope').value,
                         next_number: parseInt(document.getElementById('tagNextNumber').value, 10) || 1
                     })
                 });
@@ -2497,9 +2499,11 @@ $translationNamespaces = ['common', 'asset-management'];
                     showToast(window.t('asset-management.settings.asset_tags_saved'), 'success');
                     if (data.settings) {
                         document.getElementById('tagNextNumber').value = data.settings.next_number;
-                        updateTagPreview();
+                        document.getElementById('tagNextNumber').min = data.settings.next_number;
+                        showTagPreview(data.settings.examples || [], []);
                     }
                 } else {
+                    if (data.problems) showTagPreview([], data.problems);
                     showToast(data.error || window.t('asset-management.settings.save_settings_failed'), 'error');
                 }
             } catch (err) {
@@ -2508,7 +2512,10 @@ $translationNamespaces = ['common', 'asset-management'];
                 if (btn) { btn.disabled = false; btn.textContent = window.t('asset-management.common.save'); }
             }
         }
-
+        // Integration settings (vCenter + InTune). Secret fields are left empty;
+        // the placeholder tells the user one is already saved. The save endpoint
+        // treats blank/asterisk values as "keep existing", so leaving them
+        // alone preserves the stored secret.
         async function loadIntegrationSettings() {
             try {
                 const response = await fetch(API_SETTINGS + 'get_system_settings.php');
@@ -2535,6 +2542,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     if (document.getElementById('intuneCompanyId')) {
                         document.getElementById('intuneCompanyId').value = data.settings.intune_company_id || '';
                     }
+                    document.getElementById('intuneSyncHostnames').checked = data.settings.intune_sync_hostnames === '1';
                     if (document.getElementById('reconIgnoredSerials')) {
                         document.getElementById('reconIgnoredSerials').value = data.settings.asset_reconciliation_ignored_serials || '';
                     }
@@ -2692,7 +2700,8 @@ $translationNamespaces = ['common', 'asset-management'];
                             intune_client_id: document.getElementById('intuneClientId').value.trim(),
                             intune_client_secret: document.getElementById('intuneClientSecret').value,
                             intune_app_batch_size: String(Math.max(1, Math.min(500, parseInt(document.getElementById('intuneAppBatchSize').value, 10) || 30))),
-                            intune_company_id: document.getElementById('intuneCompanyId') ? document.getElementById('intuneCompanyId').value.trim() : ''
+                            intune_company_id: document.getElementById('intuneCompanyId') ? document.getElementById('intuneCompanyId').value.trim() : '',
+                            intune_sync_hostnames: document.getElementById('intuneSyncHostnames').checked ? '1' : '0'
                         }
                     })
                 });

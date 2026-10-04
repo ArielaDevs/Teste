@@ -32,6 +32,7 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/public_url.php';
 require_once __DIR__ . '/tenant_settings.php';
 require_once __DIR__ . '/branding.php';
+require_once __DIR__ . '/i18n.php';
 
 /** Token length in bytes (hex-encoded to 20 chars). Short enough to keep the QR
  *  coarse, long enough that guessing is pointless. */
@@ -60,29 +61,36 @@ function assetLabelsSchemaReady(PDO $conn): bool {
 
 /**
  * The token for an asset, minting one if it has never been labelled.
+ *
+ * Minting on demand rather than at creation keeps the column empty for the
+ * thousands of auto-discovered assets nobody will ever print a label for, and
+ * means an asset's token comes into existence at the moment it acquires meaning.
  */
 function assetEnsureToken(PDO $conn, int $assetId): ?string {
     if (!assetLabelsSchemaReady($conn) || $assetId <= 0) return null;
+
     $stmt = $conn->prepare("SELECT qr_token FROM assets WHERE id = ?");
     $stmt->execute([$assetId]);
     $existing = $stmt->fetchColumn();
-    if ($existing === false) return null;
+    if ($existing === false) return null;              // no such asset
     if (!empty($existing)) return (string)$existing;
 
+    // Retry on the (astronomically unlikely) collision rather than trusting luck;
+    // the unique index is the real guard and this just avoids a hard failure.
     for ($attempt = 0; $attempt < 5; $attempt++) {
         $token = bin2hex(random_bytes(ASSET_TOKEN_BYTES));
         try {
             $upd = $conn->prepare("UPDATE assets SET qr_token = ? WHERE id = ? AND (qr_token IS NULL OR qr_token = '')");
             $upd->execute([$token, $assetId]);
             if ($upd->rowCount() > 0) return $token;
-
+            // Somebody else minted one first — use theirs.
             $stmt->execute([$assetId]);
             $now = $stmt->fetchColumn();
             if (!empty($now)) return (string)$now;
         } catch (PDOException $e) {
-            // Narrow retry: only retry on true duplicate key / unique collision (SQLSTATE 23000 / MySQL 1062)
-            $isDup = ($e->getCode() === '23000' || ($e->errorInfo[1] ?? null) === 1062);
-            if ($isDup) {
+            // Only a unique-index collision is worth another go (SQLSTATE 23000 /
+            // MySQL 1062); anything else is a real fault and must surface (PR #164).
+            if ($e->getCode() === '23000' || ($e->errorInfo[1] ?? null) === 1062) {
                 continue;
             }
             throw $e;
@@ -95,6 +103,8 @@ function assetEnsureToken(PDO $conn, int $assetId): ?string {
 function assetIdForToken(PDO $conn, string $token): ?int {
     if (!assetLabelsSchemaReady($conn)) return null;
     $token = trim($token);
+    // Cheap shape check first: the column is indexed, but there is no reason to
+    // send junk from a mis-scan to the database.
     if ($token === '' || !preg_match('/^[a-f0-9]{8,64}$/i', $token)) return null;
     $stmt = $conn->prepare("SELECT id FROM assets WHERE qr_token = ? LIMIT 1");
     $stmt->execute([$token]);
@@ -104,11 +114,21 @@ function assetIdForToken(PDO $conn, string $token): ?int {
 
 /**
  * Is this asset tag free within its company?
+ *
+ * Application-level because a UNIQUE (tenant_id, asset_tag) index would NOT
+ * hold for the Default company: MySQL treats NULLs as distinct in a unique
+ * index, so two NULL-tenant assets could both be LT0001 while the index looked
+ * like it was guarding them. Same reason hostname is checked here rather than
+ * by the schema. `<=>` is the null-safe equality operator, so the comparison
+ * behaves for the Default company as well as a named one.
+ *
+ * A check in code needs serialising against a concurrent write - every caller
+ * that WRITES a tag goes through AssetTagsService::withLock() (PR #164).
  */
 function assetTagAvailable(PDO $conn, ?int $tenantId, string $tag, ?int $exceptAssetId = null): bool {
     if (!assetLabelsSchemaReady($conn)) return true;
     $tag = trim($tag);
-    if ($tag === '') return true;
+    if ($tag === '') return true;                       // blank is always allowed
     $sql = "SELECT COUNT(*) FROM assets WHERE tenant_id <=> ? AND asset_tag = ?";
     $args = [$tenantId, $tag];
     if ($exceptAssetId !== null) { $sql .= " AND id <> ?"; $args[] = $exceptAssetId; }
@@ -119,22 +139,28 @@ function assetTagAvailable(PDO $conn, ?int $tenantId, string $tag, ?int $exceptA
 
 /**
  * The URL a label's QR encodes.
+ *
+ * Absolute, because the code is scanned by a phone that has no idea what the
+ * app's base path is. Built on publicBaseUrl() - the install's ONE answer to
+ * "how does the outside world reach this install?" - so a configured public
+ * address wins over the current request: a label is printed once and lives on a
+ * laptop for years, and deriving it from whichever hostname the printing
+ * analyst happened to be using would bake that in permanently.
+ *
+ * This used to reuse the messaging-only setting, flagged at the time as wanting
+ * a generic key; publicBaseUrl() reads `public_base_url` and still falls back to
+ * `messaging_public_base_url`, so labels printed before PR #164 encode the same
+ * address. It also copes with a configured address that already carries the
+ * app's folder (publicUrlWithAppPath()), which would otherwise print
+ * …/freeitsm-app/freeitsm-app/a/<token> onto physical labels.
  */
 function assetLabelUrl(string $token, ?PDO $conn = null): string {
-    if ($conn === null) {
-        $conn = connectToDatabase();
-    }
-    return publicAbsoluteUrl($conn, 'a/' . $token);
+    return publicAbsoluteUrl($conn ?? connectToDatabase(), 'a/' . $token);
 }
 
-/**
- * The install's public base URL.
- */
+/** The install's public base, including any sub-folder - see assetLabelUrl(). */
 function assetPublicBaseUrl(?PDO $conn = null): string {
-    if ($conn === null) {
-        $conn = connectToDatabase();
-    }
-    return publicBaseUrl($conn);
+    return publicBaseUrl($conn ?? connectToDatabase());
 }
 
 /**
@@ -162,30 +188,12 @@ function assetLabelQrEcLevel(bool $hasLogo): string {
     return $hasLogo ? 'H' : 'M';
 }
 
-/**
- * Catalogue of built-in standard fields printable on asset labels.
- */
-function assetLabelStandardFields(): array {
-    return [
-        'asset_tag'   => 'Asset Tag',
-        'hostname'    => 'Hostname',
-        'service_tag' => 'Serial / Service Tag',
-        'manufacturer'=> 'Manufacturer',
-        'model'       => 'Model',
-        'company'     => 'Company / Client',
-        'location'    => 'Location',
-        'asset_type'  => 'Asset Type',
-    ];
-}
+/** The built-in fields a label can print, in the order the picker offers them. */
+const ASSET_LABEL_STANDARD_FIELDS = ['asset_tag', 'hostname', 'service_tag', 'manufacturer', 'model', 'company', 'location', 'asset_type'];
 
-/**
- * Complete catalogue of printable fields (Standard + Custom Fields) for a context.
- *
- * Custom fields are dynamically discovered from `asset_fields` table (is_deleted = 0)
- * and assigned keys prefixed with `cf_` (e.g. `cf_far_id`).
- */
-function assetLabelAvailableFields(PDO $conn, ?int $tenantId = null): array {
-    $fields = assetLabelStandardFields();
+/** Custom asset fields a label can print: key ('cf_' + field_key) => its own label. */
+function assetLabelCustomFields(PDO $conn, ?int $tenantId = null): array {
+    $out = [];
     try {
         $sql = "SELECT field_key, label FROM asset_fields WHERE is_deleted = 0";
         $args = [];
@@ -193,62 +201,49 @@ function assetLabelAvailableFields(PDO $conn, ?int $tenantId = null): array {
             $sql .= " AND (tenant_id IS NULL OR tenant_id = ?)";
             $args[] = $tenantId;
         }
-        $sql .= " ORDER BY label ASC";
-        $stmt = $conn->prepare($sql);
+        $stmt = $conn->prepare($sql . " ORDER BY label ASC");
         $stmt->execute($args);
         while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $key = 'cf_' . $r['field_key'];
-            $fields[$key] = $r['label'] . ' (Custom Field)';
+            $out['cf_' . $r['field_key']] = (string)$r['label'];
         }
-    } catch (Exception $e) { /* table absent fallback */ }
+    } catch (Exception $e) { /* custom fields not installed yet */ }
+    return $out;
+}
+
+/**
+ * Every field a label can print, with the name the SETTINGS picker shows -
+ * built-in fields in the reader's language, custom fields marked as such.
+ */
+function assetLabelAvailableFields(PDO $conn, ?int $tenantId = null): array {
+    $fields = [];
+    foreach (ASSET_LABEL_STANDARD_FIELDS as $key) {
+        $fields[$key] = t('asset-management.labels.field.' . $key);
+    }
+    foreach (assetLabelCustomFields($conn, $tenantId) as $key => $label) {
+        $fields[$key] = t('asset-management.labels.field.custom', ['label' => $label]);
+    }
     return $fields;
 }
 
 /**
- * Retrieve physical label and QR customisation settings for a company/tenant context.
- *
- * @param PDO $conn
- * @param ?int $tenantId
- * @return array{
- *   title: string,
- *   fields: array<string>,
- *   footer: string,
- *   logo_enabled: bool,
- *   logo_path: string,
- *   show_field_labels: bool
- * }
- */
-
-/**
- * Concise display labels for physical printed labels.
+ * The short names printed ON the label beside each value - space on a 38mm
+ * sticker is tight, so "Serial" rather than "Serial / service tag".
  */
 function assetLabelPrintFields(PDO $conn, ?int $tenantId = null): array {
-    $standard = [
-        'asset_tag'    => 'Asset Tag',
-        'hostname'     => 'Hostname',
-        'service_tag'  => 'Serial',
-        'manufacturer' => 'Manufacturer',
-        'model'        => 'Model',
-        'company'      => 'Company',
-        'location'     => 'Location',
-        'asset_type'   => 'Type',
-    ];
-
-    $available = assetLabelAvailableFields($conn, $tenantId);
-    $printFields = [];
-
-    foreach ($available as $key => $rawLabel) {
-        if (isset($standard[$key])) {
-            $printFields[$key] = $standard[$key];
-        } else {
-            $clean = preg_replace('/\s*\([^)]*Custom Field[^)]*\)/i', '', $rawLabel);
-            $printFields[$key] = trim($clean);
-        }
+    $fields = [];
+    foreach (ASSET_LABEL_STANDARD_FIELDS as $key) {
+        $fields[$key] = t('asset-management.labels.field_short.' . $key);
     }
-
-    return $printFields;
+    return $fields + assetLabelCustomFields($conn, $tenantId);
 }
 
+/**
+ * The label settings for a company: header, footer, which fields in which
+ * order, whether to print their names, and the logo inside the QR.
+ *
+ * @return array{title:string, fields:string[], footer:string, logo_enabled:bool,
+ *               logo_path:string, custom_logo_path:string, show_field_labels:bool}
+ */
 function assetLabelSettings(PDO $conn, ?int $tenantId = null): array {
     $title        = (string)tenantSetting($conn, $tenantId, KEY_LABEL_TITLE, '');
     $rawFields    = (string)tenantSetting($conn, $tenantId, KEY_LABEL_FIELDS, '');

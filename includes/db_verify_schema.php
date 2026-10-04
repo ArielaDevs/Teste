@@ -1686,12 +1686,13 @@ return [
         'updated_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
     ],
 
-    'asset_tag_sequences' => [
-        'id'                => 'INT NOT NULL AUTO_INCREMENT',
-        'tenant_id'         => 'INT NOT NULL DEFAULT 0',
-        'next_number'       => 'INT UNSIGNED NOT NULL DEFAULT 1',
-        'updated_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
-        'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',
+    // Generated asset tag counters (PR #164) - ticket_number_counters' shape,
+    // and the same ⚠️: counter_key is the PK, declared in db_verify.php's
+    // $primaryKeys map, not here.
+    'asset_tag_counters' => [
+        'counter_key'       => 'VARCHAR(64) NOT NULL',
+        'next_value'        => 'BIGINT NOT NULL DEFAULT 1',
+        'updated_datetime'  => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
     ],
 
     'assets' => [

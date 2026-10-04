@@ -326,9 +326,9 @@ $hostIsLocal = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/i', $labelHo
 <body>
 
 <div class="bar">
-    <h1><?php echo htmlspecialchars(t('asset-management.labels.heading', 'Asset labels')); ?></h1>
+    <h1><?php echo htmlspecialchars(t('asset-management.labels.heading')); ?></h1>
     <label>
-        <?php echo htmlspecialchars(t('asset-management.labels.sheet_label', 'Label sheet')); ?>
+        <?php echo htmlspecialchars(t('asset-management.labels.sheet_label')); ?>
         <select
             id="sheetSelector"
             name="sheet"
@@ -337,15 +337,15 @@ $hostIsLocal = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/i', $labelHo
         >
             <?php foreach ($sheets as $k => $info): ?>
                 <option value="<?php echo $k; ?>" <?php echo $k === $sheetKey ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars($k . ' per sheet (' . $info['dims'] . ')'); ?>
+                    <?php echo htmlspecialchars(t('asset-management.labels.sheet_option', ['n' => $k, 'dims' => $info['dims']])); ?>
                 </option>
             <?php endforeach; ?>
         </select>
     </label>
-    <button class="primary" onclick="window.print()"><?php echo htmlspecialchars(t('asset-management.labels.print', 'Print')); ?></button>
+    <button class="primary" onclick="window.print()"><?php echo htmlspecialchars(t('asset-management.labels.print')); ?></button>
     <?php if ($ids): ?>
         <a class="btn" href="?ids=<?php echo urlencode(implode(',', $ids)); ?>&sheet=<?php echo $sheetKey; ?>&csv=1">
-            <?php echo htmlspecialchars(t('asset-management.labels.csv', 'CSV for a printer')); ?>
+            <?php echo htmlspecialchars(t('asset-management.labels.csv')); ?>
         </a>
     <?php endif; ?>
     <span style="font-size:12px; opacity:0.8; margin-left:auto;">
@@ -382,17 +382,17 @@ $hostIsLocal = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/i', $labelHo
                     </svg>
                 </div>
                 <h3 style="font-size: 18px; font-weight: 600; margin: 0 0 8px; color: #2c3e50;">
-                    <?php if (!$ready) echo htmlspecialchars(t('asset-management.labels.not_ready_heading', 'Database Schema Not Ready'));
-                          elseif (!$ids) echo htmlspecialchars(t('asset-management.labels.no_ids_heading', 'No Assets Selected'));
-                          else echo htmlspecialchars(t('asset-management.labels.none_visible_heading', 'No Matching Assets Found')); ?>
+                    <?php if (!$ready) echo htmlspecialchars(t('asset-management.labels.not_ready_heading'));
+                          elseif (!$ids) echo htmlspecialchars(t('asset-management.labels.no_ids_heading'));
+                          else echo htmlspecialchars(t('asset-management.labels.none_visible_heading')); ?>
                 </h3>
                 <p style="font-size: 13px; color: #7f8c8d; line-height: 1.5; margin: 0 0 20px;">
-                    <?php if (!$ready) echo htmlspecialchars(t('asset-management.labels.not_ready_body', 'The database requires schema verification. Please navigate to System -> Database Verify.'));
-                          elseif (!$ids) echo htmlspecialchars(t('asset-management.labels.no_ids_body', 'Please go back to the Asset list, select one or more assets, and choose "Print Labels" from the bulk actions menu.'));
-                          else echo htmlspecialchars(t('asset-management.labels.none_visible_body', 'The requested asset records could not be retrieved. They may belong to a different company or have been deleted.')); ?>
+                    <?php if (!$ready) echo htmlspecialchars(t('asset-management.labels.not_ready_body'));
+                          elseif (!$ids) echo htmlspecialchars(t('asset-management.labels.no_ids_body'));
+                          else echo htmlspecialchars(t('asset-management.labels.none_visible_body')); ?>
                 </p>
                 <a href="../" style="display: inline-block; background: #37474f; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;">
-                    <?php echo htmlspecialchars(t('asset-management.labels.back_to_inbox', 'Back to Asset List')); ?>
+                    <?php echo htmlspecialchars(t('asset-management.labels.back_to_inbox')); ?>
                 </a>
             </div>
         </div>
@@ -450,9 +450,7 @@ $hostIsLocal = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/i', $labelHo
                                     break;
                             }
                             if ($subVal !== ''):
-                                $fieldLabel = $printCatalogue[$fk] ?? $availableCatalogue[$fk] ?? '';
-                                $fieldLabel = preg_replace('/\s*\([^)]*Custom Field[^)]*\)/i', '', $fieldLabel);
-                                $fieldLabel = trim($fieldLabel);
+                                $fieldLabel = trim((string)($printCatalogue[$fk] ?? ''));
                                 $displayLine = ($showFieldLabels && $fieldLabel !== '') ? $fieldLabel . ': ' . $subVal : $subVal;
                         ?>
                             <div class="sub"><?php echo htmlspecialchars($displayLine); ?></div>

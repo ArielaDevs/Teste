@@ -1,10 +1,15 @@
 <?php
 /**
- * API Endpoint: Save asset tag auto-generation settings & sequence counter.
+ * API: save the asset tag numbering settings for one company.
  *
- * POST /api/assets/save_asset_tag_settings.php
+ * POST { tenant_id?, enabled, format, start, scope, next_number? }
+ *   -> { success, settings } | { success:false, error, problems? }
+ *
+ * The format is checked by the same AssetTagsService::validateFormat() the
+ * live preview uses, so what the preview refuses is refused here too.
+ * next_number can only move the counter FORWARD: a number already handed out
+ * must never be handed out again (a tag may be on a sticker on a laptop).
  */
-
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
@@ -27,10 +32,9 @@ requireCapabilityJson(Cap::ASSETS_TAGS);
 try {
     $conn = connectToDatabase();
     $analystId = (int)$_SESSION['analyst_id'];
-
     $data = json_decode(file_get_contents('php://input'), true) ?: [];
 
-    $tenantId = null;
+    $tenantId = getActiveTenantId($conn, $analystId);
     if (isset($data['tenant_id']) && $data['tenant_id'] !== '' && isMultiTenant($conn)) {
         $wanted = (int)$data['tenant_id'];
         if (!analystCanAccessTenant($conn, $analystId, $wanted)) {
@@ -38,61 +42,60 @@ try {
             exit;
         }
         $tenantId = $wanted;
-    } else {
-        $tenantId = getActiveTenantId($conn, $analystId);
     }
 
     $enabled = !empty($data['enabled']) ? '1' : '0';
-    $prefix  = trim((string)($data['prefix'] ?? 'AST-'));
-    $suffix  = trim((string)($data['suffix'] ?? ''));
-    $padding = max(1, min(12, (int)($data['padding'] ?? 5)));
-    $initNum = max(1, (int)($data['initial_number'] ?? 1));
+    $format  = trim((string)($data['format'] ?? AssetTagsService::DEFAULTS['asset_tag_format']));
+    $start   = max(1, (int)($data['start'] ?? 1));
+    $scope   = ($data['scope'] ?? 'per_company') === 'global' ? 'global' : 'per_company';
 
-    // Length and character validation for prefix/suffix
-    if (mb_strlen($prefix) > 20) {
-        throw new Exception('Tag prefix cannot exceed 20 characters.');
-    }
-    if (mb_strlen($suffix) > 20) {
-        throw new Exception('Tag suffix cannot exceed 20 characters.');
-    }
-    if (!preg_match('/^[A-Za-z0-9_\-\.\/]*$/', $prefix)) {
-        throw new Exception('Tag prefix contains invalid characters. Use letters, numbers, hyphens, and underscores.');
-    }
-    if (!preg_match('/^[A-Za-z0-9_\-\.\/]*$/', $suffix)) {
-        throw new Exception('Tag suffix contains invalid characters. Use letters, numbers, hyphens, and underscores.');
+    $problems = AssetTagsService::validateFormat($format);
+    if ($problems) {
+        echo json_encode(['success' => false, 'error' => implode(' ', $problems), 'problems' => $problems]);
+        exit;
     }
 
-    // Save configuration settings
-    if ($tenantId !== null && $tenantId > 0 && isMultiTenant($conn)) {
-        setTenantSetting($conn, $tenantId, AssetTagsService::KEY_AUTOGEN_ENABLED, $enabled);
-        setTenantSetting($conn, $tenantId, AssetTagsService::KEY_PREFIX, $prefix);
-        setTenantSetting($conn, $tenantId, AssetTagsService::KEY_SUFFIX, $suffix);
-        setTenantSetting($conn, $tenantId, AssetTagsService::KEY_PADDING, (string)$padding);
-        setTenantSetting($conn, $tenantId, AssetTagsService::KEY_INITIAL_NUMBER, (string)$initNum);
+    $perCompany = [
+        'asset_tag_autogen_enabled' => $enabled,
+        'asset_tag_format'          => $format,
+        'asset_tag_start'           => (string)$start,
+    ];
+    // A company's own answer on a multi-company install; the install-wide one
+    // otherwise. Scope is always install-wide: two companies counting two ways
+    // in one install would make "the next number" mean different things.
+    if (isMultiTenant($conn) && $tenantId !== null && $tenantId > 0) {
+        foreach ($perCompany as $key => $value) setTenantSetting($conn, $tenantId, $key, $value);
     } else {
-        $stmt = $conn->prepare(
+        $up = $conn->prepare(
             "INSERT INTO system_settings (setting_key, setting_value, updated_datetime)
              VALUES (?, ?, UTC_TIMESTAMP())
              ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_datetime = UTC_TIMESTAMP()"
         );
-        $stmt->execute([AssetTagsService::KEY_AUTOGEN_ENABLED, $enabled]);
-        $stmt->execute([AssetTagsService::KEY_PREFIX, $prefix]);
-        $stmt->execute([AssetTagsService::KEY_SUFFIX, $suffix]);
-        $stmt->execute([AssetTagsService::KEY_PADDING, (string)$padding]);
-        $stmt->execute([AssetTagsService::KEY_INITIAL_NUMBER, (string)$initNum]);
+        foreach ($perCompany as $key => $value) $up->execute([$key, $value]);
     }
+    $conn->prepare(
+        "INSERT INTO system_settings (setting_key, setting_value, updated_datetime)
+         VALUES ('asset_tag_scope', ?, UTC_TIMESTAMP())
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_datetime = UTC_TIMESTAMP()"
+    )->execute([$scope]);
+    AssetTagsService::forget();
 
-    // If next_number explicitly passed, update the sequence counter
     if (isset($data['next_number']) && $data['next_number'] !== '') {
-        $nextNum = max(1, (int)$data['next_number']);
-        AssetTagsService::setNextSequenceNumber($conn, $tenantId, $nextNum);
+        AssetTagsService::setNextNumber($conn, $tenantId, (int)$data['next_number']);
     }
 
-    $updatedConfig = AssetTagsService::getAutogenConfig($conn, $tenantId);
-
+    $cfg  = AssetTagsService::config($conn, $tenantId);
+    $next = AssetTagsService::nextNumber($conn, $tenantId);
     echo json_encode([
         'success'  => true,
-        'settings' => $updatedConfig,
+        'settings' => [
+            'enabled'     => $cfg['asset_tag_autogen_enabled'] === '1',
+            'format'      => $cfg['asset_tag_format'],
+            'start'       => (int)$cfg['asset_tag_start'],
+            'scope'       => $cfg['asset_tag_scope'],
+            'next_number' => $next,
+            'examples'    => AssetTagsService::preview($cfg, $next),
+        ],
     ]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);

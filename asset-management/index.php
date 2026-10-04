@@ -4396,7 +4396,8 @@ $translationNamespaces = ['common', 'asset-management'];
             // localise here. Legacy rows hold an English label (with spaces/capitals)
             // — those don't match a key, so we show them as-is.
             const FIELD_KEYS = ['type','status','location','supplier','purchase_date',
-                'purchase_cost','order_number','warranty_expiry','lease_expiry','assigned_user'];
+                'purchase_cost','order_number','warranty_expiry','lease_expiry','assigned_user',
+                'hostname','asset_created','asset_discovered','hostname_reused'];
 
             history.forEach(entry => {
                 const noneEm = `<em style="color:#999;">${window.t('asset-management.common.none')}</em>`;
@@ -4414,7 +4415,7 @@ $translationNamespaces = ['common', 'asset-management'];
                         <span class="history-arrow">&rarr;</span>
                         <span class="history-value-new">${newVal}</span>
                     </td>
-                    <td class="history-meta">${escapeHtml(entry.analyst_name || window.t('asset-management.common.unknown'))}</td>
+                    <td class="history-meta">${escapeHtml(entry.analyst_name || window.t(entry.analyst_id ? 'asset-management.common.unknown' : 'asset-management.history.automatic'))}</td>
                 </tr>`;
             });
 

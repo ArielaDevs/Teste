@@ -74,6 +74,7 @@ $primaryKeys = [
     // ⚠️ No auto-increment id on purpose: counter_key being the PK is what lets
     // the read-and-increment happen in one statement (#1147).
     'ticket_number_counters'    => 'counter_key',
+    'asset_tag_counters'        => 'counter_key',   // the same design, for asset tags (PR #164)
     'attachment_text'           => 'attachment_id',
     'document_text'             => 'document_id',
     'system_settings'           => 'setting_key',
@@ -1850,12 +1851,16 @@ try {
             // upgrade would lock people out of their own service desk.
             'password_expiry_days'            => '0',
             'intune_company_id'                 => null,
+            // OFF on upgrade (a new install's freeitsm.sql seeds '1' first, and
+            // INSERT IGNORE keeps it): turning it on renames every asset whose
+            // device has been renamed in Intune since it was linked (PR #164).
+            'intune_sync_hostnames'             => '0',
             'asset_reconciliation_ignored_serials' => "TO BE FILLED BY O.E.M.\nDEFAULT STRING\nNONE\nSYSTEM SERIAL NUMBER\nNOT SPECIFIED\n123456789",
+            // Asset tags (PR #164): off until somebody switches them on.
             'asset_tag_autogen_enabled'          => '0',
-            'asset_tag_prefix'                   => 'AST-',
-            'asset_tag_suffix'                   => '',
-            'asset_tag_padding'                  => '5',
-            'asset_tag_initial_number'           => '1',
+            'asset_tag_format'                   => 'AST-{#####}',
+            'asset_tag_start'                    => '1',
+            'asset_tag_scope'                    => 'per_company',
         ];
         // Secrets are seeded already encrypted. The whole block is best-effort: an
         // install that has no encryption key yet must still be able to build its

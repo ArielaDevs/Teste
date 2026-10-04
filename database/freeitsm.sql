@@ -2623,16 +2623,16 @@ CREATE TABLE IF NOT EXISTS `assets` (
     -- the suppliers table is defined later in this file, so the FK can't be inline here.
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Monotonically increasing sequence counters for auto-generated asset tags.
--- Scoped per company (tenant_id = 0 for Default company).
-CREATE TABLE IF NOT EXISTS `asset_tag_sequences` (
-    `id`                INT NOT NULL AUTO_INCREMENT,
-    `tenant_id`         INT NOT NULL DEFAULT 0,
-    `next_number`       INT UNSIGNED NOT NULL DEFAULT 1,
-    `updated_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `is_demo`           TINYINT(1) NOT NULL DEFAULT 0,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_asset_tag_seq_tenant` (`tenant_id`)
+-- Counters for generated asset tags (PR #164) - the same shape, and claimed the
+-- same way, as ticket_number_counters: one atomic upsert, never read-then-write.
+-- counter_key is 'asset' (counting once across companies) or 'asset:co<id>'
+-- (each company on its own; 0 = the Default company, so the key is never NULL).
+-- next_value holds the LAST number issued. See includes/services/asset_tags.php.
+CREATE TABLE IF NOT EXISTS `asset_tag_counters` (
+    `counter_key`       VARCHAR(64) NOT NULL,
+    `next_value`        BIGINT NOT NULL DEFAULT 1,
+    `updated_datetime`  DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`counter_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Who is holding an asset.
@@ -6203,17 +6203,20 @@ INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
     ('time_format', '24h');
 
 -- Asset reconciliation: default list of generic/placeholder serial numbers to ignore
+-- intune_sync_hostnames is ON for a new install (there is nothing to rename yet)
+-- and OFF on an upgrade (db_verify seeds '0'), so an upgrade renames nothing.
 INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
     ('intune_company_id', NULL),
+    ('intune_sync_hostnames', '1'),
     ('asset_reconciliation_ignored_serials', 'TO BE FILLED BY O.E.M.\nDEFAULT STRING\nNONE\nSYSTEM SERIAL NUMBER\nNOT SPECIFIED\n123456789');
 
--- Asset tag auto-generation defaults (disabled by default for backward compatibility)
+-- Asset tag auto-generation (PR #164). Off, so a new install behaves as before
+-- until somebody switches it on. The format uses ticket numbering's tokens.
 INSERT IGNORE INTO `system_settings` (`setting_key`, `setting_value`) VALUES
     ('asset_tag_autogen_enabled', '0'),
-    ('asset_tag_prefix', 'AST-'),
-    ('asset_tag_suffix', ''),
-    ('asset_tag_padding', '5'),
-    ('asset_tag_initial_number', '1');
+    ('asset_tag_format', 'AST-{#####}'),
+    ('asset_tag_start', '1'),
+    ('asset_tag_scope', 'per_company');
 
 CREATE TABLE IF NOT EXISTS `trusted_devices` (
     `id`                 INT NOT NULL AUTO_INCREMENT,

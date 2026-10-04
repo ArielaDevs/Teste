@@ -32,10 +32,9 @@ require_once __DIR__ . '/tenancy.php';
  *
  * @param ?int $tenantId  null = ask the install-wide value only
  */
-function tenantSetting(PDO $conn, ?int $tenantId, string $key, ?string $default = null, bool $clearCache = false): ?string
+function tenantSetting(PDO $conn, ?int $tenantId, string $key, ?string $default = null): ?string
 {
-    static $cache = [];
-    if ($clearCache) { $cache = []; }
+    $cache = &tenantSettingCache();
     $ck = ($tenantId ?? 0) . '|' . $key;
     if (array_key_exists($ck, $cache)) return $cache[$ck];
 
@@ -73,6 +72,25 @@ function tenantSetting(PDO $conn, ?int $tenantId, string $key, ?string $default 
     return $value;
 }
 
+/**
+ * The per-request cache behind tenantSetting(). A function rather than a
+ * `static` inside tenantSetting() so it can be emptied from outside: a page
+ * that saves a setting and then reads it back (PR #164's label settings) must
+ * see the new value, and so must a test.
+ */
+function &tenantSettingCache(): array
+{
+    static $cache = [];
+    return $cache;
+}
+
+/** Forget every cached setting - after a write, or between test cases. */
+function tenantSettingForget(): void
+{
+    $cache = &tenantSettingCache();
+    $cache = [];
+}
+
 /** Convenience for a yes/no setting. Anything but '0' is on. */
 function tenantSettingOn(PDO $conn, ?int $tenantId, string $key, bool $default = true): bool
 {
@@ -90,6 +108,7 @@ function tenantSettingOn(PDO $conn, ?int $tenantId, string $key, bool $default =
  */
 function setTenantSetting(PDO $conn, int $tenantId, string $key, ?string $value): void
 {
+    tenantSettingForget();   // a read later in this request must see the new value
     if ($value === null) {
         $conn->prepare("DELETE FROM tenant_settings WHERE tenant_id = ? AND setting_key = ?")
              ->execute([$tenantId, $key]);

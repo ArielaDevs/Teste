@@ -66,8 +66,12 @@ final class ActorContext
         );
     }
 
-    /** Build from an authenticated API key row (API adapters). */
-    /** Build for automated / system actions (workflows, cron, CLI tests). */
+    /**
+     * Build for something no person did: an inventory agent, Intune, a cron job
+     * (PR #164). actorId 0 is recorded as "no analyst" (NULL) in history, and
+     * companyScope null means the caller has already decided the company - an
+     * agent's key carries it, Intune's setting names it.
+     */
     public static function system(string $name = 'System'): self
     {
         return new self(
@@ -79,6 +83,7 @@ final class ActorContext
         );
     }
 
+    /** Build from an authenticated API key row (API adapters). */
     public static function fromApiKey(array $apiKey): self
     {
         return new self(

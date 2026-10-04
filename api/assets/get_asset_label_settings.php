@@ -14,6 +14,7 @@ require_once '../../includes/tenancy.php';
 require_once '../../includes/tenant_settings.php';
 require_once '../../includes/capabilities.php';
 require_once '../../includes/asset_labels.php';
+I18n::initFromSession();   // the field names it returns are shown to the reader
 
 header('Content-Type: application/json');
 
@@ -23,7 +24,7 @@ if (!isset($_SESSION['analyst_id'])) {
 }
 
 requireModuleAccessJson('assets');
-requireCapabilityJson(Cap::ASSETS_TAGS);
+requireCapabilityJson(Cap::ASSETS_LABELS);
 
 try {
     $conn = connectToDatabase();

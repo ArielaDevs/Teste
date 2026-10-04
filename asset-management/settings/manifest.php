@@ -118,8 +118,7 @@ return [
             'cap'          => Cap::ASSETS_TAGS,
             'label_key'    => 'asset-management.settings.tab_asset_tags',
             'grant'        => 'Configure asset tag auto-generation and numbering sequence',
-            'setting_keys' => ['asset_tag_autogen_enabled', 'asset_tag_prefix',
-                               'asset_tag_suffix', 'asset_tag_padding', 'asset_tag_initial_number'],
+            'setting_keys' => ['asset_tag_autogen_enabled', 'asset_tag_format', 'asset_tag_start', 'asset_tag_scope'],
         ],
         [
             'id'           => 'reconciliation',
@@ -130,7 +129,7 @@ return [
         ],
         [
             'id'           => 'asset-labels',
-            'cap'          => Cap::ASSETS_TAGS,
+            'cap'          => Cap::ASSETS_LABELS,
             'label_key'    => 'asset-management.settings.tab_asset_labels',
             'grant'        => 'Configure physical asset labels, layout and QR code branding',
             'setting_keys' => ['asset_label_title', 'asset_label_fields', 'asset_label_footer',
@@ -143,7 +142,7 @@ return [
             'label_key'    => 'asset-management.settings.tab_intune',
             'grant'        => 'Configure the Intune connection and run syncs, including its credentials',
             'sensitive'    => true,
-            'setting_keys' => ['intune_tenant_id', 'intune_client_id', 'intune_client_secret', 'intune_verify_ssl', 'intune_app_batch_size', 'intune_company_id'],
+            'setting_keys' => ['intune_tenant_id', 'intune_client_id', 'intune_client_secret', 'intune_verify_ssl', 'intune_app_batch_size', 'intune_company_id', 'intune_sync_hostnames'],
         ],
         [
             // A per-analyst display preference — where your sidebar sits. Not

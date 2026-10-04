@@ -98,6 +98,20 @@ function publicUrlWithAppPath(string $root): string
     return $root . $app;
 }
 
+/** The per-request cache behind publicBaseUrl(); see publicBaseUrlForget(). */
+function &publicBaseUrlCache(): ?string
+{
+    static $root = null;
+    return $root;
+}
+
+/** Forget the cached root - after the setting is saved, or between test cases. */
+function publicBaseUrlForget(): void
+{
+    $root = &publicBaseUrlCache();
+    $root = null;
+}
+
 /**
  * The root every outbound link should be built on, without a trailing slash.
  *
@@ -107,10 +121,9 @@ function publicUrlWithAppPath(string $root): string
  *   3. BASE_URL alone — a path, which is no worse than what a caller would have
  *      done unaided, so an install that has configured nothing is not made worse.
  */
-function publicBaseUrl(PDO $conn, bool $resetCache = false): string
+function publicBaseUrl(PDO $conn): string
 {
-    static $root = null;
-    if ($resetCache) { $root = null; }
+    $root = &publicBaseUrlCache();
     if ($root !== null) {
         return $root;
     }

@@ -16,6 +16,7 @@ require_once '../../includes/capabilities.php';
 require_once '../../includes/uploads.php';
 require_once '../../includes/branding.php';
 require_once '../../includes/asset_labels.php';
+I18n::initFromSession();   // the field names it returns are shown to the reader
 
 header('Content-Type: application/json');
 
@@ -25,7 +26,7 @@ if (!isset($_SESSION['analyst_id'])) {
 }
 
 requireModuleAccessJson('assets');
-requireCapabilityJson(Cap::ASSETS_TAGS);
+requireCapabilityJson(Cap::ASSETS_LABELS);
 
 try {
     $conn = connectToDatabase();
@@ -159,8 +160,9 @@ try {
         @unlink($oldFileToUnlink);
     }
 
-    // Clear static memory cache
-    tenantSetting($conn, null, "", null, true);
+    // The install-wide branch above writes system_settings directly; forget the
+    // cache so the response below reads what was just saved.
+    tenantSettingForget();
 
     $updated = assetLabelSettings($conn, $tenantId);
     $availableFields = assetLabelAvailableFields($conn, $tenantId);

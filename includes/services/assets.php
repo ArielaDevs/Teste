@@ -116,8 +116,9 @@ class AssetsService
         // Default company).
         $storeTenant = ($tenantId !== null && $tenantId === getDefaultTenantId($conn)) ? null : $tenantId;
 
-        // hostname is the identity every ingest path upserts on — a duplicate
-        // would split an asset's records, so refuse rather than silently fork.
+        // hostname is unique per company, and the inventory sources fall back to
+        // it when a machine has no usable serial (resolveAssetIdentity()) — a
+        // duplicate would split an asset's records, so refuse rather than fork.
         // Scoped to the target company (NULL-safe) so two companies may each hold
         // a "LAPTOP-01".
         $dup = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ?");
@@ -141,89 +142,42 @@ class AssetsService
         $columns[] = 'tenant_id';
         $values[]  = $storeTenant;
 
-        // Asset tag auto-generation or manual assignment.
-        // Left blank + enabled -> mint sequentially; explicitly provided -> validate uniqueness.
+        // The tag: typed in, generated (when the company has it switched on and
+        // nothing was typed), or none. AssetTagsService owns the lock, the
+        // uniqueness check and the counter, and runs the insert below inside the
+        // same transaction, so a failed create never burns a number (PR #164).
         require_once __DIR__ . '/asset_tags.php';
-        $assignedTag = null;
-        $manualTagLock = null;
-        if (array_key_exists('asset_tag', $in) && trim((string)$in['asset_tag']) !== '') {
-            $manualTag = trim((string)$in['asset_tag']);
-            if (mb_strlen($manualTag) > 64) {
-                throw new ServiceError('validation', 'invalid_field', "'asset_tag' must be at most 64 characters.");
-            }
-            require_once __DIR__ . '/../asset_labels.php';
-
-            // Concurrency guard: serialize manual tag uniqueness check + insert using a tenant-scoped named lock.
-            // Using company scope avoids collation-aware bypass (e.g. tag-001 vs TAG-001 under case-insensitive collations).
-            $lockKey = 'freeitsm_manual_tag_' . ($storeTenant ?? 0);
-            $stmtLock = $conn->prepare("SELECT GET_LOCK(?, 10)");
-            $stmtLock->execute([$lockKey]);
-            $lockAcquired = (int)$stmtLock->fetchColumn();
-            if ($lockAcquired !== 1) {
-                throw new ServiceError(
-                    'server_error',
-                    'tag_lock_failed',
-                    'Could not acquire the asset tag allocation lock.'
-                );
-            }
-            $manualTagLock = $lockKey;
-        }
-
-        $ownsTx = !$conn->inTransaction();
-        if ($ownsTx) {
-            $conn->beginTransaction();
-        }
-
-        try {
-            if ($manualTagLock !== null) {
-                if (!assetTagAvailable($conn, $storeTenant, $manualTag)) {
-                    throw new ServiceError('conflict', 'conflict', "Asset tag '{$manualTag}' is already in use by another asset in this company.");
+        $created = AssetTagsService::createWithTag(
+            $conn,
+            $storeTenant,
+            array_key_exists('asset_tag', $in) ? (string)$in['asset_tag'] : null,
+            function (?string $tag) use ($conn, $ctx, $columns, $values, $creationNote): int {
+                if ($tag !== null) {
+                    $columns[] = 'asset_tag';
+                    $values[]  = $tag;
                 }
-                $assignedTag = $manualTag;
-            } elseif (AssetTagsService::isAutogenEnabled($conn, $storeTenant)) {
-                $assignedTag = AssetTagsService::generateNextAssetTag($conn, $storeTenant);
+                // 🔑 first_seen ONLY. `last_seen` means "when did an agent last report
+                // this machine", and nothing has ever reported a television, a SIM card
+                // or a meeting-room monitor — the very things this path exists to add.
+                //
+                // It used to stamp both, which was invisible while last_seen was shown
+                // nowhere. Now that the asset screen and the asset table both show it
+                // (#1578), a hand-added television would read "21 days ago" in amber, as
+                // though it had stopped reporting, and would sit in the Watchtower "not
+                // seen" count alongside machines that genuinely have. NULL is what makes
+                // the screen able to say **Never reported** instead, and it is the
+                // truthful answer rather than a convenient one.
+                //
+                // first_seen stays: when the record was made is a real fact about it.
+                $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+                $conn->prepare("INSERT INTO assets (" . implode(', ', $columns) . ", first_seen)
+                                VALUES ($placeholders, UTC_TIMESTAMP())")->execute($values);
+                $assetId = (int)$conn->lastInsertId();
+                self::auditWrite($conn, $assetId, $ctx->actorId, 'asset_created', null, $creationNote);
+                return $assetId;
             }
-
-            if ($assignedTag !== null) {
-                $columns[] = 'asset_tag';
-                $values[]  = $assignedTag;
-            }
-
-            // 🔑 first_seen ONLY. `last_seen` means "when did an agent last report
-            // this machine", and nothing has ever reported a television, a SIM card
-            // or a meeting-room monitor — the very things this path exists to add.
-            //
-            // It used to stamp both, which was invisible while last_seen was shown
-            // nowhere. Now that the asset screen and the asset table both show it
-            // (#1578), a hand-added television would read "21 days ago" in amber, as
-            // though it had stopped reporting, and would sit in the Watchtower "not
-            // seen" count alongside machines that genuinely have. NULL is what makes
-            // the screen able to say **Never reported** instead, and it is the
-            // truthful answer rather than a convenient one.
-            //
-            // first_seen stays: when the record was made is a real fact about it.
-            $placeholders = implode(', ', array_fill(0, count($columns), '?'));
-            $sql = "INSERT INTO assets (" . implode(', ', $columns) . ", first_seen)
-                VALUES ($placeholders, UTC_TIMESTAMP())";
-
-            $conn->prepare($sql)->execute($values);
-            $assetId = (int)$conn->lastInsertId();
-
-            self::auditWrite($conn, $assetId, $ctx->actorId, 'asset_created', null, $creationNote);
-
-            if ($ownsTx) {
-                $conn->commit();
-            }
-        } catch (Throwable $e) {
-            if ($ownsTx && $conn->inTransaction()) {
-                $conn->rollBack();
-            }
-            throw $e;
-        } finally {
-            if ($manualTagLock !== null) {
-                $conn->prepare("SELECT RELEASE_LOCK(?)")->execute([$manualTagLock]);
-            }
-        }
+        );
+        $assetId = $created['id'];
 
         if ((array_key_exists('warranty_expiry', $in) && $in['warranty_expiry'])
             || (array_key_exists('lease_expiry', $in) && $in['lease_expiry'])) {
@@ -713,11 +667,16 @@ class AssetsService
 
     private static function auditWrite(PDO $conn, int $assetId, int $analystId, string $fieldKey, ?string $old, ?string $new): void
     {
-        $realAnalystId = ($analystId > 0) ? $analystId : null;
+        // No analyst (0): an inventory source or Intune made the change. NULL,
+        // not 0 - 0 would point the foreign key at an analyst who does not
+        // exist (PR #164; Database Verification relaxes the column).
         $conn->prepare(
-            "INSERT INTO asset_history (asset_id, analyst_id, field_name, old_value, new_value, created_datetime) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())"
-        )->execute([$assetId, $realAnalystId, $fieldKey, $old, $new]);
+            "INSERT INTO asset_history (asset_id, analyst_id, field_name, old_value, new_value, created_datetime)
+             VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())"
+        )->execute([$assetId, $analystId > 0 ? $analystId : null, $fieldKey, $old, $new]);
     }
+
+    /** Validate a DATE field (YYYY-MM-DD); 422 naming the field. Null/'' clears. */
     private static function parseDate($value, string $field): ?string
     {
         if ($value === null || $value === '') {
@@ -1118,8 +1077,16 @@ class AssetsService
         return '#' . ($row['id'] ?? '?');
     }
 
+    // =====================================================================
+    //  Reconciliation - "is this incoming device one we already have?"
+    //  (PR #164, Sandy's design; see the Asset Reconciliation developer guide)
+    // =====================================================================
+
     /**
-     * Single authoritative default list of known generic / non-unique service tags and BIOS serial placeholders.
+     * Serial numbers that identify nothing: what a motherboard reports when the
+     * maker never filled the field in. Matching on one would merge every such
+     * machine into a single asset. Editable under Assets -> Settings ->
+     * Reconciliation; this list is only the default.
      */
     public const DEFAULT_IGNORED_SERVICE_TAGS = [
         'TO BE FILLED BY O.E.M.',
@@ -1127,299 +1094,223 @@ class AssetsService
         'NONE',
         'SYSTEM SERIAL NUMBER',
         'NOT SPECIFIED',
-        '123456789'
+        '123456789',
     ];
 
     /**
-     * Load the map of ignored/blacklisted service tags from system_settings.
-     *
-     * @param PDO $conn Database connection
-     * @return array<string, bool> Lowercased lookup map [trimmed_tag => true]
+     * The placeholder list as a lookup map [lowercased => true]. The stored
+     * setting, one per line, replaces the defaults when it has anything in it.
      */
-    public static function getIgnoredServiceTags(PDO $conn): array {
-        $ignoredMap = [];
+    public static function getIgnoredServiceTags(PDO $conn): array
+    {
+        $map = [];
         foreach (self::DEFAULT_IGNORED_SERVICE_TAGS as $tag) {
-            $ignoredMap[mb_strtolower(trim($tag))] = true;
+            $map[mb_strtolower(trim($tag))] = true;
         }
-
         try {
-            $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'asset_reconciliation_ignored_serials' LIMIT 1");
-            $stmt->execute();
-            $val = $stmt->fetchColumn();
-            if ($val !== false && is_string($val) && trim($val) !== '') {
-                $lines = preg_split('/\r\n|\r|\n/', $val);
-                if (is_array($lines)) {
-                    $ignoredMap = [];
-                    foreach ($lines as $line) {
-                        $trimmed = mb_strtolower(trim($line));
-                        if ($trimmed !== '') {
-                            $ignoredMap[$trimmed] = true;
-                        }
-                    }
+            $st = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'asset_reconciliation_ignored_serials' LIMIT 1");
+            $st->execute();
+            $val = $st->fetchColumn();
+            if (is_string($val) && trim($val) !== '') {
+                $map = [];
+                foreach (preg_split('/\r\n|\r|\n/', $val) as $line) {
+                    $line = mb_strtolower(trim($line));
+                    if ($line !== '') $map[$line] = true;
                 }
             }
-        } catch (Throwable $e) {
-            // Fallback to defaults
-        }
+        } catch (Throwable $e) { /* setting missing: the defaults stand */ }
+        return $map;
+    }
 
-        return $ignoredMap;
+    /** Is this serial worth matching on - not blank, not a placeholder? */
+    public static function isUsableServiceTag(?string $tag, ?array $ignoredMap = null): bool
+    {
+        $t = trim((string)$tag);
+        if ($t === '') return false;
+        $ignoredMap = $ignoredMap ?? array_fill_keys(array_map(fn($x) => mb_strtolower($x), self::DEFAULT_IGNORED_SERVICE_TAGS), true);
+        return !isset($ignoredMap[mb_strtolower($t)]);
     }
 
     /**
-     * Test whether a service tag or serial number is usable for stable device reconciliation.
+     * Which existing asset, if any, an incoming device is. Reads only.
      *
-     * Rejects empty/whitespace strings and configured placeholder / generic values.
+     *   Tier 1  an authoritative connector link the caller already holds
+     *   Tier 2  a usable serial - unless two assets share it (ambiguity guard)
+     *   Tier 3  hostname - unless a usable serial CONTRADICTS it (below)
+     *   Tier 4  nothing: a new asset
      *
-     * @param string|null $tag Raw service tag
-     * @param array<string, bool>|null $ignoredMap Optional pre-loaded ignored map
-     * @return bool
+     * 🔴 THE LAPTOP REFRESH. A replacement laptop is very often given the old
+     * one's name. It reports a good serial nobody has seen, so tier 2 finds
+     * nothing - and a plain hostname match would then put the NEW serial on the
+     * OLD laptop's record, leaving one record describing two machines. So a
+     * hostname match whose asset already holds a different usable serial is a
+     * different machine: tier 4, flagged `hostname_reused`. An asset entered
+     * without a serial (by hand, before the agent ran) still matches by name -
+     * that is how the agent finds it the first time.
+     *
+     * @param array $ids        asset_id (tier 1, with $isExplicitLink), service_tag, hostname
+     * @param ?int  $tenantId   the company to look in; NULL = the Default company
+     * @param bool  $anyCompany look in EVERY company (tiers 2-3). Only for a
+     *        connection that has no company of its own - see intuneLinkDevicesToAssets().
+     * @return array{asset_id:?int, matched_by:string, ambiguous:bool, hostname_reused:?int}
      */
-    public static function isUsableServiceTag(?string $tag, ?array $ignoredMap = null): bool {
-        if ($tag === null) {
-            return false;
-        }
-        $trimmed = trim($tag);
-        if ($trimmed === '') {
-            return false;
-        }
-        $lower = mb_strtolower($trimmed);
-        if ($ignoredMap !== null) {
-            return !isset($ignoredMap[$lower]);
-        }
-        foreach (self::DEFAULT_IGNORED_SERVICE_TAGS as $defaultTag) {
-            if ($lower === mb_strtolower(trim($defaultTag))) {
-                return false;
-            }
-        }
-        return true;
-    }
+    public static function resolveAssetIdentity(PDO $conn, array $ids, ?int $tenantId = null, bool $isExplicitLink = false, ?array $ignoredTags = null, bool $anyCompany = false): array
+    {
+        $result = fn(?int $id, string $by, bool $amb = false, ?int $reused = null) =>
+            ['asset_id' => $id, 'matched_by' => $by, 'ambiguous' => $amb, 'hostname_reused' => $reused];
+        $linkId   = !empty($ids['asset_id']) ? (int)$ids['asset_id'] : 0;
+        $serial   = trim((string)($ids['service_tag'] ?? ''));
+        $hostname = trim((string)($ids['hostname'] ?? ''));
+        $scope    = $anyCompany ? '' : ' AND tenant_id <=> ?';
+        $scopeArg = $anyCompany ? [] : [$tenantId];
 
-    /**
-     * Pure resolution: Identifies which existing asset matches the given device identifiers.
-     *
-     * Reconciliation Hierarchy:
-     *   Tier 1: Explicit authoritative connector link (e.g. intune_devices.asset_id)
-     *   Tier 2: Clean, non-generic hardware serial_number / service_tag with ambiguity guard
-     *   Tier 3: Hostname match (scoped to company/tenant)
-     *   Tier 4: Genuine new device (returns asset_id = null)
-     *
-     * @param PDO $conn Database connection
-     * @param array $identifiers ['asset_id' => int|null, 'service_tag' => string|null, 'hostname' => string|null]
-     * @param int|null $tenantId Scoped tenant ID (or null for default company)
-     * @param bool $isExplicitLink True if $identifiers['asset_id'] comes from an authoritative link
-     * @param array|null $ignoredTags Pre-loaded ignored service tags map
-     * @return array ['asset_id' => int|null, 'matched_by' => string, 'ambiguous' => bool]
-     */
-    public static function resolveAssetIdentity(
-        PDO $conn,
-        array $identifiers,
-        ?int $tenantId = null,
-        bool $isExplicitLink = false,
-        ?array $ignoredTags = null
-    ): array {
-        $rawAssetId = !empty($identifiers['asset_id']) ? (int)$identifiers['asset_id'] : null;
-        $serviceTag = isset($identifiers['service_tag']) ? trim((string)$identifiers['service_tag']) : '';
-        $hostname   = isset($identifiers['hostname']) ? trim((string)$identifiers['hostname']) : '';
-
-        // ---------------------------------------------------------------------
-        // Tier 1: Authoritative explicit connector link
-        // ---------------------------------------------------------------------
-        if ($isExplicitLink && $rawAssetId !== null && $rawAssetId > 0) {
-            // Must strictly belong to the scoped company/tenant context
-            $stmt = $conn->prepare("SELECT id FROM assets WHERE id = ? AND tenant_id <=> ? LIMIT 1");
-            $stmt->execute([$rawAssetId, $tenantId]);
-            $existingId = $stmt->fetchColumn();
-            if ($existingId) {
-                return [
-                    'asset_id'   => (int)$existingId,
-                    'matched_by' => 'explicit_link',
-                    'ambiguous'  => false,
-                ];
-            }
-            // If the explicit link points to an asset belonging to another company (or non-existent),
-            // reject it as authoritative and fall through safely to Tier 2 / Tier 3 within $tenantId.
+        // Tier 1. An explicit link names the asset; it must still be in the
+        // company being asked about, or it is not this caller's to claim.
+        if ($isExplicitLink && $linkId > 0) {
+            $st = $conn->prepare("SELECT id FROM assets WHERE id = ?$scope LIMIT 1");
+            $st->execute(array_merge([$linkId], $scopeArg));
+            if ($id = $st->fetchColumn()) return $result((int)$id, 'explicit_link');
         }
 
-        if ($ignoredTags === null) {
-            $ignoredTags = self::getIgnoredServiceTags($conn);
-        }
+        $ignoredTags = $ignoredTags ?? self::getIgnoredServiceTags($conn);
+        $serialUsable = self::isUsableServiceTag($serial, $ignoredTags);
 
-        // ---------------------------------------------------------------------
-        // Tier 2: Clean hardware serial number / service tag with ambiguity guard
-        // ---------------------------------------------------------------------
-        if ($serviceTag !== '' && self::isUsableServiceTag($serviceTag, $ignoredTags)) {
-            $stmt = $conn->prepare("SELECT id FROM assets WHERE service_tag = ? AND tenant_id <=> ?");
-            $stmt->execute([$serviceTag, $tenantId]);
-            $matchingIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-            if (count($matchingIds) === 1) {
-                return [
-                    'asset_id'   => (int)$matchingIds[0],
-                    'matched_by' => 'service_tag',
-                    'ambiguous'  => false,
-                ];
-            }
-            if (count($matchingIds) > 1) {
-                // Ambiguity guard: Multiple existing assets share this serial number.
-                // Do not guess blindly; fall through to Tier 3.
+        // Tier 2. One asset with this serial is a match; several is a question
+        // for a person, never a guess.
+        if ($serialUsable) {
+            $st = $conn->prepare("SELECT id FROM assets WHERE service_tag = ?$scope");
+            $st->execute(array_merge([$serial], $scopeArg));
+            $hits = $st->fetchAll(PDO::FETCH_COLUMN);
+            if (count($hits) === 1) return $result((int)$hits[0], 'service_tag');
+            if (count($hits) > 1) {
                 if ($hostname !== '') {
-                    $hostStmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ? LIMIT 1");
-                    $hostStmt->execute([$hostname, $tenantId]);
-                    $hostId = $hostStmt->fetchColumn();
-                    if ($hostId) {
-                        return [
-                            'asset_id'   => (int)$hostId,
-                            'matched_by' => 'hostname',
-                            'ambiguous'  => true,
-                        ];
-                    }
+                    $st = $conn->prepare("SELECT id FROM assets WHERE service_tag = ? AND hostname = ?$scope LIMIT 1");
+                    $st->execute(array_merge([$serial, $hostname], $scopeArg));
+                    if ($id = $st->fetchColumn()) return $result((int)$id, 'hostname', true);
                 }
-                return [
-                    'asset_id'   => null,
-                    'matched_by' => 'none',
-                    'ambiguous'  => true,
-                ];
+                return $result(null, 'none', true);
             }
         }
 
-        // ---------------------------------------------------------------------
-        // Tier 3: Hostname match
-        // ---------------------------------------------------------------------
+        // Tier 3, with the laptop-refresh rule above.
         if ($hostname !== '') {
-            $stmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ? LIMIT 1");
-            $stmt->execute([$hostname, $tenantId]);
-            $hostId = $stmt->fetchColumn();
-            if ($hostId) {
-                return [
-                    'asset_id'   => (int)$hostId,
-                    'matched_by' => 'hostname',
-                    'ambiguous'  => false,
-                ];
+            $st = $conn->prepare("SELECT id, service_tag FROM assets WHERE hostname = ?$scope LIMIT 1");
+            $st->execute(array_merge([$hostname], $scopeArg));
+            if ($hit = $st->fetch(PDO::FETCH_ASSOC)) {
+                $theirs = (string)($hit['service_tag'] ?? '');
+                $contradicts = $serialUsable && self::isUsableServiceTag($theirs, $ignoredTags)
+                            && strcasecmp($theirs, $serial) !== 0;
+                if (!$contradicts) return $result((int)$hit['id'], 'hostname');
+                return $result(null, 'none', false, (int)$hit['id']);
             }
         }
 
-        // ---------------------------------------------------------------------
-        // Tier 4: Genuine new device
-        // ---------------------------------------------------------------------
-        return [
-            'asset_id'   => null,
-            'matched_by' => 'none',
-            'ambiguous'  => false,
-        ];
+        return $result(null, 'none');
     }
 
     /**
-     * Updates an asset's hostname with collision protection and an atomic audit log.
+     * Apply a rename an inventory source reported for an asset it has matched
+     * by something stronger than its name. Skipped, and reported as a conflict,
+     * if another asset in the SAME company (the asset's own, wherever a person
+     * may have moved it) already has the name - hostname is unique per company.
      *
-     * If another active asset in the same tenant already claims $newHostname, the update is skipped
-     * and collision is flagged.
-     *
-     * @param PDO $conn Database connection
-     * @param int $assetId Target asset ID
-     * @param string $newHostname New hostname to apply
-     * @param int|null $tenantId Scoped tenant ID
-     * @param string $sourceLabel Integration label (e.g. 'Intune', 'system-info')
-     * @return array ['updated' => bool, 'conflict' => bool]
+     * @return array{updated:bool, conflict:bool}
      */
-    public static function updateAssetHostname(
-        PDO $conn,
-        int $assetId,
-        string $newHostname,
-        ?int $tenantId,
-        string $sourceLabel = 'system'
-    ): array {
-        $newHostname = trim($newHostname);
-        if ($newHostname === '') {
-            return ['updated' => false, 'conflict' => false];
-        }
+    public static function updateAssetHostname(PDO $conn, ActorContext $ctx, int $assetId, string $newHostname, string $source = 'system'): array
+    {
+        $newHostname = mb_substr(trim($newHostname), 0, 50);   // assets.hostname is VARCHAR(50)
+        if ($newHostname === '') return ['updated' => false, 'conflict' => false];
 
-        // Fetch current asset details
-        $stmt = $conn->prepare("SELECT hostname, tenant_id FROM assets WHERE id = ? LIMIT 1");
-        $stmt->execute([$assetId]);
-        $curr = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$curr) {
-            return ['updated' => false, 'conflict' => false];
-        }
+        $st = $conn->prepare("SELECT hostname, tenant_id FROM assets WHERE id = ?");
+        $st->execute([$assetId]);
+        $cur = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$cur) return ['updated' => false, 'conflict' => false];
+        $old = (string)($cur['hostname'] ?? '');
+        if (strcasecmp($old, $newHostname) === 0) return ['updated' => false, 'conflict' => false];
 
-        $oldHostname = (string)($curr['hostname'] ?? '');
-        if (strcasecmp($oldHostname, $newHostname) === 0) {
-            return ['updated' => false, 'conflict' => false]; // No change needed
-        }
+        $clash = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ? AND id <> ? LIMIT 1");
+        $clash->execute([$newHostname, $cur['tenant_id'], $assetId]);
+        if ($clash->fetchColumn()) return ['updated' => false, 'conflict' => true];
 
-        $effectiveTenantId = $curr['tenant_id'] !== null ? (int)$curr['tenant_id'] : $tenantId;
-
-        // Collision Guard: Ensure newHostname is not already taken by another asset in the same company
-        $collisionStmt = $conn->prepare("SELECT id FROM assets WHERE hostname = ? AND tenant_id <=> ? AND id != ? LIMIT 1");
-        $collisionStmt->execute([$newHostname, $effectiveTenantId, $assetId]);
-        if ($collisionStmt->fetchColumn()) {
-            return ['updated' => false, 'conflict' => true];
-        }
-
-        // Atomic update and audit trail
-        $inExistingTransaction = $conn->inTransaction();
-        if (!$inExistingTransaction) {
-            $conn->beginTransaction();
-        }
-
+        $conn->prepare("UPDATE assets SET hostname = ? WHERE id = ?")->execute([$newHostname, $assetId]);
+        // Best-effort: before Database Verification has relaxed analyst_id, an
+        // automated history row cannot be written, and a rename must not fail
+        // the agent's whole report over its own audit trail.
         try {
-            $upd = $conn->prepare("UPDATE assets SET hostname = ?, last_seen = UTC_TIMESTAMP() WHERE id = ?");
-            $upd->execute([$newHostname, $assetId]);
-
-            $hist = $conn->prepare("INSERT INTO asset_history (asset_id, analyst_id, field_name, old_value, new_value, created_datetime) VALUES (?, NULL, 'hostname', ?, ?, UTC_TIMESTAMP())");
-            $hist->execute([$assetId, $oldHostname, $newHostname]);
-
-            if (!$inExistingTransaction) {
-                $conn->commit();
-            }
-            return ['updated' => true, 'conflict' => false];
+            self::auditWrite($conn, $assetId, $ctx->actorId, 'hostname', $old, $newHostname . ' (' . $source . ')');
         } catch (Throwable $e) {
-            if (!$inExistingTransaction && $conn->inTransaction()) {
-                $conn->rollBack();
-            }
-            throw $e;
+            error_log('asset rename history: ' . $e->getMessage());
         }
+        return ['updated' => true, 'conflict' => false];
     }
 
     /**
-     * Reconciles an incoming device payload against the asset register and applies rename mutations.
+     * Resolve, then - for a match made by link or serial - apply a reported
+     * rename. The single entry point every inventory source uses.
      *
-     * @param PDO $conn Database connection
-     * @param array $identifiers ['asset_id' => int|null, 'service_tag' => string|null, 'hostname' => string|null]
-     * @param int|null $tenantId Scoped tenant ID (or null for default company)
-     * @param string $sourceLabel Ingest source description
-     * @param bool $isExplicitLink True if $identifiers['asset_id'] is an authoritative link
-     * @param array|null $ignoredTags Pre-loaded ignored service tags map
-     * @return array Result containing asset_id, matched_by, ambiguous flag, hostname_updated flag, and hostname_conflict flag
+     * @return array{asset_id:?int, matched_by:string, ambiguous:bool, hostname_reused:?int, hostname_updated:bool, hostname_conflict:bool}
      */
-    public static function reconcileAsset(
-        PDO $conn,
-        array $identifiers,
-        ?int $tenantId = null,
-        string $sourceLabel = 'system',
-        bool $isExplicitLink = false,
-        ?array $ignoredTags = null
-    ): array {
-        $resolution = self::resolveAssetIdentity($conn, $identifiers, $tenantId, $isExplicitLink, $ignoredTags);
-        $assetId    = $resolution['asset_id'];
-        $matchedBy  = $resolution['matched_by'];
-        $hostnameUpdated  = false;
-        $hostnameConflict = false;
-
-        $newHostname = isset($identifiers['hostname']) ? trim((string)$identifiers['hostname']) : '';
-
-        // If matched by a stable identifier (Tier 1 or Tier 2), check for a hostname rename
-        if ($assetId !== null && ($matchedBy === 'explicit_link' || $matchedBy === 'service_tag') && $newHostname !== '') {
-            $mutation = self::updateAssetHostname($conn, $assetId, $newHostname, $tenantId, $sourceLabel);
-            $hostnameUpdated  = $mutation['updated'];
-            $hostnameConflict = $mutation['conflict'];
+    public static function reconcileAsset(PDO $conn, ActorContext $ctx, array $ids, ?int $tenantId = null, string $source = 'system', bool $isExplicitLink = false, ?array $ignoredTags = null, bool $anyCompany = false): array
+    {
+        $r = self::resolveAssetIdentity($conn, $ids, $tenantId, $isExplicitLink, $ignoredTags, $anyCompany);
+        $r['hostname_updated'] = false;
+        $r['hostname_conflict'] = false;
+        $newName = trim((string)($ids['hostname'] ?? ''));
+        if ($r['asset_id'] !== null && in_array($r['matched_by'], ['explicit_link', 'service_tag'], true) && $newName !== '') {
+            $m = self::updateAssetHostname($conn, $ctx, $r['asset_id'], $newName, $source);
+            $r['hostname_updated'] = $m['updated'];
+            $r['hostname_conflict'] = $m['conflict'];
         }
+        return $r;
+    }
 
-        return [
-            'asset_id'          => $assetId,
-            'matched_by'        => $matchedBy,
-            'ambiguous'         => $resolution['ambiguous'],
-            'hostname_updated'  => $hostnameUpdated,
-            'hostname_conflict' => $hostnameConflict,
-        ];
+    /**
+     * Create an asset an inventory source has found - the inventory agents and
+     * Intune. The one place such an asset is written, so the tag, the
+     * transaction and the history row are the same whichever source found it
+     * (the three used to INSERT for themselves).
+     *
+     * @param array $fields column => value, from the discovered-asset columns below
+     * @param ?int  $tenantId the company it belongs to (NULL = Default)
+     * @param ?int  $hostnameReusedBy the asset a refreshed machine's name still belongs to, if any
+     */
+    public static function createDiscoveredAsset(PDO $conn, ActorContext $ctx, array $fields, ?int $tenantId, string $source, ?int $hostnameReusedBy = null): int
+    {
+        static $allowed = ['hostname', 'manufacturer', 'model', 'memory', 'service_tag', 'operating_system',
+            'feature_release', 'build_number', 'cpu_name', 'speed', 'bios_version', 'domain', 'logged_in_user',
+            'last_boot_utc', 'tpm_version', 'bitlocker_status', 'gpu_name', 'last_seen'];
+        require_once __DIR__ . '/asset_tags.php';
+        $store = AssetTagsService::storeTenant($conn, $tenantId);
+        $cols = ['tenant_id'];
+        $vals = [$store];
+        foreach ($fields as $col => $val) {
+            if (in_array($col, $allowed, true)) { $cols[] = $col; $vals[] = $val; }
+        }
+        // An inventory source has, by definition, just seen the machine.
+        if (!in_array('last_seen', $cols, true)) { $cols[] = 'last_seen'; $vals[] = gmdate('Y-m-d H:i:s'); }
+
+        $created = AssetTagsService::createWithTag($conn, $tenantId, null, function (?string $tag) use ($conn, $ctx, $cols, $vals, $source, $hostnameReusedBy): int {
+            if ($tag !== null) { $cols[] = 'asset_tag'; $vals[] = $tag; }
+            $ph = implode(', ', array_fill(0, count($cols), '?'));
+            $conn->prepare("INSERT INTO assets (" . implode(', ', $cols) . ", first_seen) VALUES ($ph, UTC_TIMESTAMP())")->execute($vals);
+            $id = (int)$conn->lastInsertId();
+            try {
+                // 🔴 NOT 'asset_created'. Database Verification's last_seen repair
+                // (#1583) treats an asset_created row as proof that a PERSON or an
+                // import made the record, and blanks last_seen where it equals
+                // first_seen - which it does on every machine found here. A
+                // discovered asset gets its own entry, so that evidence stays true.
+                self::auditWrite($conn, $id, $ctx->actorId, 'asset_discovered', null, $source);
+                if ($hostnameReusedBy !== null) {
+                    // Say so where somebody will look: the old record still has
+                    // this name, and is probably the machine this one replaced.
+                    self::auditWrite($conn, $id, $ctx->actorId, 'hostname_reused', null, '#' . $hostnameReusedBy);
+                }
+            } catch (Throwable $e) {
+                error_log('discovered asset history: ' . $e->getMessage());   // before Database Verification - see updateAssetHostname()
+            }
+            return $id;
+        });
+        return $created['id'];
     }
 }

@@ -150,18 +150,17 @@ if (!empty($data['tpm']) && is_array($data['tpm'])) {
 try {
     require_once __DIR__ . '/../../../../includes/services/assets.php';
 
-    // Reconcile asset using stable identity hierarchy (serial number first, then hostname)
-    // scoped to this key's company (NULL-safe match, so a Default-company key matches NULL-tenant assets).
-    $incomingSerial = strOrNull($data, 'service_tag', 50);
+    // Which asset is this machine? Serial first, then hostname (PR #164) - so a
+    // renamed machine is recognised instead of arriving as a duplicate. Scoped
+    // to this key's company (NULL-safe, so a Default-company key matches
+    // NULL-tenant assets). A rename it reports is applied here, by the service.
+    $agentCtx = ActorContext::system('Inventory agent');
     $reconcileRes = AssetsService::reconcileAsset(
         $conn,
-        [
-            'service_tag' => $incomingSerial,
-            'hostname'    => $hostname,
-        ],
+        $agentCtx,
+        ['service_tag' => strOrNull($data, 'service_tag', 50), 'hostname' => $hostname],
         $keyTenant,
-        'system-info',
-        false
+        'inventory agent'
     );
 
     if ($reconcileRes['asset_id'] !== null) {
@@ -211,65 +210,28 @@ try {
     } else {
         $isNew = true;
 
-        require_once __DIR__ . '/../../../../includes/services/asset_tags.php';
-
-        $ownsTx = !$conn->inTransaction();
-        if ($ownsTx) {
-            $conn->beginTransaction();
-        }
-        try {
-            $agentAssignedTag = null;
-            if (AssetTagsService::isAutogenEnabled($conn, $keyTenant)) {
-                $agentAssignedTag = AssetTagsService::generateNextAssetTag($conn, $keyTenant);
-            }
-
-            $stmt = $conn->prepare("
-                INSERT INTO assets (
-                    hostname, manufacturer, model, memory, service_tag,
-                    operating_system, feature_release, build_number, cpu_name, speed,
-                    bios_version, first_seen, last_seen,
-                    domain, logged_in_user, last_boot_utc,
-                    tpm_version, bitlocker_status, gpu_name, tenant_id, asset_tag
-                ) VALUES (
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?,
-                    ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(),
-                    ?, ?, ?,
-                    ?, ?, ?, ?, ?
-                )
-            ");
-            $stmt->execute([
-                mb_substr($hostname, 0, 50),
-                strOrNull($data, 'manufacturer', 50),
-                strOrNull($data, 'model', 50),
-                intOrNull($data, 'memory'),
-                strOrNull($data, 'service_tag', 50),
-                strOrNull($data, 'operating_system', 50),
-                strOrNull($data, 'feature_release', 10),
-                strOrNull($data, 'build_number', 50),
-                strOrNull($data, 'cpu_name', 250),
-                intOrNull($data, 'speed'),
-                strOrNull($data, 'bios_version', 20),
-                strOrNull($data, 'domain', 100),
-                strOrNull($data, 'logged_in_user', 100),
-                strOrNull($data, 'last_boot_utc'),
-                $tpmVersion,
-                $bitlockerStatus ? mb_substr($bitlockerStatus, 0, 20) : null,
-                $gpuName,
-                $keyTenant,
-                $agentAssignedTag
-            ]);
-            $hostId = (int)$conn->lastInsertId();
-
-            if ($ownsTx) {
-                $conn->commit();
-            }
-        } catch (Throwable $e) {
-            if ($ownsTx && $conn->inTransaction()) {
-                $conn->rollBack();
-            }
-            throw $e;
-        }    }
+        // One write path for every inventory source: the tag (if the company
+        // generates them), the transaction and the history row (PR #164).
+        $hostId = AssetsService::createDiscoveredAsset($conn, $agentCtx, [
+            'hostname'         => mb_substr($hostname, 0, 50),
+            'manufacturer'     => strOrNull($data, 'manufacturer', 50),
+            'model'            => strOrNull($data, 'model', 50),
+            'memory'           => intOrNull($data, 'memory'),
+            'service_tag'      => strOrNull($data, 'service_tag', 50),
+            'operating_system' => strOrNull($data, 'operating_system', 50),
+            'feature_release'  => strOrNull($data, 'feature_release', 10),
+            'build_number'     => strOrNull($data, 'build_number', 50),
+            'cpu_name'         => strOrNull($data, 'cpu_name', 250),
+            'speed'            => intOrNull($data, 'speed'),
+            'bios_version'     => strOrNull($data, 'bios_version', 20),
+            'domain'           => strOrNull($data, 'domain', 100),
+            'logged_in_user'   => strOrNull($data, 'logged_in_user', 100),
+            'last_boot_utc'    => strOrNull($data, 'last_boot_utc'),
+            'tpm_version'      => $tpmVersion,
+            'bitlocker_status' => $bitlockerStatus ? mb_substr($bitlockerStatus, 0, 20) : null,
+            'gpu_name'         => $gpuName,
+        ], $keyTenant, 'the inventory agent', $reconcileRes['hostname_reused']);
+    }
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Failed to upsert asset', 'detail' => $e->getMessage()]);
