@@ -64,6 +64,8 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
             'rating'      => (int) $msg['csat']['rating'],
             'button'      => true,
             'callback_id' => (string) ($msg['csat']['callback_id'] ?? ''),
+            'message_id'   => (string) ($msg['csat']['message_id'] ?? ''),
+            'message_text' => (string) ($msg['csat']['message_text'] ?? ''),
         ];
     } elseif (!$hasMedia && preg_match('/^[1-5]$/', $body)) {
         $pending = csatPendingRequestForChat($conn, (int) $channel['id'], $from);
@@ -698,6 +700,22 @@ function messagingRecordCsatReply(PDO $conn, array $channel, string $chatId, str
             ? I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.thanks')
             : '';
         $provider->answerCallbackQuery($reply['callback_id'], $thanks);
+
+        // Replace the buttons with the rating that STANDS - the one just
+        // recorded, or, on a second press of an old question, the first one.
+        // Only for this chat's own survey; an unanswered (or not ours) one
+        // keeps its buttons.
+        $stood = csatResponseBelongsToChat($conn, $reply['response_id'], (int) $channel['id'], $chatId)
+            ? csatStoredRating($conn, $reply['response_id'])
+            : null;
+        if ($stood !== null && ($reply['message_id'] ?? '') !== '') {
+            $provider->closeRatingRequest(
+                $chatId,
+                $reply['message_id'],
+                (string) ($reply['message_text'] ?? ''),
+                I18n::tFor(csatChannelLocale($conn, $channel, $chatId), 'tickets.csat_channel.rated', ['rating' => $stood])
+            );
+        }
     } elseif ($recorded && $provider) {
         try {
             // The reply address, not the sender: on Slack, Teams and Mattermost

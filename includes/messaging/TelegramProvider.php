@@ -210,6 +210,10 @@ class TelegramProvider extends MessagingProvider
                 'response_id' => (int)$m[1],
                 'rating'      => (int)$m[2],
                 'callback_id' => $callbackId,
+                // The question the button sat under, so the buttons can be
+                // replaced by the answer (closeRatingRequest()).
+                'message_id'   => (string)($cb['message']['message_id'] ?? ''),
+                'message_text' => (string)($cb['message']['text'] ?? ''),
             ],
         ]];
     }
@@ -240,6 +244,33 @@ class TelegramProvider extends MessagingProvider
             throw new Exception('Telegram rejected the rating request: ' . ($json['description'] ?? ('HTTP ' . $code)));
         }
         return (string)($json['result']['message_id'] ?? '');
+    }
+
+    /**
+     * Swap the rating buttons for the answer: the question stays, a line saying
+     * what they chose goes under it, and the keyboard goes (editMessageText
+     * without reply_markup removes it). The toast from answerCallbackQuery()
+     * fades in seconds; this is the record the customer keeps, and it leaves
+     * no buttons that would silently do nothing if tapped again.
+     *
+     * Best-effort, like the toast: the rating is already saved.
+     */
+    public function closeRatingRequest(string $chatId, string $messageId, string $question, string $answerLine): void
+    {
+        $token = $this->channel['credentials']['bot_token'] ?? '';
+        if ($token === '' || $chatId === '' || $messageId === '') {
+            return;
+        }
+        $text = trim($question) !== '' ? trim($question) . "\n\n" . $answerLine : $answerLine;
+        try {
+            $this->httpRequest(self::API_BASE . $token . '/editMessageText', [
+                'method'  => 'POST',
+                'headers' => ['Content-Type: application/json'],
+                'body'    => json_encode(['chat_id' => $chatId, 'message_id' => (int)$messageId, 'text' => $text]),
+            ]);
+        } catch (Exception $e) {
+            error_log('Telegram closeRatingRequest failed: ' . $e->getMessage());
+        }
     }
 
     /**

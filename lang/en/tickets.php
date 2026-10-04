@@ -705,6 +705,8 @@ return [
     'csat_channel' => [
         'prompt' => 'How would you rate the service you received? Tap a number from 1 (poor) to 5 (excellent), or reply with a single digit.',
         'thanks' => 'Thank you for your feedback!',
+        // Replaces the Telegram buttons under the question once it is answered.
+        'rated'  => 'You rated this {rating} out of 5 - thank you.',
     ],
 
     'telegram_bot' => [

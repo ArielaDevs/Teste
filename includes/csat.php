@@ -238,6 +238,18 @@ function csatResponseBelongsToChat(PDO $conn, int $responseId, int $channelId, s
     }
 }
 
+/** The rating a survey holds, or null while it is unanswered. */
+function csatStoredRating(PDO $conn, int $responseId): ?int {
+    try {
+        $stmt = $conn->prepare("SELECT rating FROM ticket_csat_responses WHERE id = ?");
+        $stmt->execute([$responseId]);
+        $r = $stmt->fetchColumn();
+        return ($r === false || $r === null) ? null : (int)$r;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
 /** Record a 1-5 rating once. Returns false if it was already answered or out of range. */
 function csatRecordRating(PDO $conn, int $responseId, int $rating): bool {
     if ($rating < 1 || $rating > 5) {

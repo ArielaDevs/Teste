@@ -142,6 +142,9 @@ abstract class MessagingProvider
         throw new Exception('Media download not supported for this provider.');
     }
 
+    /** @var callable|null see httpRequest() - tests only */
+    public static $testTransport = null;
+
     /**
      * Shared cURL helper. Returns [httpCode, bodyString]. No exceptions on HTTP
      * error codes — the caller decides what a bad status means.
@@ -150,6 +153,12 @@ abstract class MessagingProvider
      */
     protected function httpRequest(string $url, array $opts = []): array
     {
+        // Tests only: fn(string $url, array $opts): [int $code, string $body].
+        // Lets a test run the real path and see what would have been sent,
+        // without a network call. Never set outside tests/.
+        if (self::$testTransport !== null) {
+            return (self::$testTransport)($url, $opts);
+        }
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);

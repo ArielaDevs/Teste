@@ -28,6 +28,7 @@ require_once "$root/config.php";
 require_once "$root/includes/functions.php";
 require_once "$root/includes/messaging/messaging.php";
 require_once "$root/includes/csat.php";
+require_once "$root/includes/messaging/ingest.php";
 
 use Firebase\JWT\JWT;
 
@@ -97,9 +98,10 @@ TeamsProvider::$testKeys = null;
 echo "\nTelegram - rating buttons\n";
 $tg = new TelegramProvider(['id' => 0, 'channel_ref' => '', 'credentials' => ['bot_token' => 'x']]);
 $press = ['update_id' => 1, 'callback_query' => ['id' => 'cb1', 'data' => 'csat:42:5',
-          'from' => ['id' => 7, 'language_code' => 'en'], 'message' => ['chat' => ['id' => 7]]]];
+          'from' => ['id' => 7, 'language_code' => 'en'], 'message' => ['message_id' => 99, 'text' => 'How would you rate us?', 'chat' => ['id' => 7]]]];
 $p = $tg->parseInbound(json_encode($press), []);
 ok('a rating button press is read as a rating', ($p[0]['csat']['response_id'] ?? 0) === 42 && ($p[0]['csat']['rating'] ?? 0) === 5);
+ok('...carrying the question it answered, so the buttons can be replaced', ($p[0]['csat']['message_id'] ?? '') === '99' && ($p[0]['csat']['message_text'] ?? '') === 'How would you rate us?');
 ok('TRAP: the webhook asks Telegram for button presses, or they never arrive',
    in_array('callback_query', TelegramProvider::TELEGRAM_UPDATE_TYPES, true));
 
@@ -170,15 +172,46 @@ if (!$ticket || !$channel) {
              ->execute([$ticket, 'zzmsg' . bin2hex(random_bytes(8))]);
         ok('an emailed survey is never answered from a chat', csatPendingRequestForChat($conn, $channel, '') === null);
 
+        // A Telegram press through the real ingest path. The test transport
+        // stands in for Telegram and records what would have been sent.
+        $conn->prepare("INSERT INTO messaging_channels (name, channel_type, provider, phone_number, credentials, is_active) VALUES ('ZZMSG TG', 'telegram', 'telegram', '', NULL, 1)")->execute();
+        $tgCh = loadMessagingChannel($conn, (int)$conn->lastInsertId());
+        $tgCh['credentials'] = ['bot_token' => 'zz-test'];
+        $sent = [];
+        MessagingProvider::$testTransport = function (string $url, array $opts) use (&$sent): array {
+            $sent[] = [substr($url, strrpos($url, '/') + 1), json_decode($opts['body'] ?? '', true)];
+            return [200, '{"ok":true,"result":{}}'];
+        };
+        $conn->prepare("INSERT INTO ticket_csat_responses (ticket_id, token, sent_datetime, created_at, channel_id, channel_from)
+                        VALUES (?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?, '990000777')")
+             ->execute([$ticket, 'zzmsg' . bin2hex(random_bytes(8)), $tgCh['id']]);
+        $rTg = (int)$conn->lastInsertId();
+        $press = fn(int $n, string $cb) => ['from' => '990000777', 'to' => '', 'body' => '', 'profile_name' => '', 'provider_msg_id' => 'tgcb:' . $cb,
+            'media' => [], 'timestamp' => null, 'language_code' => 'en',
+            'csat' => ['response_id' => $rTg, 'rating' => $n, 'callback_id' => $cb, 'message_id' => '55', 'message_text' => 'How would you rate us?']];
+        ingestInboundMessage($conn, $tgCh, $press(4, 'zzcb1'));
+        $edit = array_values(array_filter($sent, fn($s) => $s[0] === 'editMessageText'))[0][1] ?? [];
+        ok('a Telegram press is recorded', csatStoredRating($conn, $rTg) === 4);
+        ok('...the buttons are replaced by the answer, under the question',
+           ($edit['message_id'] ?? 0) === 55 && str_starts_with($edit['text'] ?? '', "How would you rate us?\n\n") && str_contains($edit['text'] ?? '', '4') && !isset($edit['reply_markup']),
+           json_encode($edit));
+        $sent = [];
+        ingestInboundMessage($conn, $tgCh, $press(1, 'zzcb2'));
+        $edit = array_values(array_filter($sent, fn($s) => $s[0] === 'editMessageText'))[0][1] ?? [];
+        ok('...and a second press on an old copy shows the rating that stands', csatStoredRating($conn, $rTg) === 4 && str_contains($edit['text'] ?? '', '4') && !str_contains($edit['text'] ?? '', ' 1 '), json_encode($edit));
+        MessagingProvider::$testTransport = null;
+
         $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('csat_in_channel', '0')
                         ON DUPLICATE KEY UPDATE setting_value = '0'")->execute();
         ok('with "ask in their chat" off, a chat ticket gets the email survey', csatTicketChannel($conn, $ticket) === null);
     } catch (Throwable $e) {
         ok('the run completed', false, get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
     } finally {
+        MessagingProvider::$testTransport = null;
         if ($conn->inTransaction()) $conn->rollBack();
     }
     $left = (int)$conn->query("SELECT COUNT(*) FROM ticket_csat_responses WHERE token LIKE 'zzmsg%'")->fetchColumn()
+          + (int)$conn->query("SELECT COUNT(*) FROM messaging_channels WHERE name LIKE 'ZZMSG%'")->fetchColumn()
           + (int)$conn->query("SELECT COUNT(*) FROM emails WHERE subject = 'ZZMSG'")->fetchColumn();
     ok('nothing survived the run (rolled back)', $left === 0, "$left rows left");
 }
