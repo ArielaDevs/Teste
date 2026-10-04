@@ -13994,3 +13994,841 @@
     .ticket-context-menu.ctx-sheet > *,
     .ticket-context-menu.ctx-sheet .ctx-sheet-level2 { transition: none; }
 }
+
+@media (max-width: 768px) {
+    /* ====================================================================
+       LAYER 41 - Domains
+       --------------------------------------------------------------------
+       The module came after the rollout, so it was built with mobile.css
+       linked and markers on five of its seven pages - and its own
+       `@media (max-width: 900px)` block already stacks the register's
+       sidebar above the list. That stack is the main fault: search, ten
+       views and six filters, a screen and a half before the first domain.
+       What it needed, page by page (measured at 360x740 through an
+       explicit-width iframe, Techniques §8/§30):
+
+         register   sidebar -> a §4 sheet behind a Filters bar; the stats
+                    two-up (§10); the ten-column table -> a card feed with
+                    §21 labels; the main pane handed the scroller role (§28)
+         dashboard  stats two-up; the shell's 100vh replaced (see 41a)
+         domain     the tab strip wrapping to three rows -> one swipeable
+                    row; a card heading's link poking past the card
+         accounts   a seven-column table clipped after two -> a card feed
+         table      the shared .dt-* view (LAYER 15) already answers it
+         settings   the shared settings layer already answers it
+         help       the shared guide layer already answers it
+
+       ⚠️ Every focusable field in the module is 13px, which on an iPhone is
+       not cosmetic - §3: it zooms on focus, spills, and switches this whole
+       block off. 41b fixes it module-wide.
+       ==================================================================== */
+
+    /* ---- 41a. The scrolling shell ----------------------------------------
+       Three pages scroll inside `.dom-shell`, which was an inline
+       `height: calc(100vh - 62px)` until this round turned it into a class
+       (same values, so desktop is unchanged). On a phone the header is not
+       62px and 100vh runs under Safari's address bar, hiding the bottom of
+       the page. LAYER 2 already makes <body> a 100dvh flex column, so the
+       shell takes the remainder instead - and min-height: 0, or its content
+       becomes its floor and nothing scrolls (§28). */
+    body[data-mobile-module="domains"] .dom-shell {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    body[data-mobile-module="domains"] .dom-shell-pad {
+        padding: 12px 12px 24px;
+    }
+
+    /* ---- 41b. 16px on every field in this module (§3) -------------------
+       Excluding what must not change rather than listing what must, so a
+       field type added later is covered by default. */
+    body[data-mobile-module="domains"] input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+    body[data-mobile-module="domains"] select,
+    body[data-mobile-module="domains"] textarea {
+        font-size: 16px;
+    }
+
+    /* ---- 41c. The stat strip, two-up (§10) ------------------------------
+       `repeat(auto-fit, minmax(150px, 1fr))` needs 312px for two and the
+       padded pane has 308, so six figures stacked one per row. A grid that
+       is two-up by rule keeps them comparable and halves the scroll. */
+    body[data-mobile-module="domains"] .dom-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+    body[data-mobile-module="domains"] .dom-stat {
+        min-width: 0;
+        padding: 11px 12px;
+    }
+    body[data-mobile-module="domains"] .dom-stat .v { font-size: 22px; }
+    body[data-mobile-module="domains"] .dom-stat .l { overflow-wrap: anywhere; }
+
+    /* ---- 41d. The register: the list gets the screen -------------------
+       The sidebar goes into a sheet (mobile.js moves the REAL node, so the
+       page's own listeners keep working); the main pane is the scroller and
+       keeps clear of the Filters bar by its measured height. */
+    body[data-mobile-page="domains-register"] .dom-layout {
+        flex: 1 1 auto;
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+    }
+    body[data-mobile-page="domains-register"] .dom-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 12px calc(var(--dom-bar-h, 64px) + 12px);
+    }
+    body[data-mobile-page="domains-register"] .dom-fbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1200;
+        display: flex;
+        padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+        background: var(--surface, #fff);
+        border-top: 1px solid var(--border, #ddd);
+    }
+    body[data-mobile-page="domains-register"] .dom-fbar-btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 46px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--border, #ddd);
+        border-radius: 8px;
+        background: var(--surface, #fff);
+        color: var(--text, #1e293b);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    body[data-mobile-page="domains-register"] .dom-fbar-btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+    /* The current view rides on the button, so you can see what the list is
+       showing without opening the sheet - harvested from the view's own
+       button, so no new string. */
+    body[data-mobile-page="domains-register"] .dom-fbar-view {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+        color: var(--dom-accent, #4d7c0f);
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet {
+        position: fixed;
+        inset: 0;
+        z-index: 1300;          /* over the bar that opens it */
+        display: none;
+        flex-direction: column;
+        background: var(--surface, #fff);
+    }
+    body[data-mobile-page="domains-register"][data-dom-sheet="open"] .dom-sheet { display: flex; }
+    body[data-mobile-page="domains-register"] .dom-sheet-head {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px;
+        padding-top: calc(12px + env(safe-area-inset-top));
+        border-bottom: 1px solid var(--border-soft, #e2e8f0);
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text, #1e293b);
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet-close {
+        width: 44px;
+        height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text, #1e293b);
+        cursor: pointer;
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet-close svg { width: 22px; height: 22px; }
+    body[data-mobile-page="domains-register"] .dom-sheet-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    /* The relocated sidebar, inside the sheet: full width, no rail chrome,
+       and the sheet does the scrolling. */
+    body[data-mobile-page="domains-register"] .dom-sheet .dom-sidebar {
+        width: auto;
+        border: 0;
+        padding: 12px;
+        overflow: visible;
+    }
+    body[data-mobile-page="domains-register"] .dom-sheet .dom-quick button {
+        min-height: 44px;
+        font-size: 15px;
+    }
+
+    /* ---- 41e. The register table -> a card feed (§11, §21, §23) ---------
+       Ten known columns, read one domain at a time: a feed. Each card leads
+       with the checkbox, the name and the security grade; then status and
+       the expiry countdown on one line; then the facts that cannot speak for
+       themselves, each with its own column heading (mobile.js harvests
+       them from the hidden <thead>, so they are right in every language).
+       Columns: 1 checkbox · 2 domain · 3 status · 4 expires · 5 renewal ·
+       6 registrar · 7 grade · 8 protection · 9 certificate · 10 owner. */
+    body[data-mobile-page="domains-register"] #domTable,
+    body[data-mobile-page="domains-register"] #domTable tbody {
+        display: block;
+        width: 100%;
+    }
+    body[data-mobile-page="domains-register"] #domTable thead { display: none; }
+    /* The checkbox sits in the card's corner and the whole card is indented
+       past it, so no cell needs its own offset - the first version gave every
+       cell padding-left and every fact a whole line, and a screenshot showed
+       seven-line cards reading like a spreadsheet. */
+    body[data-mobile-page="domains-register"] #domTable tbody tr {
+        position: relative;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+        padding: 12px 14px 12px 44px;
+        border-bottom: 1px solid var(--border-soft, #f0f0f0);
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td {
+        display: block;
+        flex: 1 1 100%;
+        min-width: 0;              /* §14 */
+        padding: 0;
+        border: 0;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+        box-sizing: border-box;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td.cb {
+        position: absolute;
+        left: 14px;
+        top: 14px;
+        width: 20px;
+        padding: 0;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td.cb input { width: 18px; height: 18px; margin: 0; }
+    /* §23, met in the data: with a middle basis a SHORT name let the status
+       climb onto the first line and a long one did not, so cards in the same
+       list had two shapes. Name + grade now fill the line exactly (the grade
+       badge is ~28px, plus the 12px gap), so the status always starts the
+       second line whatever the name's length. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(2) {
+        flex: 1 1 calc(100% - 44px);
+        padding: 0;
+        order: 1;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(7) {
+        flex: 0 0 auto;
+        padding: 0;
+        order: 2;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(3) {
+        flex: 0 0 auto;
+        order: 3;
+    }
+    /* The expiry GROWS to end the status line, so the facts below always
+       start a fresh line at the left - a growing item anywhere else pushed
+       "Renewal" to the right edge on some cards and not others. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(4) {
+        flex: 1 1 auto;
+        order: 4;
+    }
+    /* A forced line break between the status line and the facts line: a
+       zero-height full-width flex item placed by `order`. Without it, a long
+       status ("Letting lapse") wrapped the expiry and the icons rode up
+       beside it on the right - two card shapes from one rule (§23). */
+    body[data-mobile-page="domains-register"] #domTable tbody tr::after {
+        content: "";
+        order: 5;
+        flex: 0 0 100%;
+        height: 0;
+    }
+    /* The lock / registry-lock / DNSSEC icons have no text to label, so they
+       lead the facts line as a set of badges. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(8) {
+        flex: 0 0 auto;
+        order: 6;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(4) .dom-sub {
+        display: inline;
+        margin-left: 6px;
+    }
+    /* The labelled facts flow as one wrapping line rather than a line each. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(n+5):not(:nth-child(7)):not(:nth-child(8)) {
+        flex: 0 1 auto;
+        order: 7;
+        color: var(--text-dim, #888);
+        font-size: 12.5px;
+    }
+    body[data-mobile-page="domains-register"] #domTable tbody td:nth-child(n+5):not(:nth-child(7)) .dom-sub { display: inline; margin-left: 6px; }
+    /* §11: the empty state is one colspan cell - first AND last child - so
+       nothing positional may swallow it. */
+    body[data-mobile-page="domains-register"] #domTable tbody td[colspan] {
+        flex: 1 1 100%;
+        padding: 0;
+        text-align: center;
+        order: 0;
+    }
+    /* §21: never label an empty cell, and leave no gap where one was. */
+    body[data-mobile-page="domains-register"] #domTable tbody td:empty { display: none; }
+
+    /* ---- 41f. Registrar accounts -> a card feed ------------------------
+       Seven columns clipped after two. The account name (and its sign-in
+       link) heads the card; the six facts below it are labelled, because a
+       reference, a person's name and a bare domain count mean nothing alone. */
+    body[data-mobile-page="domains-accounts"] .dom-table,
+    body[data-mobile-page="domains-accounts"] .dom-table tbody {
+        display: block;
+        width: 100%;
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table thead { display: none; }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody tr {
+        display: block;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border-soft, #f0f0f0);
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td {
+        display: block;
+        padding: 2px 0;
+        border: 0;
+        font-size: 13px;
+        color: var(--text-dim, #888);
+        overflow-wrap: anywhere;
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td:first-child {
+        padding-bottom: 6px;
+        color: var(--text, #333);
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td:first-child a {
+        display: inline-block;
+        min-height: 32px;
+        line-height: 32px;
+    }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td[colspan] { text-align: center; }
+    body[data-mobile-page="domains-accounts"] .dom-table tbody td:empty { display: none; }
+    body[data-mobile-page="domains-accounts"] .dom-toolbar { flex-wrap: wrap; }
+
+    /* ---- 41g. A domain's page -------------------------------------------
+       Six tabs wrapped into three ragged rows above the content: one row
+       that swipes, as the settings tabs and .detail-tabs do. */
+    body[data-mobile-page="domains-view"] #domTabs {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+    body[data-mobile-page="domains-view"] #domTabs::-webkit-scrollbar { display: none; }
+    body[data-mobile-page="domains-view"] #domTabs .tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        min-height: 42px;
+    }
+    body[data-mobile-page="domains-view"] .dom-fields { grid-template-columns: 112px minmax(0, 1fr); }
+    body[data-mobile-page="domains-view"] .dom-actions { gap: 8px; }
+
+    /* ---- 41h. Card headings that carry a link -----------------------------
+       "All checks" / "See all" sat beside the heading with no room to wrap,
+       and ran 14px past the card's edge. Let the heading row wrap. */
+    body[data-mobile-module="domains"] .dom-card-h {
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        padding: 12px 14px;
+    }
+    body[data-mobile-module="domains"] .dom-card-h > * { min-width: 0; }
+    body[data-mobile-module="domains"] .dom-card-b { padding: 12px 14px; }
+
+    /* ---- 41i. A domain's actions in a sticky footer (Ed) ----------------
+       mobile.js moves the real Refresh / Check now / Edit / Delete buttons
+       into this bar as icons; this is the furniture - the Checklists editor's
+       40c shape (fixed, bottom, z-index 1200 so dialogs at 2000 cover it,
+       env() for the iPhone home indicator, height measured not assumed).
+       The four share the width rather than being 52px squares, so busy()'s
+       "Working..." fits while a refresh runs. Delete keeps the module's own
+       danger colour and sits apart from the other three. */
+    body[data-mobile-page="domains-view"] .dom-view-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1200;
+        display: flex;
+        gap: 8px;
+        padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+        background: var(--surface, #fff);
+        border-top: 1px solid var(--border, #ddd);
+    }
+    body[data-mobile-page="domains-view"] .dom-vb-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 46px;
+        padding: 0 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    body[data-mobile-page="domains-view"] .dom-vb-btn svg { width: 20px; height: 20px; flex: 0 0 auto; }
+    body[data-mobile-page="domains-view"] #btnDelete.dom-vb-btn { margin-left: 10px; }
+    /* Back: a square at the left, the Checklists editor's 52px shape. It is an
+       <a>, so it needs the button look the others get from .dom-btn. */
+    body[data-mobile-page="domains-view"] #domBack.dom-vb-btn {
+        flex: 0 0 46px;
+        border: 1px solid var(--border, #ddd);
+        background: var(--surface, #fff);
+        color: var(--text, #333);
+        text-decoration: none;
+    }
+    body[data-mobile-page="domains-view"] .dom-back-row { display: none; }
+    /* The row the buttons left would be an empty strip with a spacer in it. */
+    body[data-mobile-page="domains-view"] .dom-actions { display: none; }
+    body[data-mobile-page="domains-view"] .dom-shell-pad {
+        padding-bottom: calc(var(--dom-vbar-h, 64px) + 16px);
+    }
+
+    /* ---- 41j. Connections tab (3.0.0): the linked record is the tap target ---
+       An inline <a> ignores min-height (Techniques §30's inline-box note), so it
+       becomes an inline-block with room above and below. */
+    body[data-mobile-page="domains-view"] .dom-conn-row-link { display: inline-block; padding: 6px 0; }
+    body[data-mobile-page="domains-view"] .dom-conn-x { width: 36px; height: 36px; }
+}
+
+@media (max-width: 768px) {
+    /* ====================================================================
+       LAYER 42 - People
+       --------------------------------------------------------------------
+       Built after the rollout with mobile.css linked and a marker on all
+       five pages, and with its own `@media (max-width: 640px)` block that
+       already turned the tables into labelled blocks. Measured at 360x740
+       through an explicit-width iframe (§8/§30), what was still wrong:
+
+         every page  could not be SCROLLED by a finger (§28): inbox.css
+                     makes <body> overflow: hidden, LAYER 2 makes it a
+                     100dvh column, and no People container took the
+                     scroller role - a person page was 9,712px of document
+                     behind a viewport that clips. Only scrollTo() moved it.
+         list        three filters at 13px (§3) and their headings filled
+                     320px before the first person
+         tables      every value labelled, the empty ones too ("Job
+                     title:" over nothing - §21's never-label-empty), and
+                     a ticket's subject given no more room than its date
+         company     a 420px nested scroller for its people inside the
+                     page's own - a scroll trap on a touch screen
+
+       The module's 640px block moved here (Morning Checks' precedent,
+       LAYER 26): one place answers "what does People look like on a
+       phone", and it now starts at 768 like everything else. Its 900px
+       block stays in people.css - that is a narrow DESKTOP window.
+       ==================================================================== */
+
+    /* ---- 42a. The scroller role (§28) -----------------------------------
+       The record pages scroll .ppl-page; the list page keeps its filters
+       pinned and scrolls the list. min-height: 0 or the content becomes
+       the floor and nothing scrolls. The desktop's calc(100vh - 62px)
+       heights go: LAYER 2's flex body hands out the remainder. */
+    body[data-mobile-module="people"] .ppl-page {
+        flex: 1 1 auto;
+        height: auto;                 /* not the desktop's calc(100vh - 62px) */
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 12px 24px;
+    }
+    body[data-mobile-module="people"] .ppl-layout {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    body[data-mobile-module="people"] .ppl-main-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 12px 24px;
+    }
+
+    /* ---- 42b. 16px on every field (§3) ---------------------------------- */
+    body[data-mobile-module="people"] input:not([type="checkbox"]):not([type="radio"]),
+    body[data-mobile-module="people"] select,
+    body[data-mobile-module="people"] textarea {
+        font-size: 16px;
+    }
+
+    /* ---- 42c. The list's filters: a compact strip ------------------------
+       Search on its own row, the two drop-downs side by side beneath it.
+       The headings go: each control carries an aria-label, the search has
+       a placeholder and the selects show their value ("Current people",
+       "All companies"), so the words were saying it twice. */
+    body[data-mobile-page="people-list"] .ppl-sidebar {
+        flex: 0 0 auto;
+        width: auto;
+        overflow: visible;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+        border-right: none;
+        border-bottom: 1px solid var(--border, #ddd);
+    }
+    body[data-mobile-page="people-list"] .ppl-sidebar h3,
+    body[data-mobile-page="people-list"] .ppl-intro { display: none; }
+    body[data-mobile-page="people-list"] .ppl-sidebar input,
+    body[data-mobile-page="people-list"] .ppl-sidebar select {
+        margin: 0;
+        min-height: 40px;
+        flex: 1 1 140px;
+        min-width: 0;
+    }
+    body[data-mobile-page="people-list"] .ppl-sidebar input { flex-basis: 100%; }
+
+    /* ---- 42d. Every table as a card feed (§11, §23) ----------------------
+       One card per row: the identifier leads, a status pill sits at the
+       right of the same line, a forced break (the zero-height full-width
+       item placed by `order` - the Domains technique) starts a new line,
+       prose gets a line of its own, and the short facts flow after it. */
+    body[data-mobile-module="people"] .ppl-table,
+    body[data-mobile-module="people"] .ppl-table tbody { display: block; width: 100%; }
+    body[data-mobile-module="people"] .ppl-table thead { display: none; }
+    body[data-mobile-module="people"] .ppl-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 3px 12px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border, #eee);
+    }
+    /* 🔴 display: flex defeats [hidden] - "Show all" and the company's own
+       people filter both work by hiding rows. */
+    body[data-mobile-module="people"] .ppl-table tbody tr[hidden] { display: none; }
+    body[data-mobile-module="people"] .ppl-table tbody tr:last-child { border-bottom: none; }
+    body[data-mobile-module="people"] .ppl-table tbody tr::after {
+        content: ""; order: 2; flex: 0 0 100%; height: 0;
+    }
+    body[data-mobile-module="people"] .ppl-table td {
+        display: block;
+        padding: 0;
+        border: none;
+        min-width: 0;
+        order: 4;
+        font-size: 13px;
+        color: var(--text-muted, #555);
+        overflow-wrap: anywhere;
+    }
+    body[data-mobile-module="people"] .ppl-table td:empty { display: none; }
+    body[data-mobile-module="people"] .ppl-table td:first-child {
+        order: 0;
+        flex: 1 1 60%;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text, #222);
+    }
+    /* The identifier is the tap target, so it gets a tap-sized box (an
+       inline <a> ignores min-height - §30's inline-box note). */
+    body[data-mobile-module="people"] .ppl-table td:first-child > a,
+    body[data-mobile-module="people"] .ppl-table td:first-child .ppl-ref > a {
+        display: inline-block;
+        padding: 4px 0;
+    }
+    body[data-mobile-module="people"] .ppl-table td.ppl-empty {
+        flex: 1 1 100%;
+        text-align: center;
+        font-weight: 400;
+        color: var(--text-dim, #888);
+        padding: 8px 0;
+    }
+    body[data-mobile-module="people"] .ppl-table tbody tr:has(> td.ppl-empty)::after { display: none; }
+
+    /* A label only where the value means nothing alone (§21): a bare date,
+       count, priority word or a second name. Never on an empty cell - the
+       :empty rule above removes the cell, so no label is left hanging. The
+       words are the module's own translated column headings (data-label). */
+    body[data-mobile-page="people-list"] .ppl-list td:nth-child(4)::before,
+    body[data-mobile-module="people"] #sec-tickets td:nth-child(n+4)::before,
+    body[data-mobile-module="people"] #sec-assets td:nth-child(n+4)::before,
+    body[data-mobile-module="people"] #sec-contracts td:nth-child(n+2)::before,
+    body[data-mobile-module="people"] #sec-domains td:nth-child(n+3)::before,
+    body[data-mobile-module="people"] #sec-courses td:nth-child(n+3)::before,
+    body[data-mobile-module="people"] #sec-courses .ppl-table:not(:has(thead th:nth-child(4))) td:nth-child(2)::before,
+    body[data-mobile-module="people"] #sec-forms td:nth-child(n+2)::before {
+        content: attr(data-label) "\00a0";
+        color: var(--text-dim, #888);
+        font-size: 12px;
+    }
+
+    /* Status pills ride on the first line, at the right (§23). A person's
+       courses have one in column 2; a company's courses table (three
+       columns, all counts) does not - keyed on column count, not position. */
+    body[data-mobile-module="people"] #sec-tickets td:nth-child(3),
+    body[data-mobile-module="people"] #sec-domains td:nth-child(2),
+    body[data-mobile-module="people"] #sec-courses .ppl-table:has(thead th:nth-child(4)) td:nth-child(2) {
+        order: 1;
+        flex: 0 0 auto;
+    }
+
+    /* A person card: the email on a line of its own. Left to flow, a short
+       address pulled the role up beside it and a long one did not - two
+       card shapes decided by the data (§23's tell). */
+    body[data-mobile-page="people-list"] .ppl-list td:nth-child(2),
+    body[data-mobile-module="people"] #pplPeople td:nth-child(2) {
+        flex: 0 0 100%;
+    }
+
+    /* A ticket's subject is a sentence: a full line of its own (§11). */
+    body[data-mobile-module="people"] #sec-tickets td:nth-child(2) {
+        order: 3;
+        flex: 0 0 100%;
+        font-size: 14px;
+        color: var(--text, #333);
+    }
+
+    /* ---- 42e. Record pages ----------------------------------------------
+       The company's people list scrolled inside a 420px box inside the
+       page - two scrollers under one thumb. The page scrolls; this does
+       not. The filter beside the heading takes its own row. */
+    body[data-mobile-module="people"] .ppl-people-wrap { max-height: none; overflow: visible; }
+    body[data-mobile-module="people"] .ppl-table-wrap { overflow: visible; }
+    body[data-mobile-module="people"] .ppl-filter { flex: 1 1 100%; min-width: 0; width: 100%; margin-left: 0; min-height: 40px; }
+    body[data-mobile-module="people"] .ppl-hero { padding: 14px; gap: 12px; }
+    body[data-mobile-module="people"] .ppl-hero h1 { font-size: 19px; }
+    body[data-mobile-module="people"] .ppl-hero-actions .ppl-btn { min-height: 36px; }
+    body[data-mobile-module="people"] .ppl-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    body[data-mobile-module="people"] .ppl-stat { padding: 10px 12px; }
+    body[data-mobile-module="people"] .ppl-stat .v { font-size: 17px; }
+    body[data-mobile-module="people"] .ppl-showall { min-height: 44px; }
+    /* Companies: the search under the intro at full width, one card per row
+       (minmax(0, ...) - a bare 320px track would set a floor, §14). */
+    body[data-mobile-page="people-companies"] .ppl-co-search,
+    body[data-mobile-page="people-suppliers"] .ppl-co-search { flex: 1 1 100%; min-height: 44px; }
+    body[data-mobile-page="people-companies"] .ppl-co-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    body[data-mobile-page="people-companies"] .ppl-co-card { padding: 14px 16px; gap: 12px; }
+    body[data-mobile-page="people-companies"] .ppl-co-card:hover { transform: none; }
+}
+
+@media (max-width: 768px) {
+    /* ====================================================================
+       LAYER 43 - Assets > Users, and the Manager access page it opens
+       --------------------------------------------------------------------
+       Both pages were simply never opted in - no mobile.css, no mobile.js,
+       no marker - so none of the rollout reached them. Measured at 360x740
+       before anything was written:
+
+         users   the header nav ran to 1,379px: §3's reflow trigger, which
+                 on an iPhone puts the whole page back to desktop width;
+                 <body> clips, so the detail stacked under a 320px list was
+                 unreachable; the equipment table 516px in a 326px panel;
+                 every field 13-14px; an Add button 24px tall
+         manager the same header; a results table with a 12px column and
+                 ten crushed cells; 26px buttons; 13px search fields
+
+       Users is Tickets > Users with assets in it, so it gets the same
+       answer: LAYER 39a's pane stack, now one block serving both pages.
+       Manager access is ONE shared page (includes/manager_access_page.php)
+       behind both modules, so its marker is the page's, not the module's.
+       ⚠️ That include prints its <style> inside <body> - after this file -
+       so every rule below wins on specificity, never on order (§24).
+       ==================================================================== */
+
+    /* ---- 43a. Users: the pane stack (39a's, one more page) ---------------
+       The page's own 900px block already stacks the grid; on a phone the
+       two panels become two screens. The list scrolls inside its panel and
+       the detail scrolls itself - the page never scrolls (§28). */
+    body[data-mobile-page="assets-users"] .au-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px 12px;
+        gap: 0;
+        /* §16: the page's grid says `align-items: start` (top-align the two
+           panels). In a flex COLUMN that means "do not stretch the width",
+           and the list sized itself to its content - 357px in a 336px slot. */
+        align-items: stretch;
+    }
+    body[data-mobile-page="assets-users"] .au-wrap > .au-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;                 /* §14: the list measured 357px in 336 */
+        display: flex;
+        flex-direction: column;
+    }
+    body[data-mobile-page="assets-users"] .au-person > div { min-width: 0; }
+    body[data-mobile-page="assets-users"][data-users-pane="list"] #auDetail { display: none; }
+    body[data-mobile-page="assets-users"][data-users-pane="detail"] .au-wrap > .au-panel:first-child { display: none; }
+    body[data-mobile-page="assets-users"] .au-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    body[data-mobile-page="assets-users"] #auDetail {
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    body[data-mobile-page="assets-users"] .users-mobile-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        align-self: flex-start;
+        flex-shrink: 0;
+        margin: 10px 12px 0;
+        padding: 8px 12px 8px 8px;
+        min-height: 44px;
+        border: 1px solid var(--border, #ddd);
+        border-radius: 8px;
+        background: var(--surface, #fff);
+        color: var(--accent, #0078d4);
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    body[data-mobile-page="assets-users"] .users-mobile-back svg { width: 18px; height: 18px; }
+    /* The detail is a flex column now, so its own blocks must not shrink
+       to fit the screen - they stack and the pane scrolls. */
+    body[data-mobile-page="assets-users"] #auDetail > * { flex-shrink: 0; }
+
+    /* ---- 43b. Users: fields and buttons --------------------------------- */
+    body[data-mobile-page="assets-users"] .au-search { flex-wrap: wrap; padding: 10px 12px; }
+    body[data-mobile-page="assets-users"] .au-search input,
+    body[data-mobile-page="assets-users"] .au-search select {
+        font-size: 16px;                         /* §3 */
+        min-height: 40px;
+        flex: 1 1 140px;
+        min-width: 0;
+    }
+    body[data-mobile-page="assets-users"] .au-search input[type=search] { flex-basis: 100%; }
+    body[data-mobile-page="assets-users"] .au-head-btn { min-height: 36px; padding: 6px 14px; font-size: 13px; }
+    body[data-mobile-page="assets-users"] .au-person { padding: 12px 14px; min-height: 52px; box-sizing: border-box; }
+    body[data-mobile-page="assets-users"] .au-btn { min-height: 40px; }
+    body[data-mobile-page="assets-users"] .au-detail-head { padding: 14px 12px; }
+    body[data-mobile-page="assets-users"] .au-actions { gap: 6px; }
+    /* Facts two-up rather than one per row (§10): short values, read across. */
+    body[data-mobile-page="assets-users"] .au-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 14px;
+        padding: 12px;
+    }
+    body[data-mobile-page="assets-users"] .au-fact-value { overflow-wrap: anywhere; }
+    body[data-mobile-page="assets-users"] .au-managed-note { margin: 0 12px 12px; }
+    /* The reports' hover is a colour swap - a nicety a phone never sees (§26),
+       but a chip that small is a poor target. */
+    body[data-mobile-page="assets-users"] .au-report { padding: 6px 12px; }
+
+    /* ---- 43c. Users: the equipment as a card feed (§11, §21, §23) ---------
+       Six known columns, read one item at a time. The name leads with its
+       type pill at the right; make/model on the next line; serial, tag and
+       the date - three bare values that are meaningless alone - carry their
+       headings, harvested by mobile.js from the table's own <thead>. The
+       table is rebuilt with the whole detail pane, so the feed WATCHES the
+       pane (§30's note on tables that do not exist at load). */
+    body[data-mobile-page="assets-users"] .au-table,
+    body[data-mobile-page="assets-users"] .au-table tbody { display: block; width: 100%; }
+    body[data-mobile-page="assets-users"] .au-table thead { display: none; }
+    body[data-mobile-page="assets-users"] .au-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 3px 12px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-soft, #f0f0f0);
+    }
+    body[data-mobile-page="assets-users"] .au-table tbody tr::after {
+        content: ""; order: 2; flex: 0 0 100%; height: 0;
+    }
+    body[data-mobile-page="assets-users"] .au-table td {
+        display: block;
+        padding: 0;
+        border: none;
+        min-width: 0;
+        order: 4;
+        font-size: 13px;
+        color: var(--text-muted, #555);
+        overflow-wrap: anywhere;
+    }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(2) {
+        order: 0;
+        flex: 1 1 60%;
+        font-size: 14px;
+        color: var(--text, #333);
+    }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(2) a { display: inline-block; padding: 4px 0; }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(1) { order: 1; flex: 0 0 auto; }
+    body[data-mobile-page="assets-users"] .au-table td:nth-child(3) { order: 3; flex: 0 0 100%; }
+    body[data-mobile-page="assets-users"] .au-table td[data-mobile-label]::before {
+        content: attr(data-mobile-label) "\00a0";
+        color: var(--text-dim, #888);
+        font-size: 12px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;   /* the app's own (inbox.css) - not the code font of the serial and tag cells */
+    }
+    /* "No equipment" is one colspan cell: keep it whole and centred. */
+    body[data-mobile-page="assets-users"] .au-table td[colspan] { flex: 1 1 100%; order: 0; }
+    body[data-mobile-page="assets-users"] .au-table tbody tr:has(> td[colspan])::after { display: none; }
+
+    /* ---- 43d. Manager access (both modules) ----------------------------- */
+    body[data-mobile-page="manager-access"] .ma-search,
+    body[data-mobile-page="manager-access"] .ma-option select {
+        font-size: 16px;                         /* §3 */
+        min-height: 40px;
+    }
+    body[data-mobile-page="manager-access"] .ma-wrap { padding: 12px; }
+    body[data-mobile-page="manager-access"] .ma-back { min-height: 40px; padding: 6px 14px; font-size: 14px; }
+    body[data-mobile-page="manager-access"] .ma-stat { min-width: 0; flex: 1 1 100%; }
+    body[data-mobile-page="manager-access"] .ma-btn { min-height: 36px; padding: 6px 12px; }
+    /* The search results: name (and its job line) take the full width, the
+       member count and the Add / Exclude pair go underneath, right-aligned.
+       As a table the name got 179px and the count column 12. */
+    body[data-mobile-page="manager-access"] .ma-table,
+    body[data-mobile-page="manager-access"] .ma-table tbody { display: block; width: 100%; }
+    body[data-mobile-page="manager-access"] .ma-table tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    body[data-mobile-page="manager-access"] .ma-table td {
+        display: block;
+        padding: 0;
+        border: none;
+        min-width: 0;
+    }
+    body[data-mobile-page="manager-access"] .ma-table td:first-child { flex: 1 1 100%; overflow-wrap: anywhere; }
+    body[data-mobile-page="manager-access"] .ma-table td:empty { display: none; }
+    body[data-mobile-page="manager-access"] .ma-table td.acts { margin-left: auto; }
+    body[data-mobile-page="manager-access"] .ma-line { flex-wrap: wrap; }
+    body[data-mobile-page="manager-access"] .ma-team li { padding: 10px 8px; }
+}

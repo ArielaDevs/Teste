@@ -30,6 +30,9 @@ try {
     if (!in_array($tableKey, TABLE_VIEW_KEYS, true)) {
         throw new Exception('Unknown table');
     }
+    // Every table key is also its module's key, so the table you ask about is the
+    // module you must have.
+    requireModuleAccessJson($tableKey);
 
     $conn      = connectToDatabase();
     $analystId = (int)$_SESSION['analyst_id'];

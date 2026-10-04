@@ -2932,6 +2932,76 @@ return [
         'is_demo'           => 'TINYINT(1) NOT NULL DEFAULT 0',   // set by the demo data importer (#1297)
     ],
 
+    // ---- LMS competency tests (3.0.0) ----
+    // The question bank. answers_json is [{"text":..., "marks":n}] - a choice
+    // question has one answer worth 1, a graded one four worth e.g. 5/3/1/0.
+    // status: draft (written, not yet checked) | approved | hidden.
+    'lms_ct_questions' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'skill'                 => 'VARCHAR(120) NOT NULL',
+        'difficulty'            => 'VARCHAR(20) NOT NULL',
+        'format'                => 'VARCHAR(20) NOT NULL',
+        'question_text'         => 'TEXT NOT NULL',
+        'answers_json'          => 'TEXT NOT NULL',
+        'explanation'           => 'TEXT NULL',
+        'status'                => "VARCHAR(20) NOT NULL DEFAULT 'draft'",
+        'source'                => "VARCHAR(20) NOT NULL DEFAULT 'ai'",
+        'role_context'          => 'VARCHAR(255) NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime'      => 'DATETIME NULL',
+    ],
+    'lms_ct_tests' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'title'                 => 'VARCHAR(200) NOT NULL',
+        'role_description'      => 'TEXT NULL',
+        'time_limit_minutes'    => 'INT NULL',
+        'pass_mark'             => 'INT NULL',
+        'is_archived'           => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime'      => 'DATETIME NULL',
+    ],
+    'lms_ct_test_skills' => [
+        'id'             => 'INT NOT NULL AUTO_INCREMENT',
+        'test_id'        => 'INT NOT NULL',
+        'skill'          => 'VARCHAR(120) NOT NULL',
+        'difficulty'     => 'VARCHAR(20) NOT NULL',
+        'format'         => 'VARCHAR(20) NOT NULL',
+        'question_count' => 'INT NOT NULL DEFAULT 5',
+        'sort_order'     => 'INT NOT NULL DEFAULT 0',
+    ],
+    'lms_ct_test_questions' => [
+        'id'          => 'INT NOT NULL AUTO_INCREMENT',
+        'test_id'     => 'INT NOT NULL',
+        'question_id' => 'INT NOT NULL',
+        'sort_order'  => 'INT NOT NULL DEFAULT 0',
+    ],
+    // One candidate's attempt. snapshot_json freezes exactly what they were
+    // shown (questions, answers in their shuffled order, marks), so editing or
+    // hiding a bank question later never changes a result. The link's token is
+    // stored only as a SHA-256 hash.
+    'lms_ct_sittings' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'test_id'               => 'INT NULL',
+        'candidate_name'        => 'VARCHAR(200) NOT NULL',
+        'candidate_email'       => 'VARCHAR(255) NULL',
+        'token_hash'            => 'CHAR(64) NOT NULL',
+        'snapshot_json'         => 'LONGTEXT NOT NULL',
+        'responses_json'        => 'TEXT NULL',
+        'time_limit_minutes'    => 'INT NULL',
+        'expires_datetime'      => 'DATETIME NOT NULL',
+        'started_datetime'      => 'DATETIME NULL',
+        'submitted_datetime'    => 'DATETIME NULL',
+        'finish_reason'         => 'VARCHAR(20) NULL',
+        'score_percent'         => 'DECIMAL(5,1) NULL',
+        'skills_json'           => 'TEXT NULL',
+        'notes'                 => 'TEXT NULL',
+        'is_cancelled'          => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+
     'processes' => [
         'id'                => 'INT NOT NULL AUTO_INCREMENT',
         'title'             => 'VARCHAR(255) NOT NULL',
@@ -3989,6 +4059,13 @@ return [
         'title'                     => 'VARCHAR(255) NOT NULL',
         'description'               => 'LONGTEXT NULL',
         'supplier_id'               => 'INT NULL',
+        // Who the contract is WITH (#153). 'supplier' = we buy (supplier_id), as every
+        // contract was before; 'customer' = we sell, to a company and/or a person.
+        // Customer contracts can be limited to analysts who can see that company
+        // (contracts_customer_visibility) - see includes/contract_party.php.
+        'party_type'                => "VARCHAR(10) NOT NULL DEFAULT 'supplier'",
+        'customer_tenant_id'        => 'INT NULL',
+        'customer_user_id'          => 'INT NULL',
         'contract_owner_id'         => 'INT NULL',
         'contract_status_id'        => 'INT NULL',
         'contract_start'            => 'DATE NULL',
@@ -4390,6 +4467,33 @@ return [
         'updated_datetime'   => 'DATETIME NULL',
         'last_used_datetime' => 'DATETIME NULL',
     ],
+    // Report Packs: a multi-page report designed in Reporting and exported as a PDF.
+    // The whole design (page setup, theme, header/footer/cover, criteria and every
+    // block with its options) is ONE JSON document, read and written whole by the
+    // designer - see includes/report_packs/. NULL never occurs: a new pack is saved
+    // with a starter design.
+    'report_packs' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'name'             => 'VARCHAR(200) NOT NULL',
+        'description'      => 'VARCHAR(500) NULL',
+        'owner_id'         => 'INT NULL',
+        'design'           => 'LONGTEXT NOT NULL',
+        'created_datetime' => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime' => 'DATETIME NULL',
+        'updated_by'       => 'INT NULL',
+    ],
+    // Who else may open a pack. target_type is 'analyst' / 'team' (target_id) or
+    // 'department' (target_value = the free-text analysts.department, which has no
+    // table of its own). can_edit 0 = open and export, 1 = also change it.
+    'report_pack_shares' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'pack_id'          => 'INT NOT NULL',
+        'target_type'      => 'VARCHAR(20) NOT NULL',
+        'target_id'        => 'INT NULL',
+        'target_value'     => 'VARCHAR(255) NULL',
+        'can_edit'         => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'created_datetime' => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
     'ticket_assets' => [
         'id'                    => 'INT NOT NULL AUTO_INCREMENT',
         'ticket_id'             => 'INT NOT NULL',
@@ -4760,6 +4864,16 @@ return [
         'registrant_name'       => 'VARCHAR(255) NULL',
         'owner_analyst_id'      => 'INT NULL',
         'tech_contact_id'       => 'INT NULL',
+        // The person at the customer this domain is for (#153/#154). The domain's own
+        // company (tenant_id) stays its company - there is deliberately no second
+        // "customer company" column beside it.
+        'customer_user_id'      => 'INT NULL',
+        // #162: the customer may instead be a supplier (an organisation), optionally
+        // one of its contacts; and the technical contact may be one of your own
+        // analysts rather than a supplier contact. One of each kind is set, never two.
+        'customer_supplier_id'  => 'INT NULL',
+        'customer_contact_id'   => 'INT NULL',
+        'tech_analyst_id'       => 'INT NULL',
         'nameservers'           => 'TEXT NULL',
         'dns_provider'          => 'VARCHAR(255) NULL',
         'hosting_provider'      => 'VARCHAR(255) NULL',
@@ -4816,6 +4930,46 @@ return [
         'last_seen_datetime'  => 'DATETIME NULL',
         'dismissed'           => 'TINYINT(1) NOT NULL DEFAULT 0',
     ],
+    // Domains joined to the rest of FreeITSM (3.0.0): four links and the record
+    // of the status incidents a domain raised. Keys and FKs are in
+    // db_verify_indexes.php and api/system/db_verify.php.
+    'domain_cmdb_objects' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'             => 'INT NOT NULL',
+        'cmdb_object_id'        => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'domain_status_services' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'             => 'INT NOT NULL',
+        'service_id'            => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'ticket_domains' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'ticket_id'             => 'INT NOT NULL',
+        'domain_id'             => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'domain_knowledge_articles' => [
+        'id'                    => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'             => 'INT NOT NULL',
+        'article_id'            => 'INT NOT NULL',
+        'created_by_analyst_id' => 'INT NULL',
+        'created_datetime'      => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    ],
+    'domain_status_incidents' => [
+        'id'                => 'INT NOT NULL AUTO_INCREMENT',
+        'domain_id'         => 'INT NOT NULL',
+        'incident_id'       => 'INT NOT NULL',
+        'trigger_kind'      => 'VARCHAR(30) NOT NULL',
+        'fingerprint'       => 'VARCHAR(100) NOT NULL',
+        'created_datetime'  => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'resolved_datetime' => 'DATETIME NULL',
+    ],
     'domain_certificates' => [
         'id'                  => 'INT NOT NULL AUTO_INCREMENT',
         'domain_id'           => 'INT NOT NULL',
@@ -4827,5 +4981,35 @@ return [
         'not_after'           => 'DATETIME NULL',
         'first_seen_datetime' => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
         'acknowledged'        => 'TINYINT(1) NOT NULL DEFAULT 0',
+    ],
+
+    // Cost centres (GH #160, stage 1). Always one company's (tenant_id NOT NULL);
+    // the code is TEXT so "0010" stays "0010", unique per company ignoring case.
+    'cost_centres' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'tenant_id'        => 'INT NOT NULL',
+        'code'             => 'VARCHAR(50) NOT NULL',
+        'name'             => 'VARCHAR(150) NOT NULL',
+        'description'      => 'VARCHAR(500) NULL',
+        'parent_id'        => 'INT NULL',
+        'is_active'        => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'created_datetime' => 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'updated_datetime' => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        'is_demo'          => 'TINYINT(1) NOT NULL DEFAULT 0',   // set by the demo data importer (#1297)
+    ],
+    // System -> Photo Album: webcam photos as ASCII art. Only the art is stored,
+    // never the photo. Personal to each analyst.
+    'photo_album' => [
+        'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        'analyst_id'       => 'INT NOT NULL',
+        'title'            => 'VARCHAR(150) NOT NULL',
+        'style'            => "VARCHAR(20) NOT NULL DEFAULT 'braille'",
+        'palette'          => "VARCHAR(20) NOT NULL DEFAULT 'green'",
+        'width_chars'      => 'SMALLINT NOT NULL',
+        'height_chars'     => 'SMALLINT NOT NULL',
+        'art'              => 'MEDIUMTEXT NOT NULL',
+        'colours'          => 'MEDIUMTEXT NULL',
+        'thumbnail'        => 'MEDIUMTEXT NOT NULL',
+        'created_datetime' => 'DATETIME NOT NULL',
     ],
 ];

@@ -11,6 +11,7 @@ header('Content-Type: application/json');
 
 require_once '../../config.php';
 require_once __DIR__ . '/../../includes/db.php';   // dbConnectionOptions() — NOT in config.php, see GH #129
+require_once __DIR__ . '/../../includes/request_guard.php';   // origin + CSRF checks (S4) - this file skips functions.php
 
 try {
     $input = json_decode(file_get_contents('php://input'), true);

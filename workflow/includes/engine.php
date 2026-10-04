@@ -209,8 +209,8 @@ class WorkflowEngine
         // service method or a settings endpoint) — no dead triggers.
         return [
             // Domain entities
-            'contract'          => ['A contract', ['contract.id', 'contract.title', 'contract.status_id', 'contract.supplier_id']],
-            'domain'            => ['A domain', ['domain.id', 'domain.name', 'domain.expiry_date', 'domain.status_id', 'domain.purpose', 'domain.owner_analyst_id', 'domain.registrar', 'domain.company_id', 'domain.security_grade']],
+            'contract'          => ['A contract', ['contract.id', 'contract.title', 'contract.status_id', 'contract.supplier_id', 'contract.party_type', 'contract.customer_tenant_id', 'contract.customer_user_id']],
+            'domain'            => ['A domain', ['domain.id', 'domain.name', 'domain.expiry_date', 'domain.status_id', 'domain.purpose', 'domain.owner_analyst_id', 'domain.registrar', 'domain.company_id', 'domain.customer_user_id', 'domain.security_grade']],
             'supplier'          => ['A supplier', ['supplier.id', 'supplier.name', 'supplier.status_id', 'supplier.type_id']],
             'supplier_contact'  => ['A supplier contact', ['supplier_contact.id', 'supplier_contact.name', 'supplier_contact.supplier_id']],
             'calendar_event'    => ['A calendar event', ['calendar_event.id', 'calendar_event.title', 'calendar_event.category_id']],
@@ -406,6 +406,7 @@ class WorkflowEngine
             'contract.expiring' => [
                 'contract.id', 'contract.number', 'contract.title', 'contract.end_date',
                 'contract.days_remaining', 'contract.supplier_id', 'contract.supplier_name',
+                'contract.party_type', 'contract.party_name', 'contract.customer_tenant_id', 'contract.customer_user_id',
                 'window_days',
             ],
             'asset.warranty_expiring' => [
@@ -1176,7 +1177,7 @@ class WorkflowEngine
             ],
             'send_email' => [
                 'label'       => 'Send an email',
-                'description' => 'Send an email. With a ticket it goes from that ticket\'s mailbox and a reply threads back onto it; without one, choose the mailbox to send from — which is how a form acknowledges a submission before any ticket exists. The body is plain-text-with-newlines or HTML; both work.',
+                'description' => 'Send an email. With a ticket it goes from that ticket\'s mailbox and a reply threads back onto it; without one, choose the mailbox to send from — which is how a form acknowledges a submission before any ticket exists. The body is plain-text-with-newlines or HTML; both work. A confidential ticket is only emailed to its requester or to analysts; any other address is skipped, and the run says so.',
                 'args'        => [
                     'ticket_id'  => $ticketIdArg,
                     'mailbox_id' => ['type' => 'lookup', 'label' => 'Send from (needed when there is no ticket)', 'lookup' => 'mailbox'],
@@ -2163,6 +2164,18 @@ class WorkflowEngine
                 : 'No recipient — set one, e.g. {{submission.email}}');
         }
 
+        // 🔴 A confidential ticket is emailed only to its requester or to analysts
+        // (discussion #62) - never a manager, a list or an outside address, which
+        // is who the flag keeps it from. Skipped like the tracker actions, so the
+        // run log says why. The ticket can come from the payload as well as the
+        // arg: a "send from this mailbox" email can still quote {{ticket.subject}}.
+        require_once dirname(__DIR__, 2) . '/includes/ticket_sensitivity.php';
+        $sensTicket = $ticketId ?: (int)($payload['ticket']['id'] ?? ($payload['ticket_id'] ?? 0));
+        if ($sensTicket > 0 && !ticketEmailRecipientsAllowed($conn, $sensTicket, $recipient)) {
+            return ['skipped' => true, 'reason' => TICKET_EMAIL_CONFIDENTIAL_SKIP, 'confidential' => true,
+                    'ticket_id' => $sensTicket];
+        }
+
         // An explicitly chosen mailbox wins over the ticket's own. On a ticket
         // that is usually not what you want, so the arg is left blank there; when
         // there is no ticket it is the only way to know who is sending.
@@ -2795,7 +2808,7 @@ class WorkflowEngine
             return function (int $id) use ($conn, $R, $resourceFile, $selectFn, $where, $serialize) {
                 require_once $R . '/api/v1/lib/response.php';
                 require_once $R . '/api/v1/resources/' . $resourceFile;
-                $stmt = $conn->prepare($selectFn() . $where);
+                $stmt = $conn->prepare($selectFn($conn) . $where);   // extra arg ignored by selects that take none
                 $stmt->execute([$id]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 return $row ? $serialize($conn, $row) : null;

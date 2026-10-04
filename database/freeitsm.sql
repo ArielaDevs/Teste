@@ -5333,6 +5333,9 @@ CREATE TABLE IF NOT EXISTS `contracts` (
     `title`                     VARCHAR(255) NOT NULL,
     `description`               LONGTEXT NULL,
     `supplier_id`               INT NULL,
+    `party_type`                VARCHAR(10) NOT NULL DEFAULT 'supplier',
+    `customer_tenant_id`        INT NULL,
+    `customer_user_id`          INT NULL,
     `contract_owner_id`         INT NULL,
     `contract_status_id`        INT NULL,
     `contract_start`            DATE NULL,
@@ -5354,8 +5357,12 @@ CREATE TABLE IF NOT EXISTS `contracts` (
     `is_demo`           TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)
     PRIMARY KEY (`id`),
     KEY `ix_contracts_supplier_id` (`supplier_id`),
+    KEY `ix_contracts_customer_tenant` (`customer_tenant_id`),
+    KEY `ix_contracts_customer_user` (`customer_user_id`),
     KEY `ix_contracts_contract_end` (`contract_end`),
     CONSTRAINT `fk_contracts_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_contracts_customer_tenant` FOREIGN KEY (`customer_tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_contracts_customer_user` FOREIGN KEY (`customer_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_contracts_owner` FOREIGN KEY (`contract_owner_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_contracts_status` FOREIGN KEY (`contract_status_id`) REFERENCES `contract_statuses` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_contracts_payment_schedule` FOREIGN KEY (`payment_schedule_id`) REFERENCES `payment_schedules` (`id`) ON DELETE SET NULL
@@ -5818,6 +5825,90 @@ CREATE TABLE IF NOT EXISTS `lms_cmi_data` (
     `updated_datetime`      DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_lcd_progress_element` (`progress_id`, `element`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Competency tests (3.0.0): a question bank, tests built from it, and one
+-- sitting per candidate with a frozen snapshot of what they were shown.
+CREATE TABLE IF NOT EXISTS `lms_ct_questions` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `skill`                 VARCHAR(120) NOT NULL,
+    `difficulty`            VARCHAR(20) NOT NULL,
+    `format`                VARCHAR(20) NOT NULL,
+    `question_text`         TEXT NOT NULL,
+    `answers_json`          TEXT NOT NULL,
+    `explanation`           TEXT NULL,
+    `status`                VARCHAR(20) NOT NULL DEFAULT 'draft',
+    `source`                VARCHAR(20) NOT NULL DEFAULT 'ai',
+    `role_context`          VARCHAR(255) NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime`      DATETIME NULL,
+    PRIMARY KEY (`id`),
+    KEY `ix_lctq_skill` (`skill`, `difficulty`, `format`),
+    KEY `ix_lctq_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_tests` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `title`                 VARCHAR(200) NOT NULL,
+    `role_description`      TEXT NULL,
+    `time_limit_minutes`    INT NULL,
+    `pass_mark`             INT NULL,
+    `is_archived`           TINYINT(1) NOT NULL DEFAULT 0,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime`      DATETIME NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_test_skills` (
+    `id`             INT NOT NULL AUTO_INCREMENT,
+    `test_id`        INT NOT NULL,
+    `skill`          VARCHAR(120) NOT NULL,
+    `difficulty`     VARCHAR(20) NOT NULL,
+    `format`         VARCHAR(20) NOT NULL,
+    `question_count` INT NOT NULL DEFAULT 5,
+    `sort_order`     INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `ix_lcts_test` (`test_id`),
+    CONSTRAINT `fk_lcts_test` FOREIGN KEY (`test_id`) REFERENCES `lms_ct_tests` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_test_questions` (
+    `id`          INT NOT NULL AUTO_INCREMENT,
+    `test_id`     INT NOT NULL,
+    `question_id` INT NOT NULL,
+    `sort_order`  INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_lcttq_test_question` (`test_id`, `question_id`),
+    KEY `ix_lcttq_question` (`question_id`),
+    CONSTRAINT `fk_lcttq_test` FOREIGN KEY (`test_id`) REFERENCES `lms_ct_tests` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_lcttq_question` FOREIGN KEY (`question_id`) REFERENCES `lms_ct_questions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lms_ct_sittings` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `test_id`               INT NULL,
+    `candidate_name`        VARCHAR(200) NOT NULL,
+    `candidate_email`       VARCHAR(255) NULL,
+    `token_hash`            CHAR(64) NOT NULL,
+    `snapshot_json`         LONGTEXT NOT NULL,
+    `responses_json`        TEXT NULL,
+    `time_limit_minutes`    INT NULL,
+    `expires_datetime`      DATETIME NOT NULL,
+    `started_datetime`      DATETIME NULL,
+    `submitted_datetime`    DATETIME NULL,
+    `finish_reason`         VARCHAR(20) NULL,
+    `score_percent`         DECIMAL(5,1) NULL,
+    `skills_json`           TEXT NULL,
+    `notes`                 TEXT NULL,
+    `is_cancelled`          TINYINT(1) NOT NULL DEFAULT 0,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_lcs_token` (`token_hash`),
+    KEY `ix_lcs_test` (`test_id`),
+    CONSTRAINT `fk_lcs_test` FOREIGN KEY (`test_id`) REFERENCES `lms_ct_tests` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------
@@ -6560,6 +6651,33 @@ CREATE TABLE IF NOT EXISTS `table_views` (
     CONSTRAINT `fk_tv_owner` FOREIGN KEY (`owner_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_tv_team`  FOREIGN KEY (`team_id`)  REFERENCES `teams` (`id`)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `report_packs` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `name`             VARCHAR(200) NOT NULL,
+    `description`      VARCHAR(500) NULL,
+    `owner_id`         INT NULL,
+    `design`           LONGTEXT NOT NULL,
+    `created_datetime` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime` DATETIME NULL,
+    `updated_by`       INT NULL,
+    PRIMARY KEY (`id`),
+    KEY `ix_rp_owner` (`owner_id`),
+    CONSTRAINT `fk_rp_owner`   FOREIGN KEY (`owner_id`)   REFERENCES `analysts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_rp_updater` FOREIGN KEY (`updated_by`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `report_pack_shares` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `pack_id`          INT NOT NULL,
+    `target_type`      VARCHAR(20) NOT NULL,
+    `target_id`        INT NULL,
+    `target_value`     VARCHAR(255) NULL,
+    `can_edit`         TINYINT(1) NOT NULL DEFAULT 0,
+    `created_datetime` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `ix_rps_pack` (`pack_id`),
+    KEY `ix_rps_target` (`target_type`, `target_id`),
+    CONSTRAINT `fk_rps_pack` FOREIGN KEY (`pack_id`) REFERENCES `report_packs` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_assets` (
     `id`                    INT NOT NULL AUTO_INCREMENT,
     `ticket_id`             INT NOT NULL,
@@ -7214,6 +7332,10 @@ CREATE TABLE IF NOT EXISTS `domains` (
     `registrant_name`        VARCHAR(255) NULL,
     `owner_analyst_id`       INT NULL,
     `tech_contact_id`        INT NULL,               -- a Contracts contact (the agency, the host)
+    `customer_user_id`       INT NULL,               -- the person at the customer this domain is for
+    `customer_supplier_id`   INT NULL,               -- OR a supplier (organisation) it is for (#162)
+    `customer_contact_id`    INT NULL,               -- and optionally one of that supplier's contacts
+    `tech_analyst_id`        INT NULL,               -- OR the technical contact is one of your analysts (#162)
     `nameservers`            TEXT NULL,              -- one per line
     `dns_provider`           VARCHAR(255) NULL,
     `hosting_provider`       VARCHAR(255) NULL,
@@ -7246,12 +7368,20 @@ CREATE TABLE IF NOT EXISTS `domains` (
     KEY `idx_domains_name` (`domain_name`),
     KEY `idx_domains_expiry` (`expiry_date`),
     KEY `idx_domains_status` (`status_id`),
+    KEY `idx_domains_customer_user` (`customer_user_id`),
+    KEY `idx_domains_customer_supplier` (`customer_supplier_id`),
+    KEY `idx_domains_customer_contact` (`customer_contact_id`),
+    KEY `idx_domains_tech_analyst` (`tech_analyst_id`),
     CONSTRAINT `fk_domains_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_status` FOREIGN KEY (`status_id`) REFERENCES `domain_statuses` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_registrar` FOREIGN KEY (`registrar_supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_account` FOREIGN KEY (`registrar_account_id`) REFERENCES `domain_registrar_accounts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_owner` FOREIGN KEY (`owner_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_customer_user` FOREIGN KEY (`customer_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_tech_contact` FOREIGN KEY (`tech_contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_customer_supplier` FOREIGN KEY (`customer_supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_customer_contact` FOREIGN KEY (`customer_contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_tech_analyst` FOREIGN KEY (`tech_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -7323,6 +7453,156 @@ CREATE TABLE IF NOT EXISTS `domain_certificates` (
     CONSTRAINT `fk_domain_certificates_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+-- ---------------------------------------------------------------------------
+-- Domains, joined to the rest of FreeITSM (3.0.0). Four plain links - each is
+-- one row per pair, deleted with either side - and the record of which status
+-- incident a domain raised. A link carries no company of its own: it is only
+-- ever made, and only ever shown, between two records the analyst can already
+-- see (includes/domains/links.php).
+-- ---------------------------------------------------------------------------
+
+-- The configuration items that depend on a domain: what breaks if it lapses.
+CREATE TABLE IF NOT EXISTS `domain_cmdb_objects` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `domain_id`             INT NOT NULL,
+    `cmdb_object_id`        INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_cmdb_obj` (`domain_id`, `cmdb_object_id`),
+    KEY `ix_dco_cmdb_object` (`cmdb_object_id`),
+    CONSTRAINT `fk_dco_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dco_cmdb_object` FOREIGN KEY (`cmdb_object_id`) REFERENCES `cmdb_objects` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dco_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The Service Status services that run on a domain: the ones a lapsed domain
+-- or a failed certificate takes down (Domains -> Settings -> Service Status).
+CREATE TABLE IF NOT EXISTS `domain_status_services` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `domain_id`             INT NOT NULL,
+    `service_id`            INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_status_service` (`domain_id`, `service_id`),
+    KEY `ix_dss_service` (`service_id`),
+    CONSTRAINT `fk_dss_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dss_service` FOREIGN KEY (`service_id`) REFERENCES `status_services` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dss_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tickets about a domain, linked from either side (the ticket's reading pane
+-- or the domain's page) - the same shape as ticket_cmdb_objects.
+CREATE TABLE IF NOT EXISTS `ticket_domains` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `ticket_id`             INT NOT NULL,
+    `domain_id`             INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_ticket_domain` (`ticket_id`, `domain_id`),
+    KEY `ix_ticket_domains_domain` (`domain_id`),
+    CONSTRAINT `fk_td_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_td_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_td_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Runbooks: knowledge articles pinned to a domain ("how to move this domain's
+-- DNS"), linked from the domain or from the article.
+CREATE TABLE IF NOT EXISTS `domain_knowledge_articles` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `domain_id`             INT NOT NULL,
+    `article_id`            INT NOT NULL,
+    `created_by_analyst_id` INT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_article` (`domain_id`, `article_id`),
+    KEY `ix_dka_article` (`article_id`),
+    CONSTRAINT `fk_dka_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dka_article` FOREIGN KEY (`article_id`) REFERENCES `knowledge_articles` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dka_analyst` FOREIGN KEY (`created_by_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Status incidents a domain raised by itself (Domains -> Settings -> Service
+-- Status -> raise automatically). One row per (domain, trigger, fingerprint):
+-- the fingerprint carries the date the problem is about, so the same lapse
+-- never raises twice, and renewing re-arms it - the domain_alerts_sent rule.
+-- resolved_datetime is set when the domain recovers and the incident is closed.
+CREATE TABLE IF NOT EXISTS `domain_status_incidents` (
+    `id`                INT NOT NULL AUTO_INCREMENT,
+    `domain_id`         INT NOT NULL,
+    `incident_id`       INT NOT NULL,
+    `trigger_kind`      VARCHAR(30) NOT NULL,
+    `fingerprint`       VARCHAR(100) NOT NULL,
+    `created_datetime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `resolved_datetime` DATETIME NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_domain_status_incident` (`domain_id`, `trigger_kind`, `fingerprint`),
+    KEY `ix_dsi_incident` (`incident_id`),
+    CONSTRAINT `fk_dsi_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dsi_incident` FOREIGN KEY (`incident_id`) REFERENCES `status_incidents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- Cost centres (GH #160, stage 1) - System -> Cost Centres
+-- ----------------------------------------------------------
+-- The finance department's list, kept here so things can be charged to it later
+-- (stage 2: assets and service bookings). Most organisations hold the real list
+-- in their accounting system and copy it in by import or through the REST API,
+-- so a cost centre is matched on its CODE, never on its id.
+--
+-- 🔑 Always belongs to ONE company - tenant_id is NOT NULL, unlike most config
+-- tables where NULL means "shared". Two companies can both have a 0010.
+CREATE TABLE IF NOT EXISTS `cost_centres` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `tenant_id`        INT NOT NULL,
+    -- 🔑 TEXT, NEVER A NUMBER. "0010" and "N1414" are both real codes, and a
+    -- number column would turn the first into 10. Unique per company, and the
+    -- unicode_ci collation makes that check ignore case: n1414 = N1414.
+    `code`             VARCHAR(50) NOT NULL,
+    `name`             VARCHAR(150) NOT NULL,
+    `description`      VARCHAR(500) NULL,
+    -- The hierarchy. NULL = top level. Always in the same company - the service
+    -- refuses anything else, and refuses a loop.
+    `parent_id`        INT NULL,
+    -- Inactive = not offered for NEW assignments. Anything already charged to it
+    -- keeps it. Retiring, not deleting, is the normal path.
+    `is_active`        TINYINT(1) NOT NULL DEFAULT 1,
+    `created_datetime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_datetime` DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `is_demo`          TINYINT(1) NOT NULL DEFAULT 0,   -- set by the demo data importer (#1297)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_cost_centres_code` (`tenant_id`, `code`),
+    KEY `ix_cost_centres_parent` (`parent_id`),
+    -- SET NULL rather than RESTRICT: the service already refuses to delete a cost
+    -- centre that has children, and RESTRICT on a self-reference can block the
+    -- company CASCADE below part-way through.
+    CONSTRAINT `fk_cost_centres_parent` FOREIGN KEY (`parent_id`) REFERENCES `cost_centres` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_cost_centres_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- System -> Photo Album: a webcam photo turned into ASCII art, in the browser.
+-- 🔑 The PHOTO is never sent here - only the art (text), its colours when the
+-- Colour palette is used, and a small JPEG of the art for the album grid.
+-- Personal: each analyst sees and deletes only their own.
+CREATE TABLE IF NOT EXISTS `photo_album` (
+    `id`               INT NOT NULL AUTO_INCREMENT,
+    `analyst_id`       INT NOT NULL,
+    `title`            VARCHAR(150) NOT NULL,
+    `style`            VARCHAR(20) NOT NULL DEFAULT 'braille',  -- braille | classic | blocks
+    `palette`          VARCHAR(20) NOT NULL DEFAULT 'green',    -- green | amber | paper | colour
+    `width_chars`      SMALLINT NOT NULL,
+    `height_chars`     SMALLINT NOT NULL,
+    `art`              MEDIUMTEXT NOT NULL,                     -- the characters, one line per row
+    `colours`          MEDIUMTEXT NULL,                         -- base64 RGB, 3 bytes per character; Colour palette only
+    `thumbnail`        MEDIUMTEXT NOT NULL,                     -- data:image/jpeg;base64 of the art, for the album grid
+    `created_datetime` DATETIME NOT NULL,                       -- UTC
+    PRIMARY KEY (`id`),
+    KEY `ix_photo_album_analyst` (`analyst_id`, `created_datetime`),
+    CONSTRAINT `fk_photo_album_analyst` FOREIGN KEY (`analyst_id`) REFERENCES `analysts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Seed: the domain statuses a fresh install starts with. Only into an empty

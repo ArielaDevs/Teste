@@ -49,4 +49,4 @@ $domNav = [
 </div>
 
 <?php renderWaffleMenuJS(); ?>
-<script>window.DOM_API = <?php echo json_encode(BASE_URL . 'api/domains/'); ?>;</script>
+<script>window.DOM_API = <?php echo json_encode(BASE_URL . 'api/domains/'); ?>; window.DOM_BASE = <?php echo json_encode(BASE_URL); ?>; window.DOM_ME = <?php echo (int)($_SESSION['analyst_id'] ?? 0); ?>;</script>

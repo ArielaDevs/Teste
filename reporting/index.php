@@ -47,6 +47,32 @@ $translationNamespaces = ['common', 'reporting'];
             max-width: 700px;
         }
 
+        /* 🔴 Four cards, not three. The row was sized for three 280px cards in a
+           700px box; Report Packs made it four (~1,190px), so the browser shrank
+           each card by a different amount depending on its text - uneven widths
+           and descriptions wrapping a word or two to a line. An even grid in a
+           box wide enough for four, two-by-two on a narrower window rather than
+           squeezed. Desktop widths only: the phone layer (mobile.css LAYER 35)
+           stacks these with flex-direction, which a grid would ignore (§27). */
+        @media (min-width: 769px) {
+            .landing-content {
+                width: 100%;
+                max-width: 1160px;
+                padding: 24px 32px;
+                box-sizing: border-box;
+            }
+            .report-cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+                gap: 24px;
+            }
+            .report-card {
+                width: auto;
+                min-width: 0;
+                padding: 36px 28px;
+            }
+        }
+
         .landing-content h2 {
             font-size: 24px;
             color: var(--text, #333);
@@ -103,7 +129,7 @@ $translationNamespaces = ['common', 'reporting'];
     </style>
     <!-- Mobile layer LAST, after this page's own <style> block, or a rule at
          equal specificity loses on document order (Techniques §9). -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="reporting" data-mobile-page="rep-landing">
     <?php include 'includes/header.php'; ?>
@@ -114,6 +140,19 @@ $translationNamespaces = ['common', 'reporting'];
             <p class="subtitle"><?php echo htmlspecialchars(t('reporting.landing.subtitle')); ?></p>
 
             <div class="report-cards">
+                <a href="packs/" class="report-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 3h9l4 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path>
+                        <path d="M3 7v13a2 2 0 0 0 2 2h11"></path>
+                        <line x1="10" y1="9" x2="15" y2="9"></line>
+                        <line x1="10" y1="17" x2="10" y2="13"></line>
+                        <line x1="13.5" y1="17" x2="13.5" y2="11"></line>
+                        <line x1="17" y1="17" x2="17" y2="14"></line>
+                    </svg>
+                    <h3><?php echo htmlspecialchars(t('reporting.landing.packs_title')); ?></h3>
+                    <p><?php echo htmlspecialchars(t('reporting.landing.packs_desc')); ?></p>
+                </a>
+
                 <a href="logs/" class="report-card">
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -148,6 +187,6 @@ $translationNamespaces = ['common', 'reporting'];
             </div>
         </div>
     </div>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

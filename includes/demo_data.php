@@ -18,7 +18,7 @@
 const DEMO_MODULES = [
     'core', 'tickets', 'assets', 'knowledge', 'changes', 'calendar', 'checks',
     'checklists',
-    'contracts', 'domains', 'services', 'software', 'forms', 'software-assets',
+    'contracts', 'domains', 'cost-centres', 'services', 'software', 'forms', 'software-assets',
     'dashboards', 'tasks', 'process-mapper', 'cmdb', 'lms', 'workflow',
     'network-mapper',
 ];

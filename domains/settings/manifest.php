@@ -46,6 +46,13 @@ return [
             'grant'     => 'Configure registry lookups, DNS and certificate checks, and look-alike scanning',
         ],
         [
+            'id'        => 'service-status',
+            'cap'       => Cap::DOMAINS_SERVICE_STATUS,
+            'label_key' => 'domains.settings.tab_service_status',
+            'grant'     => 'Decide whether a domain\'s problems are suggested or raised as incidents on the Service Status page',
+            'sensitive' => true,   // can publish to a page customers read
+        ],
+        [
             'id'        => 'auth-codes',
             'cap'       => Cap::DOMAINS_AUTH_CODES,
             'label_key' => 'domains.settings.tab_auth_codes',

@@ -46,6 +46,7 @@ $apikey  = 'ZZDH-' . bin2hex(random_bytes(8));
 $sid     = 'zzdh' . bin2hex(random_bytes(4));
 $sessDir = ini_get('session.save_path') ?: 'c:/wamp64/tmp';
 $sessFile = rtrim($sessDir, "/\\") . '/sess_' . $sid;
+$csrf    = bin2hex(random_bytes(32));   // the forged session's CSRF token (S4) - sent on every POST
 
 $madeKeyId = null; $madeAssets = [];
 
@@ -84,7 +85,7 @@ function asAnalyst(string $url, string $sid, ?array $post = null): array {
     if ($post !== null) {
         $opts[CURLOPT_POST] = true;
         $opts[CURLOPT_POSTFIELDS] = json_encode($post);
-        $opts[CURLOPT_HTTPHEADER] = ['Content-Type: application/json'];
+        $opts[CURLOPT_HTTPHEADER] = ['Content-Type: application/json', 'X-CSRF-Token: ' . $GLOBALS['csrf']];
     }
     curl_setopt_array($ch, $opts);
     $body = (string)curl_exec($ch); curl_close($ch);
@@ -106,7 +107,7 @@ try {
     $madeKeyId = (int)$conn->lastInsertId();
 
     $analystId = (int)$conn->query("SELECT id FROM analysts WHERE id = 1")->fetchColumn();
-    file_put_contents($sessFile, 'analyst_id|i:' . $analystId . ';analyst_name|s:13:"Administrator";is_admin|i:1;');
+    file_put_contents($sessFile, 'analyst_id|i:' . $analystId . ';analyst_name|s:13:"Administrator";is_admin|i:1;csrf_token|s:64:"' . $csrf . '";');
 
     $ingest = $base . '/api/external/system-info/submit/';
     $a = agentPost($ingest, $apikey, payloadFor($hostA));

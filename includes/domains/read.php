@@ -12,10 +12,30 @@
  */
 
 require_once __DIR__ . '/../tenancy.php';
+require_once __DIR__ . '/customer.php';
 
 /** The columns + joins every register read uses. */
-function domainListSelect(): string
+function domainListSelect(?PDO $conn = null): string
 {
+    // The customer person (#153), once Database Verification has added the column.
+    $cust = $conn !== null && domainCustomerReady($conn);
+    $custCols = $cust
+        ? "d.customer_user_id, COALESCE(NULLIF(cu.display_name, ''), cu.email) AS customer_user_name, cu.email AS customer_user_email,"
+        : "NULL AS customer_user_id, NULL AS customer_user_name, NULL AS customer_user_email,";
+    $custJoin = $cust ? " LEFT JOIN users cu ON cu.id = d.customer_user_id" : '';
+    // #162: a supplier customer (and its contact), and an analyst tech contact.
+    if ($conn !== null && domainPartiesReady($conn)) {
+        $custCols .= " d.customer_supplier_id, COALESCE(NULLIF(csup.trading_name, ''), csup.legal_name) AS customer_supplier_name,
+                       d.customer_contact_id, TRIM(CONCAT(COALESCE(cct.first_name, ''), ' ', COALESCE(cct.surname, ''))) AS customer_contact_name,
+                       cct.email AS customer_contact_email,
+                       d.tech_analyst_id, ta.full_name AS tech_analyst_name,";
+        $custJoin .= " LEFT JOIN suppliers csup ON csup.id = d.customer_supplier_id
+                       LEFT JOIN contacts cct ON cct.id = d.customer_contact_id
+                       LEFT JOIN analysts ta ON ta.id = d.tech_analyst_id";
+    } else {
+        $custCols .= " NULL AS customer_supplier_id, NULL AS customer_supplier_name, NULL AS customer_contact_id,
+                       NULL AS customer_contact_name, NULL AS customer_contact_email, NULL AS tech_analyst_id, NULL AS tech_analyst_name,";
+    }
     return "SELECT d.id, d.tenant_id, tn.name AS company_name,
                    d.domain_name, d.display_name, d.purpose,
                    d.status_id, s.name AS status_name, s.colour AS status_colour, s.alerts_enabled,
@@ -27,7 +47,7 @@ function domainListSelect(): string
                    d.tech_contact_id, TRIM(CONCAT(COALESCE(ct.first_name, ''), ' ', COALESCE(ct.surname, ''))) AS tech_contact_name,
                    d.registrant_name, d.dns_provider, d.hosting_provider,
                    d.tags, d.cost, d.currency, d.billing_years, d.cost_centre,
-                   d.contract_id, d.monitoring_enabled,
+                   d.contract_id, d.monitoring_enabled, $custCols
                    d.ssl_expiry_date, d.ssl_issuer, d.security_score, d.security_grade,
                    d.lookup_source, d.last_lookup_datetime, d.last_lookup_error, d.last_check_datetime,
                    d.created_datetime, d.updated_datetime,
@@ -39,7 +59,7 @@ function domainListSelect(): string
          LEFT JOIN domain_registrar_accounts acc ON acc.id = d.registrar_account_id
          LEFT JOIN analysts a ON a.id = d.owner_analyst_id
          LEFT JOIN contacts ct ON ct.id = d.tech_contact_id
-         LEFT JOIN tenants tn ON tn.id = d.tenant_id";
+         LEFT JOIN tenants tn ON tn.id = d.tenant_id$custJoin";
 }
 
 /**
@@ -66,7 +86,7 @@ function domainListRows(PDO $conn, int $analystId, array $f = []): array
         $where[] = 'd.expiry_date IS NOT NULL AND d.expiry_date <= DATE_ADD(UTC_DATE(), INTERVAL ? DAY)';
         $args[] = (int)$f['expiring_days'];
     }
-    $sql = domainListSelect() . ' WHERE ' . implode(' AND ', $where) . $tSql . ' ORDER BY d.expiry_date IS NULL, d.expiry_date, d.domain_name';
+    $sql = domainListSelect($conn) . ' WHERE ' . implode(' AND ', $where) . $tSql . ' ORDER BY d.expiry_date IS NULL, d.expiry_date, d.domain_name';
     $st = $conn->prepare($sql);
     $st->execute(array_merge($args, $tArgs));
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -79,7 +99,7 @@ function domainShapeRow(array $r): array
     $today = new DateTimeImmutable(gmdate('Y-m-d'));
     $days = fn($d) => $d ? (int)$today->diff(new DateTimeImmutable(substr($d, 0, 10)))->format('%r%a') : null;
     foreach (['id', 'tenant_id', 'status_id', 'registrar_supplier_id', 'registrar_account_id', 'owner_analyst_id',
-              'tech_contact_id', 'contract_id', 'security_score', 'billing_years', 'lookalike_count', 'new_certificate_count'] as $k) {
+              'tech_contact_id', 'customer_user_id', 'customer_supplier_id', 'customer_contact_id', 'tech_analyst_id', 'contract_id', 'security_score', 'billing_years', 'lookalike_count', 'new_certificate_count'] as $k) {
         if (array_key_exists($k, $r)) $r[$k] = $r[$k] === null ? null : (int)$r[$k];
     }
     foreach (['transfer_lock', 'registry_lock', 'dnssec'] as $k) {
@@ -89,6 +109,7 @@ function domainShapeRow(array $r): array
         if (array_key_exists($k, $r)) $r[$k] = $r[$k] === null ? null : (bool)(int)$r[$k];
     }
     $r['tech_contact_name'] = isset($r['tech_contact_name']) && trim($r['tech_contact_name']) !== '' ? trim($r['tech_contact_name']) : null;
+    $r['customer_contact_name'] = isset($r['customer_contact_name']) && trim($r['customer_contact_name']) !== '' ? trim($r['customer_contact_name']) : null;
     $r['days_left']     = $days($r['expiry_date'] ?? null);
     $r['ssl_days_left'] = $days($r['ssl_expiry_date'] ?? null);
     $r['annual_cost']   = ($r['cost'] ?? null) !== null ? round((float)$r['cost'] / max(1, (int)($r['billing_years'] ?? 1)), 2) : null;
@@ -115,19 +136,22 @@ function domainNeedsAttention(array $r): array
 }
 
 /** One domain for its page: everything but the auth code's value. */
-function domainDetail(PDO $conn, int $id): ?array
+function domainDetail(PDO $conn, int $id, ?int $analystId = null): ?array
 {
-    $st = $conn->prepare(domainListSelect() . ' WHERE d.id = ?');
+    $st = $conn->prepare(domainListSelect($conn) . ' WHERE d.id = ?');
     $st->execute([$id]);
     $r = $st->fetch(PDO::FETCH_ASSOC);
     if (!$r) return null;
     $r = domainShapeRow($r);
 
+    // A linked CUSTOMER contract the viewer cannot see shows no label (#153).
+    require_once __DIR__ . '/../contract_party.php';
+    [$kVis, $kArgs] = $analystId !== null ? contractVisibilitySql($conn, $analystId, 'k') : ['', []];
     $x = $conn->prepare("SELECT nameservers, ssl_hosts, dkim_selectors, notes, registry_statuses, registry_updated_date,
                                 check_results, auth_code, contract_id,
-                                (SELECT CONCAT(contract_number, ' - ', title) FROM contracts WHERE id = domains.contract_id) AS contract_label
+                                (SELECT CONCAT(k.contract_number, ' - ', k.title) FROM contracts k WHERE k.id = domains.contract_id$kVis) AS contract_label
                            FROM domains WHERE id = ?");
-    $x->execute([$id]);
+    $x->execute(array_merge($kArgs, [$id]));
     $more = $x->fetch(PDO::FETCH_ASSOC) ?: [];
     $r['nameservers']           = $more['nameservers'] ?? null;
     $r['ssl_hosts']             = $more['ssl_hosts'] ?? null;
@@ -150,6 +174,14 @@ function domainApiLookups(PDO $conn, int $analystId): array
 {
     require_once __DIR__ . '/names.php';
     [$tSql, $tArgs] = activeTenantReadFilter($conn, $analystId, 'acc');
+    require_once __DIR__ . '/../contract_party.php';
+    $contracts = [];
+    if (analystCanAccessModule($conn, $analystId, 'contracts')) {
+        [$kVis, $kArgs] = contractVisibilitySql($conn, $analystId, 'k');   // #153
+        $k = $conn->prepare("SELECT k.id, CONCAT(k.contract_number, ' - ', k.title) AS name FROM contracts k WHERE k.is_active = 1$kVis ORDER BY k.contract_number");
+        $k->execute($kArgs);
+        $contracts = $k->fetchAll(PDO::FETCH_ASSOC);
+    }
     $acc = $conn->prepare("SELECT acc.id, acc.account_name, acc.supplier_id, acc.tenant_id FROM domain_registrar_accounts acc WHERE 1=1 $tSql ORDER BY acc.account_name");
     $acc->execute($tArgs);
     return [
@@ -164,10 +196,12 @@ function domainApiLookups(PDO $conn, int $analystId): array
         // Contracts' own records: only for somebody who could open Contracts —
         // otherwise this list would show contract titles to people the
         // Contracts module deliberately keeps out.
-        'contracts'  => analystCanAccessModule($conn, $analystId, 'contracts')
-            ? $conn->query("SELECT id, CONCAT(contract_number, ' - ', title) AS name FROM contracts WHERE is_active = 1 ORDER BY contract_number")->fetchAll(PDO::FETCH_ASSOC) : [],
+        'contracts'  => $contracts,
         'contacts'   => analystCanAccessModule($conn, $analystId, 'contracts')
             ? $conn->query("SELECT c.id, CONCAT(c.first_name, ' ', c.surname, COALESCE(CONCAT(' (', COALESCE(NULLIF(s.trading_name, ''), s.legal_name), ')'), '')) AS name
                                FROM contacts c LEFT JOIN suppliers s ON s.id = c.supplier_id WHERE c.is_active = 1 ORDER BY c.first_name, c.surname LIMIT 1000")->fetchAll(PDO::FETCH_ASSOC) : [],
+        // #162: the edit dialog offers an analyst as technical contact and a
+        // supplier as customer only once Database Verification has added the columns.
+        'parties_ready' => domainPartiesReady($conn),
     ];
 }

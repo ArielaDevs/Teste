@@ -33,14 +33,14 @@ $dtSearchPlaceholder = t('domains.table.search');
     <link rel="stylesheet" href="../../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../../assets/css/data-table.css?v=4">
-    <link rel="stylesheet" href="../../assets/css/domains.css?v=1">
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../../assets/css/domains.css?v=7">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=167">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
     <script src="../../assets/js/tz.js?v=5"></script>
     <script src="../../assets/js/i18n.js?v=3"></script>
 </head>
-<body>
+<body data-mobile-module="domains" data-mobile-page="domains-table">
     <?php include '../includes/header.php'; ?>
     <div class="dt-page">
         <?php include '../../includes/data-table-skeleton.php'; ?>
@@ -48,6 +48,6 @@ $dtSearchPlaceholder = t('domains.table.search');
     <script src="../../assets/js/domains.js?v=1"></script>
     <script src="../../assets/js/data-table.js?v=6"></script>
     <script src="../../assets/js/domains-table.js?v=1"></script>
-    <script src="../../assets/js/mobile.js?v=65"></script>
+    <script src="../../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

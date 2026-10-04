@@ -20,6 +20,9 @@ $current_page = $current_page ?? '';
 // Resolved here so every LMS page's header is consistent, using the RBAC helper.
 require_once $path_prefix . 'includes/rbac.php';
 $lmsCanManage = analystHasCapability(connectToDatabase(), (int) $_SESSION['analyst_id'], Cap::LMS_MANAGE);
+// Competency tests are their own grant (candidates' personal data), so a
+// recruiter can have Tests without managing courses, and the reverse.
+$lmsCanTest = analystHasCapability(connectToDatabase(), (int) $_SESSION['analyst_id'], Cap::LMS_TESTS);
 
 require_once $path_prefix . 'includes/waffle-menu.php';
 ?>
@@ -46,6 +49,17 @@ require_once $path_prefix . 'includes/waffle-menu.php';
             </svg>
             <span><?php echo htmlspecialchars(function_exists('t') ? t('lms.nav.dashboard') : 'Dashboard'); ?></span>
         </a>
+        <?php endif; ?>
+        <?php if ($lmsCanTest): ?>
+        <a href="<?php echo BASE_URL; ?>lms/tests/" class="nav-btn <?php echo $current_page === 'tests' ? 'active' : ''; ?>" title="<?php echo htmlspecialchars(function_exists('t') ? t('lms.nav.tests') : 'Tests'); ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span><?php echo htmlspecialchars(function_exists('t') ? t('lms.nav.tests') : 'Tests'); ?></span>
+        </a>
+        <?php endif; ?>
+        <?php if ($lmsCanManage || $lmsCanTest): ?>
         <a href="<?php echo BASE_URL; ?>lms/settings/" class="nav-btn <?php echo $current_page === 'settings' ? 'active' : ''; ?>" title="<?php echo htmlspecialchars(function_exists('t') ? t('lms.nav.settings') : 'Settings'); ?>">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>

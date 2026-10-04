@@ -48,7 +48,12 @@ try {
     // ?accessible=1 → only the companies this analyst may access (for "move ticket to
     // company" pickers). Default returns every company (unchanged behaviour).
     $accessibleOnly = !empty($_GET['accessible']);
-    $allowed = $accessibleOnly ? getAccessibleTenantIds($conn, (int)$_SESSION['analyst_id']) : null;
+    // The full list (every company and its email domains) is only asked for by the
+    // System screens, Tickets settings and Triage. Everyone else asks for ?accessible=1.
+    if (!$accessibleOnly) {
+        requireAnyModuleAccessJson(['system', 'tickets'], $conn);
+    }
+    $allowed =$accessibleOnly ? getAccessibleTenantIds($conn, (int)$_SESSION['analyst_id']) : null;
 
     $companies = [];
     foreach (getAllTenants($conn) as $t) {

@@ -294,17 +294,19 @@ try {
     }
 
     // --- Contracts: by reference or title -------------------------------
-    // Contracts are install-wide (no tenant_id column), so there is no company
-    // scope to apply here.
+    // Contracts have no tenant_id, but a CUSTOMER contract belongs to its
+    // customer's company and is hidden from analysts outside it (#153).
     if ($can('contracts')) {
         try {
+            require_once __DIR__ . '/../../includes/contract_party.php';
+            [$kVis, $kArgs] = contractVisibilitySql($conn, $analystId, 'k');
             $sql = "SELECT k.id, k.contract_number, k.title
                       FROM contracts k
-                     WHERE (k.contract_number LIKE ? OR k.title LIKE ?)
+                     WHERE (k.contract_number LIKE ? OR k.title LIKE ?)$kVis
                      ORDER BY k.title
                      LIMIT " . $perType;
             $stmt = $conn->prepare($sql);
-            $stmt->execute([$like, $like]);
+            $stmt->execute(array_merge([$like, $like], $kArgs));
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $results[] = [
                     'type'     => 'contract',
@@ -316,6 +318,79 @@ try {
                 ];
             }
         } catch (Exception $e) { /* table not ready — no contract results */ }
+    }
+
+    // --- People (#153): a person by name, email or job; a company by name -----
+    // Only people in companies the analyst can access - the same rule as the
+    // person page the result opens.
+    if ($can('people')) {
+        try {
+            [$uSql, $uArgs] = isMultiTenant($conn) ? allAccessibleTenantsFilter($conn, $analystId, 'u.tenant_id') : ['', []];
+            $sql = "SELECT u.id, COALESCE(NULLIF(u.preferred_name, ''), NULLIF(u.display_name, ''), u.email, u.username) AS name,
+                           u.email, u.job_title, u.is_active
+                      FROM users u
+                     WHERE (u.display_name LIKE ? OR u.preferred_name LIKE ? OR u.email LIKE ? OR u.job_title LIKE ?)" . $uSql . "
+                     ORDER BY u.is_active DESC, name
+                     LIMIT " . $perType;
+            $stmt = $conn->prepare($sql);
+            $stmt->execute(array_merge([$like, $like, $like, $like], $uArgs));
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $results[] = [
+                    'type'     => 'person',
+                    'module'   => 'people',
+                    'id'       => (int) $r['id'],
+                    'title'    => (string) $r['name'],
+                    'subtitle' => trim(($r['job_title'] ?? '') . ($r['email'] && $r['email'] !== $r['name'] ? ' · ' . $r['email'] : ''), ' ·'),
+                    'url'      => entityLink('person', (int) $r['id']),
+                ];
+            }
+            if (isMultiTenant($conn)) {
+                $ids = array_map('intval', getAccessibleTenantIds($conn, $analystId));
+                if ($ids) {
+                    $in = implode(',', array_fill(0, count($ids), '?'));
+                    $stmt = $conn->prepare("SELECT id, name FROM tenants WHERE name LIKE ? AND id IN ($in) ORDER BY name LIMIT " . $perType);
+                    $stmt->execute(array_merge([$like], $ids));
+                    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                        $results[] = [
+                            'type' => 'company', 'module' => 'people', 'id' => (int) $r['id'],
+                            'title' => $r['name'], 'subtitle' => '', 'url' => entityLink('company', (int) $r['id']),
+                        ];
+                    }
+                }
+            }
+        } catch (Exception $e) { /* no people results */ }
+    }
+
+    // --- Suppliers and supplier contacts (#153 step 3) ----------------------
+    // Contracts' records, shown in People: both modules, as the pages need.
+    // Install-wide, like Contracts itself - they have no company.
+    if ($can('people') && $can('contracts')) {
+        try {
+            $stmt = $conn->prepare("SELECT id, COALESCE(NULLIF(trading_name, ''), legal_name) AS name, legal_name, city
+                                      FROM suppliers WHERE legal_name LIKE ? OR trading_name LIKE ?
+                                     ORDER BY is_active DESC, name LIMIT " . $perType);
+            $stmt->execute([$like, $like]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $results[] = [
+                    'type' => 'supplier', 'module' => 'people', 'id' => (int) $r['id'], 'title' => (string) $r['name'],
+                    'subtitle' => (string) ($r['legal_name'] !== $r['name'] ? $r['legal_name'] : ($r['city'] ?? '')),
+                    'url' => entityLink('supplier', (int) $r['id']),
+                ];
+            }
+            $stmt = $conn->prepare("SELECT c.id, TRIM(CONCAT(c.first_name, ' ', c.surname)) AS name, c.email, c.job_title,
+                                           COALESCE(NULLIF(s.trading_name, ''), s.legal_name) AS supplier
+                                      FROM contacts c LEFT JOIN suppliers s ON s.id = c.supplier_id
+                                     WHERE CONCAT(c.first_name, ' ', c.surname) LIKE ? OR c.email LIKE ?
+                                     ORDER BY c.is_active DESC, name LIMIT " . $perType);
+            $stmt->execute([$like, $like]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $results[] = [
+                    'type' => 'supplier_contact', 'module' => 'people', 'id' => (int) $r['id'], 'title' => (string) $r['name'],
+                    'subtitle' => implode(' · ', array_filter([$r['supplier'], $r['job_title'], $r['email']])),
+                    'url' => entityLink('supplier_contact', (int) $r['id']),
+                ];
+            }
+        } catch (Exception $e) { /* no supplier results */ }
     }
 
     // --- Domains (#154): by name, registrar or tag -------------------------

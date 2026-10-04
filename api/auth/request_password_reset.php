@@ -16,6 +16,7 @@ require_once '../../includes/encryption.php';
 require_once '../../includes/mailbox_graph.php';    // mailboxCanSend
 require_once '../../includes/template_email.php';   // templateGraphContext, templateSendViaGraph
 require_once '../../includes/session_security.php';  // requestScheme() — proxy-aware (GH #152)
+require_once '../../includes/request_guard.php';     // origin + CSRF checks (S4) - this file skips functions.php
 
 try {
     $input = json_decode(file_get_contents('php://input'), true);

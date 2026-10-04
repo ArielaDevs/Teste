@@ -21,6 +21,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('assets');
 
 $asset_id = $_GET['asset_id'] ?? '';
 

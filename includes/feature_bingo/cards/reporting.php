@@ -1,6 +1,30 @@
 <?php
-/** Feature Bingo cards - Reporting: the Intune dashboard and the email import log. The module has no settings page and the ticket dashboards are not built yet. See includes/feature_bingo.php for the format. */
+/** Feature Bingo cards - Reporting: report packs, the Intune dashboard and the email import log. The module has no settings page and the ticket dashboards are not built yet. See includes/feature_bingo.php for the format. */
 return [
+    [
+        'id'       => 'reporting.report_pack',
+        'module'   => 'reporting',
+        'tier'     => 'recommended',
+        'category' => 'insight',
+        'title'    => 'Report pack',
+        'what'     => 'A multi-page report you design once - cover, headings, charts, tables and your own commentary from tickets, service status, software and assets - and export as a PDF for any period, under Reporting, Packs.',
+        'why'      => 'The monthly service report stops being an afternoon of screenshots: pick the period, check the summary, export.',
+        'done'     => 'At least one report pack has been made.',
+        'link'     => 'reporting/packs/',
+        'check'    => ['rows', 'report_packs'],
+    ],
+    [
+        'id'       => 'reporting.report_pack_shared',
+        'module'   => 'reporting',
+        'tier'     => 'extra',
+        'category' => 'insight',
+        'title'    => 'Shared report pack',
+        'what'     => 'A report pack shared with other analysts, a team or a department, to view and export or to edit together.',
+        'why'      => 'The person who reads the report each month can run it themselves, and sees only the figures their own access allows.',
+        'done'     => 'At least one report pack has been shared.',
+        'link'     => 'reporting/packs/',
+        'check'    => ['rows', 'report_pack_shares'],
+    ],
     [
         'id'       => 'reporting.email_import_log',
         'module'   => 'reporting',

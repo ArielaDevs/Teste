@@ -347,7 +347,8 @@ $identityPoints = [
 ];
 foreach ($identityPoints as $p) {
     $src = code("$APP/$p");
-    check("$p rotates the session id", strpos($src, 'sessionPromoteToAuthenticated()') !== false);
+    // sessionPromoteToAuthenticated() or (false) - a password change keeps the CSRF token (S4).
+    check("$p rotates the session id", (bool)preg_match('/sessionPromoteToAuthenticated\((false)?\)/', $src));
 
     // ⚠️ …and that the call can actually DO anything. Searching for the call string is
     // not the same as checking it works: api/self-service/change_password.php opened

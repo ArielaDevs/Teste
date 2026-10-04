@@ -1,0 +1,172 @@
+{
+    "tier1": {
+        "tenants": [
+            {
+                "_ref": "default",
+                "_skip_insert": true,
+                "_match_by": "is_default",
+                "_match_value": 1
+            }
+        ],
+        "cost_centres": [
+            {
+                "_ref": "board",
+                "tenant_id": "@tenants.default",
+                "code": "0010",
+                "name": "Board and Executive",
+                "description": "Directors' costs. The leading zeros are part of the code, as finance writes it."
+            },
+            {
+                "_ref": "it",
+                "tenant_id": "@tenants.default",
+                "code": "1000",
+                "name": "Information Technology",
+                "description": "All IT spend rolls up to here."
+            },
+            {
+                "_ref": "fin",
+                "tenant_id": "@tenants.default",
+                "code": "2000",
+                "name": "Finance"
+            },
+            {
+                "_ref": "ops",
+                "tenant_id": "@tenants.default",
+                "code": "3000",
+                "name": "Operations"
+            },
+            {
+                "_ref": "sales",
+                "tenant_id": "@tenants.default",
+                "code": "4000",
+                "name": "Sales and Marketing"
+            },
+            {
+                "_ref": "hr",
+                "tenant_id": "@tenants.default",
+                "code": "5000",
+                "name": "People and HR"
+            },
+            {
+                "_ref": "proj",
+                "tenant_id": "@tenants.default",
+                "code": "9000",
+                "name": "Projects",
+                "description": "One-off projects with their own budget."
+            },
+            {
+                "_ref": "shared",
+                "tenant_id": "@tenants.default",
+                "code": "N1414",
+                "name": "Shared services recharge",
+                "description": "Costs recharged to the other companies in the group at month end."
+            }
+        ]
+    },
+    "tier2": {
+        "cost_centres": [
+            {
+                "tenant_id": "@tenants.default",
+                "code": "1010",
+                "name": "IT Infrastructure",
+                "description": "Servers, network, storage and hosting.",
+                "parent_id": "@cost_centres.it"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "1020",
+                "name": "Service Desk",
+                "parent_id": "@cost_centres.it"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "1030",
+                "name": "Software Licensing",
+                "description": "Subscriptions and licence renewals.",
+                "parent_id": "@cost_centres.it"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "1040",
+                "name": "Telecoms and Mobiles",
+                "parent_id": "@cost_centres.it"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "1050",
+                "name": "End-user Devices",
+                "description": "Laptops, desktops, monitors and peripherals.",
+                "parent_id": "@cost_centres.it"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "2010",
+                "name": "Accounts Payable",
+                "parent_id": "@cost_centres.fin"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "2020",
+                "name": "Payroll",
+                "parent_id": "@cost_centres.fin"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "3010",
+                "name": "Facilities",
+                "parent_id": "@cost_centres.ops"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "3020",
+                "name": "Warehouse and Logistics",
+                "parent_id": "@cost_centres.ops"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "4010",
+                "name": "Marketing Campaigns",
+                "parent_id": "@cost_centres.sales"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "4020",
+                "name": "Field Sales",
+                "parent_id": "@cost_centres.sales"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "5010",
+                "name": "Recruitment",
+                "parent_id": "@cost_centres.hr"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "5020",
+                "name": "Training and Development",
+                "parent_id": "@cost_centres.hr"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "9010",
+                "name": "Office Move 2026",
+                "description": "Fit-out, cabling and moving costs for the new office.",
+                "parent_id": "@cost_centres.proj"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "9020",
+                "name": "Windows 11 Rollout",
+                "parent_id": "@cost_centres.proj"
+            },
+            {
+                "tenant_id": "@tenants.default",
+                "code": "9099",
+                "name": "Legacy CRM Migration",
+                "description": "Project closed. Kept so past costs still show where they went.",
+                "parent_id": "@cost_centres.proj",
+                "is_active": 0
+            }
+        ]
+    }
+}

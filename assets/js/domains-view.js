@@ -12,6 +12,8 @@
         await Promise.all([load(), loadLookups()]);
         const tab = new URLSearchParams(location.search).get('tab');
         if (tab) switchTab(tab);
+        // ?edit=1 - from the register's right-click Edit: straight into the dialog.
+        if (new URLSearchParams(location.search).get('edit') === '1' && D) openEdit();
     });
 
     async function load() {
@@ -19,6 +21,7 @@
             data = await api('get.php?id=' + ID);
             D = data.domain;
             renderHero(); renderOverview(); renderSecurity(); renderCerts(); renderLookalikes(); renderHistory();
+            loadConnections();
         } catch (e) {
             document.getElementById('hero').innerHTML = '<div class="dom-empty">' + esc(e.message) + '</div>';
         }
@@ -97,7 +100,8 @@
 
         const people = '<div class="dom-card"><div class="dom-card-h"><h3>' + esc(T('page.people_money')) + '</h3></div><div class="dom-card-b"><div class="dom-fields">'
             + row('field.owner', esc(D.owner_name || ''))
-            + row('field.tech_contact', esc(D.tech_contact_name || ''))
+            + row('field.tech_contact', techCell())
+            + row('field.customer', customerCell())
             + (data.multi_company ? row('field.company', esc(D.company_name || '')) : '')
             + row('field.cost', D.cost !== null ? esc(money(D.cost, D.currency)) + (D.billing_years > 1 ? ' <span class="dom-sub">/ ' + esc(T('page.years', { n: D.billing_years })) + '</span>' : '') : '')
             + row('field.cost_centre', esc(D.cost_centre || ''))
@@ -206,6 +210,166 @@
         }).join('');
     }
 
+
+    // ---------------------------------------------------------------- connections (3.0.0)
+    // What this domain is part of elsewhere: CIs, Service Status services,
+    // tickets, runbooks and its contract. One card per kind the analyst can open
+    // (the server leaves out the rest); link by searching, unlink with the ✕.
+    // Every rule is server-side in includes/domains/links.php.
+    const KINDS = [
+        { kind: 'cmdb',    icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' },
+        { kind: 'service', icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>' },
+        { kind: 'ticket',  icon: '<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h6"/>' },
+        { kind: 'article', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' },
+    ];
+    let C = null;
+
+    async function loadConnections() {
+        try { C = await api('links.php?domain_id=' + ID); }
+        catch (e) { C = { error: e.message }; }
+        renderConnections();
+    }
+
+    function connIcon(paths) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
+    }
+
+    function riskHtml() {
+        const s = C.status || {};
+        if (!s.ready || !(s.problems || []).length || !s.at_risk || s.mode === undefined) return '';
+        const why = s.problems.map(p => esc(p.kind === 'expired' ? T('links.risk_expired', { date: fmtDate(p.date) })
+            : T(p.date < new Date().toISOString().slice(0, 10) ? 'links.risk_cert_gone' : 'links.risk_cert', { date: fmtDate(p.date) }))).join(' ');
+        let act = '';
+        if (s.incident) {
+            act = '<div class="dom-conn-risk-act">' + esc(T('links.incident_open', { title: s.incident.title }))
+                + ' <a class="dom-btn" href="' + esc(window.DOM_BASE + 'service-status/') + '">' + esc(T('links.incident_view')) + '</a></div>';
+        } else if (s.mode === 'off') {
+            act = '<div class="dom-conn-risk-act dom-sub">' + esc(T('links.mode_off')) + '</div>';
+        } else if (!s.can_raise) {
+            act = '<div class="dom-conn-risk-act dom-sub">' + esc(T('links.cant_raise')) + '</div>';
+        } else {
+            act = '<div class="dom-conn-risk-act">' + (s.mode === 'auto' ? '<span class="dom-sub">' + esc(T('links.mode_auto')) + '</span> ' : '')
+                + '<button type="button" class="dom-btn danger" id="connRaise">' + esc(T('links.raise')) + '</button></div>';
+        }
+        return '<div class="dom-conn-risk" role="alert"><strong>' + esc(T('links.risk_title')) + '</strong> ' + why
+            + ' ' + esc(T('links.risk_body', { n: s.at_risk })) + act + '</div>';
+    }
+
+    function contractHtml() {
+        const has = D && D.contract_id;
+        const label = (data && data.domain && data.domain.contract_label) || '';
+        return '<div class="dom-card dom-conn-card"><div class="dom-card-h"><h3>' + connIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>')
+            + esc(T('links.contract_title')) + '</h3></div><div class="dom-card-b"><p class="dom-hint">' + esc(T('links.contract_hint')) + '</p>'
+            + (has ? '<a class="dom-conn-row-link" href="' + esc(window.DOM_BASE + 'contracts/view.php?id=' + D.contract_id) + '">' + esc(label || ('#' + D.contract_id)) + '</a>'
+                   : '<div class="dom-sub">' + esc(T('links.contract_none')) + '</div>')
+            + ' <button type="button" class="dom-btn" data-goto-edit="1">' + esc(T('links.contract_set')) + '</button></div></div>';
+    }
+
+    function rowHtml(kind, r) {
+        const extra = kind === 'ticket' && r.status
+            ? ' <span class="dom-pill" style="background:' + esc(r.status_colour || '#888') + '22;color:' + esc(r.status_colour || '#666') + '">' + esc(r.status) + '</span>'
+            : (r.inactive ? ' <span class="dom-pill grey">' + esc(T('links.inactive')) + '</span>' : '');
+        return '<li class="dom-conn-row"><div class="dom-conn-row-main"><a class="dom-conn-row-link" href="' + esc(window.DOM_BASE + r.url) + '">' + esc(r.label) + '</a>' + extra
+            + (r.sub ? '<div class="dom-sub">' + esc(r.sub) + '</div>' : '') + '</div>'
+            + '<button type="button" class="dom-conn-x" data-unlink="' + kind + '" data-id="' + r.id + '" title="' + esc(T('links.remove')) + '" aria-label="' + esc(T('links.remove')) + ': ' + esc(r.label) + '">&times;</button></li>';
+    }
+
+    function renderConnections() {
+        const host = document.getElementById('connections');
+        if (!host) return;
+        if (C.error) { host.innerHTML = '<div class="dom-empty">' + esc(C.error) + '</div>'; return; }
+        if (C.ready === false) { host.innerHTML = '<div class="dom-card"><div class="dom-card-b dom-sub">' + esc(T('links.not_ready')) + '</div></div>'; return; }
+        const kinds = KINDS.filter(k => C.links && C.links[k.kind] !== undefined);
+        let total = 0;
+        const cards = kinds.map(k => {
+            const rows = C.links[k.kind];
+            total += rows.length;
+            return '<div class="dom-card dom-conn-card" data-kind="' + k.kind + '"><div class="dom-card-h"><h3>' + connIcon(k.icon) + esc(T('links.' + k.kind + '_title'))
+                + ' <span class="dom-pill grey">' + rows.length + '</span></h3></div><div class="dom-card-b">'
+                + '<p class="dom-hint">' + esc(T('links.' + k.kind + '_hint')) + '</p>'
+                + (rows.length ? '<ul class="dom-conn-list">' + rows.map(r => rowHtml(k.kind, r)).join('') + '</ul>' : '<div class="dom-sub dom-conn-none">' + esc(T('links.none')) + '</div>')
+                + '<div class="dom-person dom-conn-search"><input type="text" data-search="' + k.kind + '" autocomplete="off" placeholder="' + esc(T('links.search_ph')) + '" aria-label="' + esc(T('links.' + k.kind + '_title')) + ': ' + esc(T('links.search_ph')) + '">'
+                + '<ul class="dom-person-results" data-results="' + k.kind + '" role="listbox" hidden></ul></div>'
+                + '</div></div>';
+        }).join('');
+        host.innerHTML = riskHtml() + '<p class="dom-hint dom-conn-intro">' + esc(T('links.intro')) + '</p>'
+            + '<div class="dom-conn-grid">' + contractHtml() + (cards || '') + '</div>'
+            + (kinds.length ? '' : '<div class="dom-sub">' + esc(T('links.nothing_allowed')) + '</div>');
+        const badge = document.getElementById('connBadge');
+        if (badge) badge.innerHTML = total ? '<span class="dom-pill grey">' + total + '</span>' : '';
+        const risk = C.status && C.status.at_risk && (C.status.problems || []).length && !C.status.incident;
+        if (badge && risk) badge.innerHTML = '<span class="dom-pill red">' + total + '</span>';
+    }
+
+    let connTimer = null;
+    async function connSearch(input) {
+        const kind = input.dataset.search;
+        const ul = document.querySelector('[data-results="' + kind + '"]');
+        try {
+            const d = await api('links.php?domain_id=' + ID + '&search=' + encodeURIComponent(kind) + '&q=' + encodeURIComponent(input.value.trim()));
+            const res = d.results || [];
+            ul.innerHTML = res.length
+                ? res.map(r => '<li role="option" tabindex="-1" data-add="' + kind + '" data-id="' + r.id + '">' + esc(r.label) + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</li>').join('')
+                : '<li class="dom-sub" aria-disabled="true">' + esc(T('links.no_match')) + '</li>';
+            ul.hidden = false;
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    function wireConnections() {
+        const host = document.getElementById('connections');
+        if (!host) return;
+        host.addEventListener('input', e => {
+            const inp = e.target.closest('[data-search]');
+            if (!inp) return;
+            clearTimeout(connTimer);
+            connTimer = setTimeout(() => connSearch(inp), 220);
+        });
+        host.addEventListener('focusin', e => { const inp = e.target.closest('[data-search]'); if (inp) connSearch(inp); });
+        host.addEventListener('focusout', e => {
+            const box = e.target.closest('.dom-conn-search');
+            if (box) setTimeout(() => { if (!box.contains(document.activeElement)) box.querySelector('.dom-person-results').hidden = true; }, 150);
+        });
+        // mousedown, not click: the input's blur would hide the list first.
+        host.addEventListener('mousedown', async e => {
+            const li = e.target.closest('[data-add]');
+            if (!li) return;
+            e.preventDefault();
+            try {
+                await api('links.php', { action: 'add', domain_id: ID, kind: li.dataset.add, target_id: Number(li.dataset.id) });
+                showToast(T('links.linked'), 'success');
+                await loadConnections();
+            } catch (err) { showToast(err.message, 'error'); }
+        });
+        host.addEventListener('click', async e => {
+            const x = e.target.closest('[data-unlink]');
+            if (x) {
+                try {
+                    await api('links.php', { action: 'remove', domain_id: ID, kind: x.dataset.unlink, target_id: Number(x.dataset.id) });
+                    showToast(T('links.unlinked'), 'success');
+                    await loadConnections();
+                } catch (err) { showToast(err.message, 'error'); }
+                return;
+            }
+            if (e.target.closest('[data-goto-edit]')) { openEdit(); return; }
+            if (e.target.id === 'connRaise') {
+                busy(e.target, async () => {
+                    await api('links.php', { action: 'raise_incident', domain_id: ID });
+                    showToast(T('links.raised'), 'success');
+                    await loadConnections();
+                });
+            }
+        });
+        host.addEventListener('keydown', e => {
+            const li = e.target.closest('[data-add]');
+            if (li && e.key === 'Enter') { e.preventDefault(); li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+            if (e.key === 'Escape') { const ul = e.target.closest('.dom-conn-search')?.querySelector('.dom-person-results'); if (ul) ul.hidden = true; }
+            if (e.key === 'ArrowDown' && e.target.matches('[data-search]')) {
+                const first = e.target.closest('.dom-conn-search').querySelector('[data-add]');
+                if (first) { e.preventDefault(); first.focus(); }
+            }
+        });
+    }
+
     // ---------------------------------------------------------------- actions
     function switchTab(tab) {
         document.querySelectorAll('#domTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -218,6 +382,7 @@
     }
 
     function wire() {
+        wireConnections();
         document.getElementById('domTabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) switchTab(b.dataset.tab); });
         document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => window.Dom.closeModal(b.dataset.close)));
         document.getElementById('btnRefresh').addEventListener('click', e => busy(e.currentTarget, async () => {
@@ -262,7 +427,62 @@
         });
     }
 
+    // ------------------------------------- who: tech contact + customer (#162)
+    // The technical contact is a supplier contact OR one of your analysts; the
+    // customer is a person OR a supplier, optionally with one of its contacts.
+    function peopleLink(page, id, name) {
+        const label = esc(name || ('#' + id));
+        const ok = page === 'person.php' ? window.DOM_PEOPLE : (window.DOM_PEOPLE && window.DOM_PEOPLE_SUPPLIERS);
+        return ok ? '<a href="' + esc(window.DOM_PEOPLE + page + '?id=' + id) + '">' + label + '</a>' : label;
+    }
+    function techCell() {
+        if (D.tech_analyst_id) return esc(D.tech_analyst_name || ('#' + D.tech_analyst_id)) + '<div class="dom-sub">' + esc(T('field.tech_is_analyst')) + '</div>';
+        if (D.tech_contact_id) return peopleLink('contact.php', D.tech_contact_id, D.tech_contact_name);
+        return '';
+    }
+    function customerCell() {
+        if (D.customer_user_id) {
+            return peopleLink('person.php', D.customer_user_id, D.customer_user_name)
+                + (D.customer_user_email && D.customer_user_email !== D.customer_user_name ? '<div class="dom-sub">' + esc(D.customer_user_email) + '</div>' : '');
+        }
+        if (D.customer_supplier_id && D.customer_contact_id) {
+            return peopleLink('supplier.php', D.customer_supplier_id, D.customer_supplier_name)
+                + '<div class="dom-sub">' + peopleLink('contact.php', D.customer_contact_id, D.customer_contact_name) + '</div>';
+        }
+        if (D.customer_supplier_id) return peopleLink('supplier.php', D.customer_supplier_id, D.customer_supplier_name);
+        if (D.customer_contact_id) return peopleLink('contact.php', D.customer_contact_id, D.customer_contact_name);
+        return '';
+    }
+    function customerLabel() {
+        if (D.customer_user_id) return D.customer_user_name || '';
+        if (D.customer_contact_id) return (D.customer_contact_name || '') + (D.customer_supplier_name ? ' (' + D.customer_supplier_name + ')' : '');
+        if (D.customer_supplier_id) return D.customer_supplier_name || '';
+        return '';
+    }
+
     // ---------------------------------------------------------------- edit
+    let techAtOpen = '', custAtOpen = '';
+    function fillTech() {
+        const sel = document.getElementById('eTech');
+        const opt = (v, label) => { const o = document.createElement('option'); o.value = v; o.textContent = label; return o; };
+        const group = (label, items) => { const g = document.createElement('optgroup'); g.label = label; g.append(...items); return g; };
+        sel.replaceChildren(opt('', '—'));
+        if (L.parties_ready) {
+            const analysts = (L.analysts || []).slice();
+            // Somebody set earlier who has since left stays on the list, so the
+            // dialog shows the truth; saving sends this field only if it changed.
+            if (D.tech_analyst_id && !analysts.some(a => +a.id === D.tech_analyst_id)) analysts.unshift({ id: D.tech_analyst_id, name: D.tech_analyst_name || ('#' + D.tech_analyst_id) });
+            sel.append(group(T('field.tech_group_analysts'), analysts.map(a => opt('a:' + a.id, a.name))));
+        }
+        // Contacts are listed only for analysts who can open Contracts; the one
+        // already set is always kept, so opening and saving never clears it.
+        const contacts = (L.contacts || []).slice();
+        if (D.tech_contact_id && !contacts.some(c => +c.id === D.tech_contact_id)) contacts.unshift({ id: D.tech_contact_id, name: D.tech_contact_name || ('#' + D.tech_contact_id) });
+        if (contacts.length) sel.append(group(T('field.tech_group_contacts'), contacts.map(c => opt('c:' + c.id, c.name))));
+        sel.value = D.tech_analyst_id ? 'a:' + D.tech_analyst_id : (D.tech_contact_id ? 'c:' + D.tech_contact_id : '');
+        techAtOpen = sel.value;
+    }
+
     function openEdit() {
         if (!L) { showToast(T('err.generic'), 'error'); return; }
         const F = window.Dom.fillSelect;
@@ -274,8 +494,12 @@
         F('eAccount', acc, { blank: '—' });
         F('eRenewal', L.renewal_modes.map(m => ({ id: m, name: renewal(m) })));
         F('eTLock', [{ id: '1', name: T('lock.on') }, { id: '0', name: T('lock.off') }], { blank: T('lock.unknown') });
-        F('eContract', L.contracts || [], { blank: '—' });
-        F('eTech', L.contacts || [], { blank: '—' });
+        // A linked customer contract this analyst cannot see (#153) is not in the
+        // list; keep it as an option so saving the form does not unlink it.
+        const contracts = (L.contracts || []).slice();
+        if (D.contract_id && !contracts.some(c => +c.id === D.contract_id)) contracts.unshift({ id: D.contract_id, name: T('field.contract_hidden') });
+        F('eContract', contracts, { blank: '—' });
+        fillTech();
         document.querySelectorAll('#editForm [data-f]').forEach(el => {
             const k = el.dataset.f;
             let v = D[k];
@@ -284,8 +508,85 @@
             el.value = v === null || v === undefined ? '' : v;
         });
         document.getElementById('ePurposeHint').textContent = T('purpose_hint.' + D.purpose);
+        const ck = D.customer_user_id ? 'user:' + D.customer_user_id
+                 : D.customer_contact_id ? 'contact:' + D.customer_contact_id
+                 : D.customer_supplier_id ? 'supplier:' + D.customer_supplier_id : '';
+        setCustomer(ck, customerLabel());
+        custAtOpen = ck;
         window.Dom.openModal('mEdit');
     }
+
+    // --------------------------------- customer: person (#153) or supplier (#162)
+    // eCustomerId holds "user:5", "supplier:3" or "contact:9" - one kind only.
+    function setCustomer(key, label) {
+        document.getElementById('eCustomerId').value = key || '';
+        document.getElementById('eCustomer').value = label || '';
+        document.getElementById('eCustomerClear').hidden = !key;
+        hideCustomers();
+    }
+    function hideCustomers() { const ul = document.getElementById('eCustomerResults'); ul.hidden = true; ul.replaceChildren(); }
+    let custTimer = null, custSeq = 0;
+    function searchCustomers() {
+        document.getElementById('eCustomerId').value = '';   // typing again means choosing again
+        document.getElementById('eCustomerClear').hidden = true;
+        clearTimeout(custTimer);
+        const q = document.getElementById('eCustomer').value.trim();
+        if (q.length < 2) { hideCustomers(); return; }
+        custTimer = setTimeout(async () => {
+            const seq = ++custSeq;
+            let people = [], suppliers = [];
+            try {
+                const res = await api('people.php?domain_id=' + ID + '&q=' + encodeURIComponent(q));
+                people = res.people || []; suppliers = res.suppliers || [];
+            } catch (e) { people = []; suppliers = []; }
+            if (seq !== custSeq) return;
+            const ul = document.getElementById('eCustomerResults');
+            if (!people.length && !suppliers.length) {
+                const li = document.createElement('li'); li.textContent = T('field.customer_none'); li.setAttribute('aria-disabled', 'true');
+                ul.replaceChildren(li); ul.hidden = false; return;
+            }
+            const item = (key, label, sub) => {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option'); li.dataset.id = key; li.dataset.label = label;
+                li.append(document.createTextNode(label));
+                if (sub) { const s = document.createElement('small'); s.textContent = sub; li.append(s); }
+                li.addEventListener('mousedown', e => { e.preventDefault(); setCustomer(key, label); });
+                return li;
+            };
+            const heading = text => { const li = document.createElement('li'); li.className = 'dom-person-group'; li.setAttribute('role', 'presentation'); li.textContent = text; return li; };
+            const out = [];
+            // Headings only when both kinds are there - one list needs no label.
+            if (people.length && suppliers.length) out.push(heading(T('field.customer_group_people')));
+            people.forEach(p => out.push(item('user:' + p.id, p.name, p.email && p.email !== p.name ? p.email : '')));
+            if (suppliers.length && people.length) out.push(heading(T('field.customer_group_suppliers')));
+            suppliers.forEach(s => s.kind === 'supplier'
+                ? out.push(item('supplier:' + s.id, s.name, T('field.customer_is_supplier')))
+                : out.push(item('contact:' + s.id, s.name + (s.supplier ? ' (' + s.supplier + ')' : ''), s.email || '')));
+            ul.replaceChildren(...out);
+            ul.hidden = false;
+        }, 220);
+    }
+    function customerKeys(e) {
+        const ul = document.getElementById('eCustomerResults');
+        const items = Array.from(ul.querySelectorAll('li[role=option]'));
+        if (ul.hidden || !items.length) return;
+        let i = items.findIndex(li => li.getAttribute('aria-selected') === 'true');
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
+            items.forEach((li, n) => li.setAttribute('aria-selected', n === i ? 'true' : 'false'));
+        } else if (e.key === 'Enter' && i >= 0) {
+            e.preventDefault(); setCustomer(items[i].dataset.id, items[i].dataset.label);
+        } else if (e.key === 'Escape') { hideCustomers(); }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        const input = document.getElementById('eCustomer');
+        if (!input) return;   // no edit modal for a domain that does not exist
+        input.addEventListener('input', searchCustomers);
+        input.addEventListener('keydown', customerKeys);
+        document.getElementById('eCustomerClear').addEventListener('click', () => { setCustomer('', ''); input.focus(); });
+        document.addEventListener('click', e => { if (!e.target.closest('.dom-person')) hideCustomers(); });
+    });
 
     async function saveEdit() {
         const body = { id: ID };
@@ -293,6 +594,22 @@
             const k = el.dataset.f;
             body[k] = el.dataset.bool ? (el.checked ? 1 : 0) : el.value;
         });
+        // Who (#162): sent only when changed, so a contact or analyst set by
+        // somebody else - one this analyst's lists cannot show - is left alone.
+        const tech = document.getElementById('eTech').value;
+        if (tech !== techAtOpen) {
+            body.tech_contact_id = tech.startsWith('c:') ? tech.slice(2) : null;
+            if (L.parties_ready) body.tech_analyst_id = tech.startsWith('a:') ? tech.slice(2) : null;
+        }
+        const cust = document.getElementById('eCustomerId').value;
+        if (cust !== custAtOpen) {
+            const [kind, id] = cust ? cust.split(':') : ['', ''];
+            body.customer_user_id = kind === 'user' ? id : null;
+            if (L.parties_ready) {
+                body.customer_supplier_id = kind === 'supplier' ? id : null;
+                body.customer_contact_id = kind === 'contact' ? id : null;
+            }
+        }
         const btn = document.getElementById('eSave');
         btn.disabled = true;
         try {

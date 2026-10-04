@@ -78,6 +78,7 @@ function featureBingoModules(): array
         'tickets'        => 'Tickets',
         'self-service'   => 'Self-service portal',
         'assets'         => 'Asset Management',
+        'people'         => 'People',
         'knowledge'      => 'Knowledge',
         'changes'        => 'Change Management',
         'problems'       => 'Problem Management',

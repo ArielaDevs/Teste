@@ -46,7 +46,7 @@ $translationNamespaces = ['common', 'reporting'];
     </style>
     <!-- Mobile layer LAST, after this page's own <style> block, or a rule at
          equal specificity loses on document order (Techniques §9). -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="reporting" data-mobile-page="rep-help">
     <?php include 'includes/header.php'; ?>
@@ -59,24 +59,28 @@ $translationNamespaces = ['common', 'reporting'];
                 <span class="help-nav-num">1</span>
                 <?php echo htmlspecialchars(t('reporting.help.nav_overview')); ?>
             </a>
-            <a href="#ticket-reports" class="help-nav-link" data-section="ticket-reports">
+            <a href="#report-packs" class="help-nav-link" data-section="report-packs">
                 <span class="help-nav-num">2</span>
+                <?php echo htmlspecialchars(t('reporting.help.nav_packs')); ?>
+            </a>
+            <a href="#ticket-reports" class="help-nav-link" data-section="ticket-reports">
+                <span class="help-nav-num">3</span>
                 <?php echo htmlspecialchars(t('reporting.help.nav_ticket_reports')); ?>
             </a>
             <a href="#system-logs" class="help-nav-link" data-section="system-logs">
-                <span class="help-nav-num">3</span>
+                <span class="help-nav-num">4</span>
                 <?php echo htmlspecialchars(t('reporting.help.nav_system_logs')); ?>
             </a>
             <a href="#understanding-data" class="help-nav-link" data-section="understanding-data">
-                <span class="help-nav-num">4</span>
+                <span class="help-nav-num">5</span>
                 <?php echo htmlspecialchars(t('reporting.help.nav_understanding_data')); ?>
             </a>
             <a href="#settings-filters" class="help-nav-link" data-section="settings-filters">
-                <span class="help-nav-num">5</span>
+                <span class="help-nav-num">6</span>
                 <?php echo htmlspecialchars(t('reporting.help.nav_settings_filters')); ?>
             </a>
             <a href="#tips" class="help-nav-link" data-section="tips">
-                <span class="help-nav-num">6</span>
+                <span class="help-nav-num">7</span>
                 <?php echo htmlspecialchars(t('reporting.help.nav_tips')); ?>
             </a>
         </div>
@@ -132,10 +136,52 @@ $translationNamespaces = ['common', 'reporting'];
                     </div>
                 </div>
 
-                <!-- Section 2: Ticket Reports -->
-                <div class="help-section" id="ticket-reports">
+                <!-- Section 2: Report Packs -->
+                <div class="help-section" id="report-packs">
                     <div class="help-section-header">
                         <span class="help-section-num">2</span>
+                        <h3><?php echo htmlspecialchars(t('reporting.help.packs_heading')); ?></h3>
+                    </div>
+                    <p><?php echo htmlspecialchars(t('reporting.help.packs_intro')); ?></p>
+
+                    <div class="help-cards cols-3">
+                        <?php foreach (['create', 'design', 'text', 'period', 'share', 'export'] as $k): ?>
+                        <div class="help-card">
+                            <strong><?php echo htmlspecialchars(t('reporting.help.packs_' . $k . '_title')); ?></strong>
+                            <span><?php echo htmlspecialchars(t('reporting.help.packs_' . $k . '_body')); ?></span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <h4><?php echo htmlspecialchars(t('reporting.help.packs_blocks_heading')); ?></h4>
+                    <div class="help-defs">
+                        <?php foreach (['tickets', 'status', 'software', 'assets', 'layout'] as $k): ?>
+                        <div class="help-def">
+                            <span class="help-def-term"><?php echo htmlspecialchars(t('reporting.help.packs_area_' . $k)); ?></span>
+                            <div class="help-def-desc"><?php echo htmlspecialchars(t('reporting.help.packs_area_' . $k . '_body')); ?></div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <h4><?php echo htmlspecialchars(t('reporting.help.packs_keys_heading')); ?></h4>
+                    <div class="help-table">
+                        <table>
+                            <tbody>
+                                <?php foreach (['save' => 'Ctrl+S', 'undo' => 'Ctrl+Z', 'redo' => 'Ctrl+Y', 'copy' => 'Ctrl+C / Ctrl+V', 'duplicate' => 'Ctrl+D', 'delete' => 'Delete', 'move' => 'Alt+↑ / Alt+↓', 'edit' => 'Enter', 'zoom' => 'Ctrl + wheel', 'export' => 'Ctrl+P'] as $k => $keys): ?>
+                                <tr><td><kbd><?php echo htmlspecialchars($keys); ?></kbd></td><td><?php echo htmlspecialchars(t('reporting.help.packs_key_' . $k)); ?></td></tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="help-note"><?php echo htmlspecialchars(t('reporting.help.packs_access_note')); ?></p>
+                    <p class="help-note"><?php echo htmlspecialchars(t('reporting.help.packs_fonts_note')); ?></p>
+                </div>
+
+                <!-- Section 3: Ticket Reports -->
+                <div class="help-section" id="ticket-reports">
+                    <div class="help-section-header">
+                        <span class="help-section-num">3</span>
                         <h3><?php echo htmlspecialchars(t('reporting.help.s2_heading')); ?></h3>
                     </div>
                     <p><?php echo htmlspecialchars(t('reporting.help.s2_intro')); ?></p>
@@ -170,10 +216,10 @@ $translationNamespaces = ['common', 'reporting'];
                     <p class="help-note"><?php echo htmlspecialchars(t('reporting.help.s2_tip')); ?></p>
                 </div>
 
-                <!-- Section 3: System Logs -->
+                <!-- Section 4: System Logs -->
                 <div class="help-section" id="system-logs">
                     <div class="help-section-header">
-                        <span class="help-section-num">3</span>
+                        <span class="help-section-num">4</span>
                         <h3><?php echo htmlspecialchars(t('reporting.help.s3_heading')); ?></h3>
                     </div>
                     <p><?php echo htmlspecialchars(t('reporting.help.s3_intro')); ?></p>
@@ -229,10 +275,10 @@ $translationNamespaces = ['common', 'reporting'];
                     <p class="help-note"><?php echo htmlspecialchars(t('reporting.help.s3_tip')); ?></p>
                 </div>
 
-                <!-- Section 4: Understanding the Data (highlighted) -->
+                <!-- Section 5: Understanding the Data (highlighted) -->
                 <div class="help-section" id="understanding-data">
                     <div class="help-section-header">
-                        <span class="help-section-num">4</span>
+                        <span class="help-section-num">5</span>
                         <h3><?php echo htmlspecialchars(t('reporting.help.s4_heading')); ?></h3>
                     </div>
                     <p><?php echo htmlspecialchars(t('reporting.help.s4_intro')); ?></p>
@@ -261,10 +307,10 @@ $translationNamespaces = ['common', 'reporting'];
                     <p class="help-note"><?php echo htmlspecialchars(t('reporting.help.s4_tip')); ?></p>
                 </div>
 
-                <!-- Section 5: Settings & Filters -->
+                <!-- Section 6: Settings & Filters -->
                 <div class="help-section" id="settings-filters">
                     <div class="help-section-header">
-                        <span class="help-section-num">5</span>
+                        <span class="help-section-num">6</span>
                         <h3><?php echo htmlspecialchars(t('reporting.help.s5_heading')); ?></h3>
                     </div>
                     <p><?php echo htmlspecialchars(t('reporting.help.s5_intro')); ?></p>
@@ -305,10 +351,10 @@ $translationNamespaces = ['common', 'reporting'];
                     <p class="help-note"><?php echo htmlspecialchars(t('reporting.help.s5_tip')); ?></p>
                 </div>
 
-                <!-- Section 6: Quick Tips -->
+                <!-- Section 7: Quick Tips -->
                 <div class="help-section" id="tips">
                     <div class="help-section-header">
-                        <span class="help-section-num">6</span>
+                        <span class="help-section-num">7</span>
                         <h3><?php echo htmlspecialchars(t('reporting.help.s6_heading')); ?></h3>
                     </div>
                     <div class="help-cards">
@@ -376,6 +422,6 @@ $translationNamespaces = ['common', 'reporting'];
             });
         });
     </script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

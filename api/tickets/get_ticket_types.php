@@ -25,6 +25,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireAnyModuleAccessJson(['tickets', 'morning-checks']);
 
 try {
     $conn = connectToDatabase();

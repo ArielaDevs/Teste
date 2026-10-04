@@ -125,10 +125,17 @@ function sessionCookieOptions(): array
  * refusing to log somebody in over a cookie-attribute problem would be a worse
  * outcome than the one being prevented.
  */
-function sessionPromoteToAuthenticated(): void
+function sessionPromoteToAuthenticated(bool $newIdentity = true): void
 {
     if (session_status() !== PHP_SESSION_ACTIVE) {
         return;
+    }
+    // A new CSRF token at sign-in, so a token seen before login (by whoever planted
+    // the session) is worthless after it. Not on a password change - the person is
+    // the same, and the page they changed it on must keep working.
+    if ($newIdentity) {
+        require_once __DIR__ . '/csrf.php';
+        csrfRotate();
     }
     if (headers_sent($file, $line)) {
         error_log("session_security: cannot rotate the session id, output already started at $file:$line");

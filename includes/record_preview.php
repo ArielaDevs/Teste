@@ -342,19 +342,23 @@ function recordPreviewAsset(PDO $conn, int $analystId, int $id): ?array
 // ── Contract ────────────────────────────────────────────────────────────────
 function recordPreviewContract(PDO $conn, int $analystId, int $id): ?array
 {
-    // ⚠️ No tenancy filter: contracts carry no tenant_id. The module gate is the
-    // whole of the check, which is true of the contracts module generally — see
-    // includes/contract_assets.php.
+    // Contracts carry no tenant_id, but a CUSTOMER contract belongs to its customer's
+    // company (#153): one this analyst may not see previews as nothing at all.
+    require_once __DIR__ . '/contract_party.php';
+    [$partyCols, $partyJoins] = contractPartySql($conn, 'c');
+    [$vis, $visParams] = contractVisibilitySql($conn, $analystId, 'c');
     $stmt = $conn->prepare(
         "SELECT c.contract_number, c.title, c.contract_end, c.notice_date,
-                s.legal_name AS supplier, s.trading_name AS supplier_trading,
+                s.legal_name AS supplier_name, s.trading_name AS supplier_trading_name,
                 st.name AS status
+                $partyCols
            FROM contracts c
       LEFT JOIN suppliers s          ON s.id = c.supplier_id
       LEFT JOIN contract_statuses st ON st.id = c.contract_status_id
-          WHERE c.id = ?"
+                $partyJoins
+          WHERE c.id = ?$vis"
     );
-    $stmt->execute([$id]);
+    $stmt->execute(array_merge([$id], $visParams));
     $r = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$r) return null;
 
@@ -362,7 +366,9 @@ function recordPreviewContract(PDO $conn, int $analystId, int $id): ?array
         'heading' => trim(($r['contract_number'] ?? '') . ' ' . ($r['title'] ?? '')),
         'fields'  => rpFields([
             rpField(t('common.preview.status'),   $r['status']),
-            rpField(t('common.preview.supplier'), $r['supplier_trading'] ?: $r['supplier']),
+            ($r['party_type'] ?? 'supplier') === 'customer'
+                ? rpField(t('common.preview.customer'), contractPartyLabel($r))
+                : rpField(t('common.preview.supplier'), contractPartyLabel($r)),
             rpField(t('common.preview.renewal'),  $r['contract_end']),
             // Not in the promised list, and included anyway: on a contract the
             // notice date is the one that costs money to miss.

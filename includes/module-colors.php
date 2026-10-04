@@ -23,6 +23,8 @@ $defaultModuleColors = [
     // Domains: a deep lime-olive, distinct from Assets' green and Service
     // Status' emerald, and dark enough to carry white text in the header.
     'domains'        => ['#4d7c0f', '#3f6212'],
+    // People (#153): a plum, apart from CMDB's pink and Tasks' violet.
+    'people'         => ['#a21caf', '#86198f'],
     'service-status' => ['#10b981', '#059669'],
     'war-room'       => ['#ea580c', '#c2410c'],
     'wiki'           => ['#c62828', '#b71c1c'],

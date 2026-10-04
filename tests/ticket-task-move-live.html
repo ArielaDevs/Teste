@@ -183,8 +183,9 @@ const ticketOf = async () =>
     log('FAIL  CLEANUP REFUSED: original ticket was ' + originalTicket + ' — put it back by hand');
     f.remove(); return;
   }
+  // This page is not a FreeITSM page, so it sends the token the loaded page carries (S4).
   await fetch('../api/tasks/save.php', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': (f.contentDocument.querySelector('meta[name="csrf-token"]') || {}).content || '' },
     body: JSON.stringify({ id: Number(TASK), ticket_id: Number(originalTicket) })
   });
   await new Promise(r => setTimeout(r, 1200));

@@ -19,6 +19,7 @@ $tabCaps = [
     'alerts'     => Cap::DOMAINS_ALERTS,
     'monitoring' => Cap::DOMAINS_MONITORING,
     'auth-codes' => Cap::DOMAINS_AUTH_CODES,
+    'service-status' => Cap::DOMAINS_SERVICE_STATUS,
 ];
 
 domainApiRun(function () use ($conn, $analystId, $tabCaps) {
@@ -92,6 +93,6 @@ domainApiRun(function () use ($conn, $analystId, $tabCaps) {
     foreach ($clean as $k => $v) domainSettingWrite($conn, $k, $v);
 
     // Where renewals show changed → the calendar follows at once.
-    if (isset($clean['domain_expiry_surface'])) domainSyncExpiryCalendar($conn);
+    if (isset($clean['domain_expiry_surface']) || isset($clean['domain_cert_surface'])) domainSyncExpiryCalendar($conn);
     domainApiOk(['settings' => domainSettings($conn, true)]);
 });

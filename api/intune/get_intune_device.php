@@ -13,6 +13,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('assets');
 
 $assetId = isset($_GET['asset_id']) ? (int)$_GET['asset_id'] : 0;
 if ($assetId <= 0) {

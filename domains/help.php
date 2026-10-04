@@ -29,23 +29,26 @@ $multi = isMultiTenant(connectToDatabase());
 // id => number of paragraphs (help.<id>.p1 … pN). The company section only
 // appears where there is more than one company, like every other help page.
 $sections = [
-    'overview'   => 3,
+    'overview'   => 4,
     'adding'     => 5,
     'grade'      => 4,
     'email'      => 5,
-    'certs'      => 4,
+    'certs'      => 5,
     'lookalikes' => 3,
     'changes'    => 3,
-    'alerts'     => 6,
+    'alerts'     => 7,
+    'connections'=> 3,
+    'status'     => 4,
+    'rightclick' => 1,
     'accounts'   => 4,
     'schedule'   => 5,
-    'companies'  => 3,
-    'api'        => 3,
+    'companies'  => 4,
+    'api'        => 4,
 ];
 if (!$multi) unset($sections['companies']);
 $h = fn(string $k, array $p = []) => htmlspecialchars(t('domains.help.' . $k, $p));
-/** Paragraph text may carry `code` in backticks, rendered as <code>. */
-$para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspecialchars(t('domains.help.' . $k)));
+/** Paragraph text may carry `code` in backticks and **bold**. */
+$para = fn(string $k) => preg_replace(['/\*\*([^*]+)\*\*/', '/`([^`]+)`/'], ['<strong>$1</strong>', '<code>$1</code>'], htmlspecialchars(t('domains.help.' . $k)));
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
@@ -70,9 +73,9 @@ $para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspec
             --on-accent:    var(--dom-on-accent, #fff);
         }
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
-<body>
+<body data-mobile-module="domains" data-mobile-page="domains-help">
     <?php include 'includes/header.php'; ?>
 
     <div class="help-container">
@@ -138,6 +141,6 @@ $para = fn(string $k) => preg_replace('/`([^`]+)`/', '<code>$1</code>', htmlspec
             });
         });
     </script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

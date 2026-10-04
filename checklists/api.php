@@ -94,7 +94,8 @@ if ($action === 'save') {
 }
 
 if ($action === 'delete') {
-    $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
+    // POST only: a delete must never be reachable from a link (S4).
+    $id = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? (int)($_POST['id'] ?? 0) : 0;
     if ($id > 0) {
         // 🔴 Children first, explicitly - there is no FK on template_id, and a
         // Database-Verification-grown install would not have one even if there were.

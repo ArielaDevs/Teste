@@ -84,6 +84,20 @@ function entityLink(string $type, int $id): ?string {
         // ⚠️ ONLY `id` — domains/view.php reads exactly that.
         case 'domain':
             return 'domains/view.php?id=' . $id;
+
+        // People (#153): a person is a row in `users`, a company a row in `tenants`.
+        case 'person':
+            return 'people/person.php?id=' . $id;
+
+        case 'company':
+            return 'people/company.php?id=' . $id;
+
+        // Suppliers and their contacts (#153 step 3): shown in People, kept in Contracts.
+        case 'supplier':
+            return 'people/supplier.php?id=' . $id;
+
+        case 'supplier_contact':
+            return 'people/contact.php?id=' . $id;
     }
 
     return null;
@@ -99,5 +113,6 @@ function entityLinkTypes(): array {
     return [
         'ticket', 'task', 'problem', 'change',
         'asset', 'cmdb_object', 'knowledge_article', 'contract', 'domain',
+        'person', 'company', 'supplier', 'supplier_contact',
     ];
 }

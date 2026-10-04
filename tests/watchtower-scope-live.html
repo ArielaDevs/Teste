@@ -56,8 +56,9 @@ document.body.appendChild(f); f.src='../watchtower/';
      JSON.stringify(pref));
 
   // Put it back.
+  // This page is not a FreeITSM page, so it sends the token the loaded page carries (S4).
   await fetch('../api/system/set_user_preference.php',{method:'POST',credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'watchtower_scope',value:'all'})});
+    headers:{'Content-Type':'application/json','X-CSRF-Token':(d().querySelector('meta[name="csrf-token"]')||{}).content||''},body:JSON.stringify({key:'watchtower_scope',value:'all'})});
   log('\ncleanup: scope preference set back to "all"');
 })();
 </script></body>

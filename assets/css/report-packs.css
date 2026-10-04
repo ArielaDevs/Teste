@@ -1,0 +1,157 @@
+/*
+ * Report Packs - the list page (reporting/packs/index.php).
+ * The designer has its own stylesheet (report-packs-designer.css).
+ * Theme tokens only (assets/css/theme.css), so dark mode needs nothing here.
+ */
+
+body { --accent: var(--rep-accent, #ca5010); --accent-hover: var(--rep-accent-hover, #a5410a); }
+
+.rp-list-page {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--app-bg, #f5f7fa);
+    padding: 28px 32px 48px;
+    display: block;
+}
+
+.rp-list-toolbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    max-width: 1240px;
+    margin: 0 auto 24px;
+}
+.rp-list-toolbar h1 { margin: 0; font-size: 24px; color: var(--text, #333); }
+.rp-list-sub { margin: 4px 0 0; color: var(--text-muted, #666); font-size: 14px; }
+.rp-list-actions { display: flex; gap: 10px; align-items: center; }
+
+.rp-search, .rp-input {
+    padding: 9px 12px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 14px;
+    background: var(--surface, #fff);
+    color: var(--text, #333);
+    box-sizing: border-box;
+}
+.rp-input { width: 100%; }
+.rp-search { width: 260px; }
+.rp-search:focus, .rp-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--rep-accent-soft, rgba(202, 80, 16, .15)); }
+
+.rp-grid {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.rp-card {
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #e0e0e0);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    overflow: hidden;
+    transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+}
+.rp-card:hover, .rp-card:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 6px 18px var(--shadow, rgba(0, 0, 0, .08));
+    transform: translateY(-2px);
+    outline: none;
+}
+@media (prefers-reduced-motion: reduce) { .rp-card, .rp-card:hover { transition: none; transform: none; } }
+
+/* A little sheet of paper, so the card reads as "a document". */
+.rp-card-thumb {
+    height: 92px;
+    background: var(--surface-2, #f3f4f6);
+    border-bottom: 1px solid var(--border-soft, #eee);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 26%;
+}
+.rp-card-thumb span { display: block; height: 6px; border-radius: 3px; background: var(--border, #ddd); }
+.rp-card-thumb span:first-child { background: var(--accent); width: 60%; margin: 0 auto 4px; }
+.rp-card-thumb span:last-child { width: 75%; }
+
+.rp-card-body { padding: 14px 16px 6px; flex: 1; }
+.rp-card-title { margin: 0 0 4px; font-size: 16px; color: var(--text, #333); overflow-wrap: anywhere; }
+.rp-card-desc { margin: 0 0 8px; color: var(--text-muted, #666); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.rp-card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.rp-card-when { margin: 0; color: var(--text-dim, #888); font-size: 12px; }
+
+.rp-role {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--surface-3, #eceff3);
+    color: var(--text-muted, #555);
+}
+.rp-role-owner { background: var(--rep-accent-soft, #fbe9df); color: var(--accent); }
+.rp-role-shared { background: var(--info-bg, #e3f0fb); color: var(--text, #333); }
+
+.rp-card-actions {
+    display: flex;
+    gap: 4px;
+    padding: 8px 10px 10px;
+    border-top: 1px solid var(--border-soft, #f0f0f0);
+    flex-wrap: wrap;
+}
+.rp-link {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.rp-link:hover, .rp-link:focus-visible { background: var(--surface-hover, #f3f4f6); outline: none; }
+.rp-link-danger { color: #c62828; }
+
+.rp-empty, .rp-loading { grid-column: 1 / -1; text-align: center; color: var(--text-muted, #666); padding: 40px; }
+.rp-empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 64px 20px;
+    background: var(--surface, #fff);
+    border: 1px dashed var(--border, #ddd);
+    border-radius: 12px;
+}
+.rp-empty-state h2 { margin: 0 0 8px; color: var(--text, #333); }
+.rp-empty-state p { margin: 0 auto 20px; max-width: 520px; color: var(--text-muted, #666); line-height: 1.5; }
+
+/* Dialogs */
+.rp-modal-sm { max-width: 460px; }
+.rp-modal-md { max-width: 640px; }
+.rp-hint { margin: 0 0 16px; color: var(--text-muted, #666); font-size: 13px; line-height: 1.5; }
+.rp-form-error { color: #c62828; font-size: 13px; margin-top: 8px; }
+.rp-btn-danger { background: #c62828; color: #fff; }
+.rp-btn-danger:hover { background: #a61f1f; }
+
+.rp-share-add { display: flex; gap: 8px; flex-wrap: wrap; }
+.rp-share-add .rp-input { flex: 1 1 180px; width: auto; }
+.rp-share-type, .rp-share-level { flex: 0 0 auto !important; width: auto !important; }
+.rp-share-list { list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--border-soft, #eee); }
+.rp-share-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-soft, #eee); }
+.rp-share-icon { width: 22px; text-align: center; }
+.rp-share-name { flex: 1; color: var(--text, #333); overflow-wrap: anywhere; }
+.rp-share-kind { color: var(--text-dim, #888); font-size: 12px; }
+.rp-share-empty { padding: 14px 0; color: var(--text-muted, #666); font-size: 13px; }
+
+@media (max-width: 640px) {
+    .rp-list-page { padding: 18px 16px 40px; }
+    .rp-search { width: 100%; }
+    .rp-list-actions { width: 100%; }
+    .rp-list-actions .rp-search { flex: 1; }
+}

@@ -53,6 +53,9 @@ requireModuleAccess('cmdb');
 // the button is decided server-side and never rendered for someone the
 // endpoint would refuse.
 $canMakeDiagram = analystCanAccessModule(connectToDatabase(), (int) $_SESSION['analyst_id'], 'network-mapper');
+// The domains this CI depends on (3.0.0) - Domains' data, so only for analysts
+// who can open Domains; everyone else gets no panel rather than an empty one.
+$showDomains = analystCanAccessModule(connectToDatabase(), (int) $_SESSION['analyst_id'], 'domains');
 
 // The recent trail (#124). Server-side here, rather than the JS ping the other
 // modules use, because a CI IS its own page — opening one is a real navigation
@@ -62,6 +65,7 @@ entityVisit('cmdb_object', (int) ($_GET['id'] ?? 0));
 
 $current_page = 'browse';
 $translationNamespaces = ['common', 'cmdb'];
+if ($showDomains) $translationNamespaces[] = 'domains';
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
@@ -72,6 +76,7 @@ $translationNamespaces = ['common', 'cmdb'];
     <title><?php echo htmlspecialchars(systemName()); ?> - <?php echo htmlspecialchars(t('cmdb.title')); ?> (v2)</title>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
+    <link rel="stylesheet" href="../assets/css/domain-links.css?v=1">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
     <script src="../assets/js/tz.js?v=5"></script>
@@ -780,7 +785,7 @@ $translationNamespaces = ['common', 'cmdb'];
         }
     </style>
     <!-- Mobile layer: after this page's own <style> (Techniques §9). -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="cmdb" data-mobile-page="cmdb-object">
     <?php include 'includes/header.php'; ?>
@@ -914,13 +919,16 @@ $translationNamespaces = ['common', 'cmdb'];
     <script>
         window.OBJECT_ID = <?php echo isset($_GET['id']) ? (int)$_GET['id'] : 0; ?>;
         window.CAN_MAKE_DIAGRAM = <?php echo $canMakeDiagram ? 'true' : 'false'; ?>;
+        window.SHOW_DOMAINS = <?php echo $showDomains ? 'true' : 'false'; ?>;
+        window.APP_BASE = <?php echo json_encode(BASE_URL); ?>;
     </script>
     <!-- The class-icon library. Its own docblock names CMDB as consumer #1;
          object.php simply never loaded it. -->
     <script src="../assets/js/network-mapper-icons.js?v=3"></script>
     <!-- The shared dropdown-options editor, same one the settings page uses. -->
     <script src="options-editor.js?v=3"></script>
-    <script src="object.js?v=9"></script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/domain-links.js?v=1"></script>
+    <script src="object.js?v=11"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

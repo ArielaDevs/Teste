@@ -36,7 +36,7 @@ $translationNamespaces = ['common', 'tickets'];
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../checklists/ticket_checklist.css?v=4">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
     <?php
@@ -985,6 +985,8 @@ $translationNamespaces = ['common', 'tickets'];
         // endpoint enforces this too — this flag only stops us offering a
         // button that cannot work.
         window.KB_WRITEUP_ENABLED = <?php echo analystCanAccessModule(connectToDatabase(), (int)($_SESSION['analyst_id'] ?? 0), 'knowledge') ? 'true' : 'false'; ?>;
+        // Domains on a ticket (3.0.0): Domains' data, so only for analysts who can open it.
+        window.TICKETS_SHOW_DOMAINS = <?php echo analystCanAccessModule(connectToDatabase(), (int)($_SESSION['analyst_id'] ?? 0), 'domains') ? 'true' : 'false'; ?>;
         window.KB_BASE = '../api/knowledge/';
         // What this analyst's ticket rows show (discussion #61). Resolved
         // server-side — their own choice over the install default — and already
@@ -1011,8 +1013,8 @@ $translationNamespaces = ['common', 'tickets'];
     <script src="../assets/js/schedule.js?v=1"></script>
     <script src="../checklists/search_scoring.js?v=1"></script>
     <script src="../checklists/ticket_view.js?v=9"></script>
-    <script src="../assets/js/inbox.js?v=144"></script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/inbox.js?v=145"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
     <script>
     // Auto-check mailboxes every 60 seconds
     (function() {

@@ -150,17 +150,17 @@ function documentEntityRegistry(): array {
             'filter' => function (PDO $c, int $a, string $alias) { return activeTenantFilter($c, $a, $alias); },
         ],
         'contract' => [
-            // No tenant_id column at all — module membership IS the whole rule
-            // here, and pretending otherwise would invent a filter on a column
-            // that does not exist.
+            // No tenant_id column: a SUPPLIER contract is install-wide, so module
+            // membership is the rule. A CUSTOMER contract belongs to its
+            // customer's company (#153) and is gated by it.
             'module' => 'contracts',
             'table'  => 'contracts',
             'label'  => 'Contract',
             'url'    => 'contracts/view.php?id=%d',
             'title'  => 'title',
             'alive'  => null,
-            'can'    => null,
-            'filter' => null,
+            'can'    => function (PDO $c, int $a, int $id) { require_once __DIR__ . '/contract_party.php'; return contractCanView($c, $a, $id); },
+            'filter' => function (PDO $c, int $a, string $alias) { require_once __DIR__ . '/contract_party.php'; return contractVisibilitySql($c, $a, $alias); },
         ],
         'domain' => [
             // Registrar invoices, transfer authorisations, the letter from the

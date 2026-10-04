@@ -75,9 +75,12 @@ async function postJson(url, body) {
 
 /* created/updated are UTC and get converted; a `date` PROPERTY is naive and
    must never go through the timezone path or it shifts by a day. */
-function fmtDateTime(s) {
+/* Was a top-level `function fmtDateTime` that called itself - it shadowed
+   tz.js's global (#1195) - until the stack overflowed, and then showed the raw
+   UTC string. A different name, so the shared formatter is the one called. */
+function fmtWhen(s) {
     if (!s) return '';
-    try { return fmtDateTime(s); } catch (e) { return s; }
+    try { return window.fmtDateTime(s) || s; } catch (e) { return s; }
 }
 
 /* "2026-04-15 00:00:00" -> "2026-04-15". Never parsed as a Date: a date
@@ -237,6 +240,8 @@ function render() {
             // Attached documents (discussion #76) — the diagram, the licence, the
             // rack photo. Before activity and danger, which both read as endings.
             '<div class="o2-sec"><div id="cmdbDocuments"></div></div>' +
+            // The domains this CI depends on (3.0.0): what breaks if one lapses.
+            (window.SHOW_DOMAINS ? '<div class="o2-sec"><div id="cmdbDomains"></div></div>' : '') +
             '<div class="o2-sec">' + activityHtml() + '</div>' +
             '<div class="o2-sec">' + dangerHtml() + '</div>' +
         '</div>';
@@ -248,6 +253,13 @@ function render() {
             parentId:   obj.id,
             apiBase:    '../api/documents/',
             showHeading: true      // every other section here carries its own title
+        });
+    }
+
+    if (window.SHOW_DOMAINS && window.DomainLinks && obj && obj.id) {
+        DomainLinks.mount(document.getElementById('cmdbDomains'), {
+            kind: 'cmdb', id: obj.id, base: window.APP_BASE,
+            cardClass: 'o2-card', headClass: 'o2-card-head', titleClass: 'o2-card-title'
         });
     }
 
@@ -345,7 +357,7 @@ function aiHtml() {
             '<div class="o2-ai-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></div>' +
             '<div><div class="o2-ai-txt" id="o2AiTxt">' + esc(obj.ai_summary) + '</div>' +
             (obj.ai_summary_generated_at
-                ? '<div class="o2-ai-when">' + esc(window.t('cmdb.summary.generated', { datetime: fmtDateTime(obj.ai_summary_generated_at) })) + '</div>'
+                ? '<div class="o2-ai-when">' + esc(window.t('cmdb.summary.generated', { datetime: fmtWhen(obj.ai_summary_generated_at) })) + '</div>'
                 : '') +
             '</div></div>';
     }
@@ -599,8 +611,8 @@ function propsHtml() {
         // for the normal case leaves the reader to assume it.
         '<div style="margin-top:14px;"><span class="o2-stat-lbl">' +
         esc(window.t(obj.is_planned ? 'cmdb.object.state_planned' : 'cmdb.object.state_real')) +
-        ' · ' + esc(window.t('cmdb.details.added_on', { datetime: fmtDateTime(obj.created_datetime) })) +
-        ' · ' + esc(window.t('cmdb.details.last_change', { datetime: fmtDateTime(obj.updated_datetime) })) +
+        ' · ' + esc(window.t('cmdb.details.added_on', { datetime: fmtWhen(obj.created_datetime) })) +
+        ' · ' + esc(window.t('cmdb.details.last_change', { datetime: fmtWhen(obj.updated_datetime) })) +
         '</span></div>' +
     '</div>';
 }
@@ -663,10 +675,10 @@ function activityHtml() {
 
     const row = (t, isOpen) =>
         '<a class="o2-tik" href="../tickets/?ticket_id=' + t.id + '">' +
-            '<span class="o2-tik-ref">' + esc(t.reference || ('#' + t.id)) + '</span>' +
+            '<span class="o2-tik-ref">' + esc(t.ticket_number || ('#' + t.id)) + '</span>' +
             '<span class="o2-tik-sub">' + esc(t.subject || window.t('cmdb.activity.no_subject')) + '</span>' +
-            '<span class="o2-tik-meta">' + esc(t.status_name || window.t('cmdb.activity.unknown_status')) +
-            (t.priority_name ? ' · ' + esc(t.priority_name) : '') + '</span>' +
+            '<span class="o2-tik-meta">' + esc(t.status || window.t('cmdb.activity.unknown_status')) +
+            (t.priority ? ' · ' + esc(t.priority) : '') + '</span>' +
         '</a>';
 
     return '<div class="o2-card" id="o2Activity">' + head +

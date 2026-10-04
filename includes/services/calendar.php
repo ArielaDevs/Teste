@@ -42,7 +42,7 @@ class CalendarService
             if (!array_diff_key($in, ['id' => true])) {
                 throw new ServiceError('validation', 'missing_field', 'No fields to update.');
             }
-            $f = self::collectEventFields($conn, $in, $current);
+            $f = self::collectEventFields($conn, $in, $current, $ctx);
             if ($f['title'] === '') {
                 throw new ServiceError('validation', 'invalid_field', "'title' cannot be empty.");
             }
@@ -66,7 +66,7 @@ class CalendarService
             return ['id' => $id, 'created' => false];
         }
 
-        $f = self::collectEventFields($conn, $in);
+        $f = self::collectEventFields($conn, $in, [], $ctx);
         if ($f['title'] === '') {
             throw new ServiceError('validation', 'missing_field', "'title' is required.");
         }
@@ -183,7 +183,7 @@ class CalendarService
      * apiCalendarEventFields). On update, absent keys fall back to the current
      * row. Datetimes are naive server-local (Z/offset rejected).
      */
-    private static function collectEventFields(PDO $conn, array $in, array $current = []): array
+    private static function collectEventFields(PDO $conn, array $in, array $current = [], ?ActorContext $ctx = null): array
     {
         $get = function (string $key, $default = null) use ($in, $current) {
             return array_key_exists($key, $in) ? $in[$key] : ($current[$key] ?? $default);
@@ -220,8 +220,10 @@ class CalendarService
         if ($conRaw !== null && $conRaw !== '') {
             $f['contract_id'] = (int)$conRaw;
             try {
-                $c = $conn->prepare("SELECT id FROM contracts WHERE id = ?");
-                $c->execute([$f['contract_id']]);
+                require_once __DIR__ . '/../contract_party.php';
+                [$kVis, $kArgs] = contractVisibilitySqlForScope($conn, $ctx ? $ctx->companyScope : null, 'k');   // #153
+                $c = $conn->prepare("SELECT k.id FROM contracts k WHERE k.id = ?$kVis");
+                $c->execute(array_merge([$f['contract_id']], $kArgs));
                 if (!$c->fetchColumn()) {
                     throw new ServiceError('validation', 'invalid_field', "Unknown contract id: {$f['contract_id']}");
                 }

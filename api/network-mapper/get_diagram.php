@@ -22,6 +22,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('network-mapper');
 
 try {
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;

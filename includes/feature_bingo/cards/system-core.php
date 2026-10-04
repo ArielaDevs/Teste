@@ -633,6 +633,34 @@ return [
         ]],
     ],
 
+    // ───────────────────────── Cost centres (GH #160) ─────────────────────────
+    [
+        'id'       => 'system.cost_centres',
+        'module'   => 'system',
+        'tier'     => 'extra',
+        'category' => 'organisation',
+        'title'    => 'Cost centres',
+        'what'     => 'Your finance department\'s cost centres, for each company - with a hierarchy, kept in step with your accounting system by spreadsheet import or the API.',
+        'why'      => 'With the list in place, what IT spends can be charged to the right budget, using the same codes finance already reports on.',
+        'done'     => 'At least one active cost centre exists.',
+        'link'     => 'system/cost-centres/',
+        'check'    => ['rows', 'cost_centres', 'is_active = 1 AND is_demo = 0'],
+    ],
+
+    // ───────────────────────── Photo Album (just for fun) ─────────────────────────
+    [
+        'id'       => 'system.photo_album',
+        'module'   => 'system',
+        'tier'     => 'extra',
+        'category' => 'look',
+        'title'    => 'Photo Album',
+        'what'     => 'Your webcam picture turned into ASCII art, live as you move - Braille, classic characters or blocks, on a green, amber, paper or full-colour screen.',
+        'why'      => 'No reason at all, except that it is fun. The photo never leaves your browser; only the art is kept, and only if you save it.',
+        'done'     => 'At least one picture has been saved to an album.',
+        'link'     => 'system/photo-album/',
+        'check'    => ['rows', 'photo_album'],
+    ],
+
     // ───────────────────────── Encryption & maintenance ─────────────────────────
     [
         'id'       => 'system.encryption_key',

@@ -13,6 +13,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireAnyModuleAccessJson(['calendar', 'contracts']);
 
 $activeOnly = isset($_GET['active_only']) && $_GET['active_only'] === '1';
 

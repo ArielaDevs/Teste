@@ -40,7 +40,7 @@ try {
     }
 
     $conn     = connectToDatabase();
-    $contract = contractReportLoad($conn, $contractId);
+    $contract = contractReportLoad($conn, $contractId, (int)$_SESSION['analyst_id']);
     if (!$contract) {
         throw new Exception(t('contracts.report.not_found'));
     }

@@ -422,6 +422,157 @@ class ServiceUptime
         return $days;
     }
 
+    // ── Fixed date ranges (Report Packs) ──────────────────────────────────────
+    //
+    // The methods above answer "the last N days, ending now", which is what the
+    // status board shows. A report answers "1 to 30 September", which may have
+    // ended weeks ago - so it needs both ends. These are deliberately separate
+    // methods rather than an extra parameter on the ones above, so the board's
+    // own figures cannot move because a report needed something different. The
+    // rules are the same: segments from the update log where there is one,
+    // overlaps unioned, only counts_as_downtime levels counted.
+
+    /**
+     * Every incident (or update-log segment) touching this service that overlaps
+     * [$fromUtc, $toUtc). Same shape as incidentsFor(). An incident still open
+     * runs to now, or to the end of the range if that is earlier.
+     */
+    public static function incidentsBetween(PDO $conn, int $serviceId, string $fromUtc, string $toUtc): array
+    {
+        $hasLog = self::updateLogAvailable($conn);
+        $logClause = $hasLog
+            ? "OR EXISTS (SELECT 1 FROM status_incident_update_services y
+                            JOIN status_incident_updates u ON u.id = y.update_id
+                           WHERE u.incident_id = si.id AND y.service_id = ?)"
+            : '';
+
+        $sql = "SELECT si.id AS incident_id, si.title,
+                       si.created_datetime  AS started,
+                       si.resolved_datetime AS ended,
+                       il.name   AS impact,
+                       il.colour AS colour,
+                       il.counts_as_downtime AS counts
+                  FROM status_incidents si
+                  LEFT JOIN status_incident_services sis
+                         ON sis.incident_id = si.id AND sis.service_id = ?
+                  LEFT JOIN service_impact_levels il ON il.id = sis.impact_level_id
+                 WHERE (sis.id IS NOT NULL $logClause)
+                   AND si.created_datetime < ?
+                   AND (si.resolved_datetime IS NULL OR si.resolved_datetime >= ?)
+                 ORDER BY si.created_datetime DESC";
+        $params = $hasLog ? [$serviceId, $serviceId, $toUtc, $fromUtc] : [$serviceId, $toUtc, $fromUtc];
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+
+        $from = strtotime($fromUtc . ' UTC');
+        $to   = strtotime($toUtc . ' UTC');
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $segments = self::segmentsFor($conn, (int)$r['incident_id'], $serviceId, (string)$r['started'], $r['ended']);
+            if ($segments === null) {
+                $segments = [[
+                    'impact'  => (string)($r['impact'] ?? 'Unknown'),
+                    'colour'  => $r['colour'] ?? null,
+                    'counts'  => (int)($r['counts'] ?? 1) === 1,
+                    'started' => (string)$r['started'],
+                    'ended'   => $r['ended'],
+                    'ongoing' => $r['ended'] === null,
+                    'seconds' => self::spanSeconds((string)$r['started'], $r['ended']),
+                ]];
+            }
+            foreach ($segments as $seg) {
+                // A segment of an overlapping incident can itself fall outside.
+                $s = strtotime($seg['started'] . ' UTC');
+                $e = $seg['ended'] !== null ? strtotime($seg['ended'] . ' UTC') : time();
+                if ($s === false || $e === false || $e <= $from || $s >= $to) continue;
+                $out[] = $seg + ['title' => (string)$r['title'], 'incident_id' => (int)$r['incident_id']];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Uptime over [$fromUtc, $toUtc). Downtime is clipped to the range AND to now,
+     * so a range running into the future is measured only up to the present.
+     *
+     * @return array{range_seconds:int,downtime_seconds:int,uptime_percent:float,incident_count:int,counted_count:int}
+     */
+    public static function summaryBetween(PDO $conn, int $serviceId, string $fromUtc, string $toUtc, ?array $incidents = null): array
+    {
+        $incidents = $incidents ?? self::incidentsBetween($conn, $serviceId, $fromUtc, $toUtc);
+        $from = strtotime($fromUtc . ' UTC');
+        $to   = min(strtotime($toUtc . ' UTC'), time());
+        $rangeSeconds = max(0, $to - $from);
+
+        $spans = []; $counted = 0; $ids = [];
+        foreach ($incidents as $i) {
+            $ids[$i['incident_id']] = true;
+            if (!$i['counts']) continue;
+            $counted++;
+            $s = strtotime($i['started'] . ' UTC');
+            $e = $i['ended'] !== null ? strtotime($i['ended'] . ' UTC') : time();
+            if ($s === false || $e === false) continue;
+            $s = max($s, $from); $e = min($e, $to);
+            if ($e > $s) $spans[] = [$s, $e];
+        }
+        $downtime = max(0, min(self::unionSeconds($spans), $rangeSeconds));
+        return [
+            'range_seconds'    => $rangeSeconds,
+            'downtime_seconds' => $downtime,
+            'uptime_percent'   => $rangeSeconds > 0 ? round((($rangeSeconds - $downtime) / $rangeSeconds) * 100, 3) : 100.0,
+            'incident_count'   => count($ids),
+            'counted_count'    => $counted,
+        ];
+    }
+
+    /**
+     * One entry per LOCAL day from $fromDate to $toDate inclusive (Y-m-d in $tz),
+     * oldest first - the bar strip for a report. Same states as dailyStrip().
+     */
+    public static function dailyStripBetween(PDO $conn, int $serviceId, string $fromDate, string $toDate, string $tz, ?array $incidents = null): array
+    {
+        try { $zone = new DateTimeZone($tz); } catch (Exception $e) { $zone = new DateTimeZone('UTC'); }
+        $day  = new DateTimeImmutable($fromDate, $zone);
+        $last = new DateTimeImmutable($toDate, $zone);
+        if ($incidents === null) {
+            $utc = new DateTimeZone('UTC');
+            $incidents = self::incidentsBetween($conn, $serviceId,
+                $day->setTimezone($utc)->format('Y-m-d H:i:s'),
+                $last->modify('+1 day')->setTimezone($utc)->format('Y-m-d H:i:s'));
+        }
+
+        $severity = [];
+        foreach ($conn->query("SELECT name, severity_order FROM service_impact_levels")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $severity[$r['name']] = (int)$r['severity_order'];
+        }
+
+        $now = time(); $days = []; $guard = 0;
+        while ($day <= $last && $guard++ < 3700) {
+            $dayStart = $day->getTimestamp();
+            $dayEnd   = $day->modify('+1 day')->getTimestamp();
+            $worst = null; $worstSev = PHP_INT_MAX; $secs = 0; $info = null;
+            foreach ($incidents as $i) {
+                $s = strtotime($i['started'] . ' UTC');
+                $e = $i['ended'] !== null ? strtotime($i['ended'] . ' UTC') : $now;
+                if ($s === false || $e === false || $e <= $dayStart || $s >= $dayEnd) continue;
+                if (!$i['counts']) { if ($info === null) $info = $i; continue; }
+                $secs += min($e, $dayEnd) - max($s, $dayStart);
+                $sev = $severity[$i['impact']] ?? 99;
+                if ($sev < $worstSev) { $worstSev = $sev; $worst = $i; }
+            }
+            $shown = $worst ?? $info;
+            $days[] = [
+                'date'    => $day->format('Y-m-d'),
+                'state'   => $dayStart > $now ? 'future' : ($worst !== null ? 'down' : ($info !== null ? 'info' : 'ok')),
+                'impact'  => $shown['impact'] ?? null,
+                'colour'  => $shown['colour'] ?? null,
+                'seconds' => $secs,
+            ];
+            $day = $day->modify('+1 day');
+        }
+        return $days;
+    }
+
     /**
      * Merge overlapping [start, end] pairs and total the result.
      *

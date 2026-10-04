@@ -303,7 +303,7 @@ if (!isset($_SESSION['analyst_id'])) {
         [data-theme-mode="dark"] .error-text { color: var(--danger-text, #fca5a5); }
     </style>
     <!-- Mobile layer LAST, after this page's own <style> (Techniques §9). -->
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="system" data-mobile-page="demo-data">
     <?php include '../includes/header.php'; ?>
@@ -452,6 +452,16 @@ if (!isset($_SESSION['analyst_id'])) {
                     <button class="import-btn" id="btn-domains" onclick="importModule('domains', this)" disabled><?php echo htmlspecialchars(t('system.demo.import')); ?></button>
                 </div>
                 <div class="error-text" id="err-domains" style="display:none"></div>
+            </div>
+
+            <div class="module-card" data-module="cost-centres">
+                <h4>Cost Centres</h4>
+                <p class="module-desc">24 cost centres (nominal codes) in the default company, two levels deep, with one retired. Includes 0010 and N1414 to show codes are kept as text.</p>
+                <div class="module-footer">
+                    <span class="record-count">~24 records</span>
+                    <button class="import-btn" id="btn-cost-centres" onclick="importModule('cost-centres', this)" disabled><?php echo htmlspecialchars(t('system.demo.import')); ?></button>
+                </div>
+                <div class="error-text" id="err-cost-centres" style="display:none"></div>
             </div>
 
             <div class="module-card" data-module="services">
@@ -637,7 +647,7 @@ if (!isset($_SESSION['analyst_id'])) {
         }
 
         function enableModuleButtons() {
-            const modules = ['tickets', 'assets', 'knowledge', 'changes', 'calendar', 'checks', 'checklists', 'contracts', 'domains', 'services', 'software', 'forms', 'tasks', 'process-mapper', 'cmdb', 'lms', 'workflow', 'network-mapper'];
+            const modules = ['tickets', 'assets', 'knowledge', 'changes', 'calendar', 'checks', 'checklists', 'contracts', 'domains', 'cost-centres', 'services', 'software', 'forms', 'tasks', 'process-mapper', 'cmdb', 'lms', 'workflow', 'network-mapper'];
             modules.forEach(function(m) {
                 const btn = document.getElementById('btn-' + m);
                 if (btn && !btn.classList.contains('success')) {
@@ -704,6 +714,6 @@ if (!isset($_SESSION['analyst_id'])) {
             } catch (e) { /* ignore - user can still click Import */ }
         })();
     </script>
-    <script src="../../assets/js/mobile.js?v=65"></script>
+    <script src="../../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

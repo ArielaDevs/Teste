@@ -49,15 +49,15 @@ $translationNamespaces = ['common', 'domains'];
     <script src="../assets/js/i18n.js?v=3"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=25">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
-    <link rel="stylesheet" href="../assets/css/domains.css?v=1">
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/domains.css?v=7">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="domains" data-mobile-page="domains-view">
     <?php include 'includes/header.php'; ?>
 
-    <div style="height:calc(100vh - 62px);overflow-y:auto;background:var(--app-bg,#f5f5f5)">
-    <div style="padding:20px 26px 40px">
-        <div style="margin-bottom:10px"><a href="./" class="dom-sub" style="text-decoration:none">← <?php echo htmlspecialchars(t('domains.page.back')); ?></a></div>
+    <div class="dom-shell">
+    <div class="dom-shell-pad">
+        <div class="dom-back-row" style="margin-bottom:10px"><a href="./" id="domBack" class="dom-sub" style="text-decoration:none">← <?php echo htmlspecialchars(t('domains.page.back')); ?></a></div>
 
         <?php if (!$exists): ?>
             <div class="dom-card"><div class="dom-empty"><h3><?php echo htmlspecialchars(t('domains.page.not_found')); ?></h3></div></div>
@@ -85,6 +85,7 @@ $translationNamespaces = ['common', 'domains'];
             <button type="button" class="tab" data-tab="lookalikes"><?php echo htmlspecialchars(t('domains.tab.lookalikes')); ?> <span id="laBadge"></span></button>
             <button type="button" class="tab" data-tab="history"><?php echo htmlspecialchars(t('domains.tab.history')); ?></button>
             <button type="button" class="tab" data-tab="documents"><?php echo htmlspecialchars(t('domains.tab.documents')); ?></button>
+            <button type="button" class="tab" data-tab="connections"><?php echo htmlspecialchars(t('domains.tab.connections')); ?> <span id="connBadge"></span></button>
         </div>
 
         <div class="tab-content active" id="tab-overview" style="padding:0;background:none;box-shadow:none"><div class="dom-grid" id="overview"></div></div>
@@ -92,6 +93,7 @@ $translationNamespaces = ['common', 'domains'];
         <div class="tab-content" id="tab-certs"><div id="certs"></div></div>
         <div class="tab-content" id="tab-lookalikes"><div id="lookalikes"></div></div>
         <div class="tab-content" id="tab-history"><div id="history" class="dom-timeline"></div></div>
+        <div class="tab-content" id="tab-connections" style="padding:0;background:none;box-shadow:none"><div id="connections"><div class="dom-sub"><?php echo htmlspecialchars(t('common.loading')); ?></div></div></div>
         <div class="tab-content" id="tab-documents">
             <?php require_once '../includes/documents_panel.php'; renderDocumentsPanel('domain', $domainId, '../'); ?>
         </div>
@@ -123,7 +125,16 @@ $translationNamespaces = ['common', 'domains'];
                     <div class="form-group"><label for="eRenewed"><?php echo htmlspecialchars(t('domains.field.last_renewed_date')); ?></label><input type="date" id="eRenewed" data-f="last_renewed_date"></div>
                     <div class="form-group"><label for="eRegistrant"><?php echo htmlspecialchars(t('domains.field.registrant_name')); ?></label><input type="text" id="eRegistrant" data-f="registrant_name"></div>
                     <div class="form-group"><label for="eTLock"><?php echo htmlspecialchars(t('domains.field.transfer_lock')); ?></label><select id="eTLock" data-f="transfer_lock" data-tri="1"></select></div>
-                    <div class="form-group"><label for="eTech"><?php echo htmlspecialchars(t('domains.field.tech_contact')); ?></label><select id="eTech" data-f="tech_contact_id"></select></div>
+                    <div class="form-group"><label for="eTech"><?php echo htmlspecialchars(t('domains.field.tech_contact')); ?></label><select id="eTech"></select><div class="dom-hint"><?php echo htmlspecialchars(t('domains.field.tech_contact_hint')); ?></div></div>
+                    <div class="form-group"><label for="eCustomer"><?php echo htmlspecialchars(t('domains.field.customer')); ?></label>
+                        <div class="dom-person">
+                            <input type="text" id="eCustomer" autocomplete="off" placeholder="<?php echo htmlspecialchars(t('domains.field.customer_ph')); ?>">
+                            <input type="hidden" id="eCustomerId">
+                            <button type="button" class="dom-person-clear" id="eCustomerClear" title="<?php echo htmlspecialchars(t('domains.field.customer_clear')); ?>" aria-label="<?php echo htmlspecialchars(t('domains.field.customer_clear')); ?>" hidden>&times;</button>
+                            <ul class="dom-person-results" id="eCustomerResults" role="listbox" hidden></ul>
+                        </div>
+                        <div class="dom-hint"><?php echo htmlspecialchars(t('domains.field.customer_hint')); ?></div>
+                    </div>
 
                     <div class="dom-section-title"><?php echo htmlspecialchars(t('domains.edit.s_dns')); ?></div>
                     <div class="form-group"><label for="eNs"><?php echo htmlspecialchars(t('domains.field.nameservers')); ?></label><textarea id="eNs" data-f="nameservers" rows="3"></textarea></div>
@@ -170,10 +181,14 @@ $translationNamespaces = ['common', 'domains'];
             </div>
         </div>
     </div>
-    <script>window.DOMAIN_ID = <?php echo (int)$domainId; ?>;</script>
+    <script>window.DOMAIN_ID = <?php echo (int)$domainId; ?>;
+    // The customer links to their People page (#153), for analysts who can open People.
+    window.DOM_PEOPLE = <?php echo json_encode(analystCanAccessModule($conn, (int)$_SESSION['analyst_id'], 'people') ? BASE_URL . 'people/' : null); ?>;
+    // Supplier and contact pages in People (#162) also need Contracts, which owns those records.
+    window.DOM_PEOPLE_SUPPLIERS = <?php echo json_encode(analystCanAccessModule($conn, (int)$_SESSION['analyst_id'], 'people') && analystCanAccessModule($conn, (int)$_SESSION['analyst_id'], 'contracts')); ?>;</script>
     <script src="../assets/js/domains.js?v=1"></script>
-    <script src="../assets/js/domains-view.js?v=1"></script>
+    <script src="../assets/js/domains-view.js?v=6"></script>
     <?php endif; ?>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

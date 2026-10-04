@@ -17,6 +17,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('system');
 
 $tenantId = isset($_GET['tenant_id']) ? (int)$_GET['tenant_id'] : 0;
 if ($tenantId <= 0) {

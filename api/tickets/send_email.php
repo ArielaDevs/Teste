@@ -21,6 +21,15 @@ require_once '../../includes/encryption.php';
 require_once '../../includes/tenancy.php';
 require_once '../../includes/mailbox_graph.php';
 require_once '../../includes/email_log.php';
+require_once '../../includes/timezone.php';   // fmt_local() for the quoted thread's dates
+
+// Most bytes of thread pictures one email carries - see processInlineImages().
+// ⚠️ Must stay up here, above the code that sends. Unlike a function, a top-level
+// const only exists once PHP has run the line, and this file's functions are
+// called before execution ever reaches the bottom of it. 2.10.0 declared it next
+// to processInlineImages(), so every reply whose thread held a picture died with
+// "Undefined constant" and was never sent (GH #158 follow-up).
+const INLINE_THREAD_BUDGET = 2 * 1024 * 1024;
 
 header('Content-Type: application/json');
 
@@ -30,6 +39,7 @@ if (!isset($_SESSION['analyst_id'])) {
     exit;
 }
 requireModuleAccessJson('tickets');
+Tz::init();   // the sending analyst's zone, for the dates in the quoted thread
 
 try {
     // Get POST data
@@ -386,8 +396,6 @@ function uploadedFileParts($attachments) {
  * 2. data: images - what the editor produces when a screenshot is pasted.
  *    Gmail and Outlook refuse to show a data: image in a received email.
  */
-const INLINE_THREAD_BUDGET = 2 * 1024 * 1024;
-
 function processInlineImages($body, $ticketId) {
     $inlineAttachments = [];
     $cidCounter = 1;
@@ -462,7 +470,9 @@ function processInlineImages($body, $ticketId) {
 
             // Return the CID reference
             return 'src="cid:' . $newCid . '"';
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            // Throwable, not Exception: a fault while embedding one picture must
+            // leave that link as it was, never stop the whole email going out.
             error_log('Inline image processing error: ' . $e->getMessage());
             return $matches[0];
         }
@@ -679,7 +689,12 @@ function buildFullEmailBody($conn, $ticketId, $analystBody, $type) {
         $fromName = htmlspecialchars((string)($e['from_name'] ?: ($e['from_address'] ?? '')), ENT_QUOTES, 'UTF-8');
         $fromAddr = htmlspecialchars((string)($e['from_address'] ?? ''), ENT_QUOTES, 'UTF-8');
         $fromLabel = $fromAddr !== '' ? ($fromName . ' &lt;' . $fromAddr . '&gt;') : $fromName;
-        $date = date('d M Y H:i', strtotime($e['received_datetime']));
+        // In the SENDING analyst's zone (their preference, else the install's).
+        // This was date('d M Y H:i', strtotime($utc)) - parsed and formatted in
+        // the same zone, so it printed the stored UTC digits as if they were local
+        // time: "05:20" in Ho Chi Minh for a 12:20 email (GH #161). The same fault
+        // GH #126 fixed in email templates; this copy was missed then.
+        $date = fmt_local($e['received_datetime'], 'd M Y H:i');
 
         $threadParts[] = '<div style="margin-bottom: 15px;">'
             . '<p style="margin: 0 0 5px 0; color: #666; font-size: 13px;"><strong>On ' . $date . ', ' . $fromLabel . ' wrote:</strong></p>'

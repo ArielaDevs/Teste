@@ -16,6 +16,10 @@ requireModuleAccess('contracts');
 $current_page = 'dashboard';
 $path_prefix = '../';
 $translationNamespaces = ['common', 'contracts'];
+// The domains renewed or billed under a contract (3.0.0) - Domains' data, so
+// only for analysts who can open Domains.
+$ctShowDomains = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'domains');
+if ($ctShowDomains) $translationNamespaces[] = 'domains';
 $contract_id = $_GET['id'] ?? null;
 
 if (!$contract_id) {
@@ -28,6 +32,8 @@ if (!$contract_id) {
 // navigation with a real URL, so the moment it is recorded is this one.
 require_once '../includes/recent_trail.php';
 entityVisit('contract', (int) $contract_id);
+// The customer's name links to their People page (#153), for analysts who can open People.
+$peopleBase = analystCanAccessModule(connectToDatabase(), (int)$_SESSION['analyst_id'], 'people') ? BASE_URL . 'people/' : null;
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
@@ -44,6 +50,7 @@ entityVisit('contract', (int) $contract_id);
     <script src="../assets/js/record-preview.js?v=1"></script>
     <link rel="stylesheet" href="../assets/css/theme.css?v=24">
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
+    <link rel="stylesheet" href="../assets/css/domain-links.css?v=1">
     <style>
         body { --accent: var(--con-accent, #f59e0b); }
         /* Full-screen layout with sidebar - matches contracts dashboard */
@@ -375,7 +382,7 @@ entityVisit('contract', (int) $contract_id);
         .checkbox-row label { margin: 0; }
     </style>
     <!-- Mobile layer: linked AFTER this page's own <style> so its @media rules win on ties. -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="contracts" data-mobile-page="contract-view">
     <?php include 'includes/header.php'; ?>
@@ -448,6 +455,7 @@ entityVisit('contract', (int) $contract_id);
 
     <script>
         const API_BASE = '../api/contracts/';
+        const PEOPLE_BASE = <?php echo json_encode($peopleBase); ?>;
         const TASKS_API = '../api/tasks/';
         const CONTRACTS_API = '../api/contracts/';
         const CALENDAR_API = '../api/calendar/';
@@ -562,10 +570,13 @@ entityVisit('contract', (int) $contract_id);
                         <label>${escapeHtml(window.t('contracts.detail.description'))}</label>
                         <div class="value">${escapeHtml(c.description)}</div>
                     </div>` : ''}
-                    <div class="detail-group">
+                    ${c.party_type === 'customer' ? `<div class="detail-group">
+                        <label>${escapeHtml(window.t('contracts.party.customer'))}</label>
+                        <div class="value">${peopleLink('company.php', c.customer_tenant_id, c.customer_company_name)}${c.customer_company_name && c.customer_person_name ? '<br>' : ''}${c.customer_person_name ? peopleLink('person.php', c.customer_user_id, c.customer_person_name) + (c.customer_person_email ? ' <span style="color:var(--text-dim, #888);">' + escapeHtml(c.customer_person_email) + '</span>' : '') : ''}${!c.customer_company_name && !c.customer_person_name ? '-' : ''}</div>
+                    </div>` : `<div class="detail-group">
                         <label>${escapeHtml(window.t('contracts.detail.supplier'))}</label>
                         <div class="value">${escapeHtml(c.supplier_name || '-')}${c.supplier_trading_name ? ' <span style="color:var(--text-dim, #888);">(t/a ' + escapeHtml(c.supplier_trading_name) + ')</span>' : ''}</div>
-                    </div>
+                    </div>`}
                     <div class="detail-group">
                         <label>${escapeHtml(window.t('contracts.detail.owner'))}</label>
                         <div class="value">${escapeHtml(c.owner_name || '-')}</div>
@@ -647,6 +658,7 @@ entityVisit('contract', (int) $contract_id);
                         </h3>
                         <div id="relatedAssetsList" class="related-empty">${escapeHtml(window.t('common.loading'))}</div>
                     </div>
+                    ${window.CT_SHOW_DOMAINS ? '<div class="related-section" id="relatedDomainsSection"><h3>' + escapeHtml(window.t('domains.links.domains_title')) + '</h3><div id="relatedDomainsList"></div></div>' : ''}
                     <div class="related-section" id="relatedTasksSection">
                         <h3>${escapeHtml(window.t('contracts.detail.related_tasks'))}</h3>
                         <div id="relatedTasksList" class="related-empty">${escapeHtml(window.t('common.loading'))}</div>
@@ -720,6 +732,20 @@ entityVisit('contract', (int) $contract_id);
             return labels[val] || val;
         }
 
+        /** " (Supplier: X)" or " (Customer: X)" for a task or event made from this contract (#153). */
+        // A name, linked to its People page when the reader can open People.
+        function peopleLink(page, id, name) {
+            if (!name) return '';
+            return PEOPLE_BASE && id ? '<a href="' + PEOPLE_BASE + page + '?id=' + encodeURIComponent(id) + '">' + escapeHtml(name) + '</a>' : escapeHtml(name);
+        }
+
+        function partySuffix(c) {
+            if (c.party_type === 'customer') {
+                return c.party_label ? ' ' + window.t('contracts.party.customer_suffix', { customer: c.party_label }) : '';
+            }
+            return c.supplier_name ? ' ' + window.t('contracts.detail.supplier_suffix', { supplier: c.supplier_name }) : '';
+        }
+
         function escapeHtml(text) {
             if (!text) return '';
             const div = document.createElement('div');
@@ -786,6 +812,9 @@ entityVisit('contract', (int) $contract_id);
         // Related items
         async function loadRelatedItems() {
             loadRelatedAssets();
+            if (window.CT_SHOW_DOMAINS && window.DomainLinks && currentContract) {
+                DomainLinks.mount(document.getElementById('relatedDomainsList'), { kind: 'contract', id: currentContract.id, base: window.CT_BASE, bare: true });
+            }
             loadRelatedTasks();
             loadRelatedEvents();
         }
@@ -1118,7 +1147,7 @@ entityVisit('contract', (int) $contract_id);
             const assigneeDefault = c.contract_owner_id || '';
 
             document.getElementById('taskTitle').value = titleDefault;
-            document.getElementById('taskDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + (c.supplier_name ? ' ' + window.t('contracts.detail.supplier_suffix', { supplier: c.supplier_name }) : '');
+            document.getElementById('taskDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + partySuffix(c);
             document.getElementById('taskDueDate').value = dueDefault ? dueDefault.substring(0, 10) : '';
             document.getElementById('taskPriority').value = 'Medium';
             document.getElementById('taskStatus').value = 'To Do';
@@ -1193,7 +1222,7 @@ entityVisit('contract', (int) $contract_id);
             const titleDefault = `${c.contract_number} — ${c.title}`;
 
             document.getElementById('eventTitle').value = titleDefault;
-            document.getElementById('eventDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + (c.supplier_name ? ' ' + window.t('contracts.detail.supplier_suffix', { supplier: c.supplier_name }) : '');
+            document.getElementById('eventDescription').value = window.t('contracts.detail.linked_description', { number: c.contract_number, title: c.title }) + partySuffix(c);
             document.getElementById('eventStart').value = dateDefault ? dateDefault.substring(0, 10) : '';
             document.getElementById('eventAllDay').checked = true;
             document.getElementById('eventLocation').value = '';
@@ -1421,6 +1450,8 @@ entityVisit('contract', (int) $contract_id);
             </div>
         </div>
     </div>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script>window.CT_SHOW_DOMAINS = <?php echo $ctShowDomains ? 'true' : 'false'; ?>; window.CT_BASE = <?php echo json_encode(BASE_URL); ?>;</script>
+    <script src="../assets/js/domain-links.js?v=1"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

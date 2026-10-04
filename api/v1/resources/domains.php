@@ -27,21 +27,34 @@ require_once dirname(__DIR__, 3) . '/includes/services/domains.php';
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-function apiDomainSelect(): string {
+function apiDomainSelect(?PDO $conn = null): string {
+    require_once dirname(__DIR__, 3) . '/includes/domains/customer.php';
+    $cust = $conn !== null && domainCustomerReady($conn);   // #153, once Database Verification has run
+    $custCols = $cust ? ", COALESCE(NULLIF(cu.display_name, ''), cu.email) AS customer_user_name, cu.email AS customer_user_email" : '';
+    $custJoin = $cust ? " LEFT JOIN users cu ON cu.id = d.customer_user_id" : '';
+    // #162: a supplier customer (and its contact), and an analyst tech contact.
+    if ($conn !== null && domainPartiesReady($conn)) {
+        $custCols .= ", COALESCE(NULLIF(csup.trading_name, ''), csup.legal_name) AS customer_supplier_name,
+                       TRIM(CONCAT(COALESCE(cct.first_name, ''), ' ', COALESCE(cct.surname, ''))) AS customer_contact_name,
+                       cct.email AS customer_contact_email, ta.full_name AS tech_analyst_name";
+        $custJoin .= " LEFT JOIN suppliers csup ON csup.id = d.customer_supplier_id
+                       LEFT JOIN contacts cct ON cct.id = d.customer_contact_id
+                       LEFT JOIN analysts ta ON ta.id = d.tech_analyst_id";
+    }
     return "SELECT d.*,
                    s.name AS status_name, s.colour AS status_colour,
                    COALESCE(NULLIF(sup.trading_name, ''), sup.legal_name) AS supplier_name,
                    acc.account_name,
                    a.full_name AS owner_name,
                    TRIM(CONCAT(COALESCE(ct.first_name, ''), ' ', COALESCE(ct.surname, ''))) AS tech_contact_name,
-                   tn.name AS company_name
+                   tn.name AS company_name$custCols
               FROM domains d
          LEFT JOIN domain_statuses s          ON s.id = d.status_id
          LEFT JOIN suppliers sup              ON sup.id = d.registrar_supplier_id
          LEFT JOIN domain_registrar_accounts acc ON acc.id = d.registrar_account_id
          LEFT JOIN analysts a                 ON a.id = d.owner_analyst_id
          LEFT JOIN contacts ct                ON ct.id = d.tech_contact_id
-         LEFT JOIN tenants tn                 ON tn.id = d.tenant_id";
+         LEFT JOIN tenants tn                 ON tn.id = d.tenant_id$custJoin";
 }
 
 function apiSerializeDomain(array $r): array {
@@ -78,6 +91,16 @@ function apiSerializeDomain(array $r): array {
         'registrant_name'   => $r['registrant_name'],
         'owner'             => $rel($r['owner_analyst_id'], $r['owner_name']),
         'tech_contact'      => $rel($r['tech_contact_id'], $r['tech_contact_name'] !== '' ? $r['tech_contact_name'] : null),
+        'customer'          => empty($r['customer_user_id']) ? null
+            : ['id' => (int)$r['customer_user_id'], 'name' => $r['customer_user_name'] ?? null, 'email' => $r['customer_user_email'] ?? null],
+        // #162, added beside the fields above rather than changing them: the
+        // technical contact may be an analyst, the customer a supplier and/or
+        // one of its contacts. At most one of tech_contact / tech_analyst is set,
+        // and customer is never set together with customer_supplier.
+        'tech_analyst'      => $rel($r['tech_analyst_id'] ?? null, $r['tech_analyst_name'] ?? null),
+        'customer_supplier' => $rel($r['customer_supplier_id'] ?? null, $r['customer_supplier_name'] ?? null),
+        'customer_contact'  => empty($r['customer_contact_id']) ? null
+            : ['id' => (int)$r['customer_contact_id'], 'name' => ($r['customer_contact_name'] ?? '') !== '' ? $r['customer_contact_name'] : null, 'email' => $r['customer_contact_email'] ?? null],
         'nameservers'       => $list($r['nameservers'], '/\R/'),
         'dns_provider'      => $r['dns_provider'],
         'hosting_provider'  => $r['hosting_provider'],
@@ -107,7 +130,7 @@ function apiSerializeDomain(array $r): array {
 
 /** The by-id gate: existence + company scope, both failing as 404. */
 function apiLoadDomain(PDO $conn, array $apiKey, int $id): array {
-    $stmt = $conn->prepare(apiDomainSelect() . " WHERE d.id = ?");
+    $stmt = $conn->prepare(apiDomainSelect($conn) . " WHERE d.id = ?");
     $stmt->execute([$id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row || !apiKeyCanAccessTenantRow($conn, $apiKey, 'domains', $id)) {
@@ -200,7 +223,7 @@ function apiDomainsList(PDO $conn, array $apiKey, array $params, array $body): v
     $count->execute($args);
     $total = (int)$count->fetchColumn();
 
-    $stmt = $conn->prepare(apiDomainSelect() . " WHERE $whereSql ORDER BY $orderSql LIMIT $perPage OFFSET $offset");
+    $stmt = $conn->prepare(apiDomainSelect($conn) . " WHERE $whereSql ORDER BY $orderSql LIMIT $perPage OFFSET $offset");
     $stmt->execute($args);
     apiRespond(array_map('apiSerializeDomain', $stmt->fetchAll(PDO::FETCH_ASSOC)), 200, [
         'page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => (int)ceil($total / max(1, $perPage)),

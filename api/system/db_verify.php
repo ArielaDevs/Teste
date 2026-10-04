@@ -805,6 +805,20 @@ try {
         }
     }
 
+    // Competency tests (3.0.0). A sitting outlives its test (SET NULL): its
+    // snapshot holds everything the result needs, so deleting a test never
+    // deletes a candidate's result - retention does that, on its own clock.
+    $ctFks = [
+        ['lms_ct_test_skills',    'fk_lcts_test',     "ALTER TABLE lms_ct_test_skills ADD CONSTRAINT fk_lcts_test FOREIGN KEY (test_id) REFERENCES lms_ct_tests (id) ON DELETE CASCADE"],
+        ['lms_ct_test_questions', 'fk_lcttq_test',    "ALTER TABLE lms_ct_test_questions ADD CONSTRAINT fk_lcttq_test FOREIGN KEY (test_id) REFERENCES lms_ct_tests (id) ON DELETE CASCADE"],
+        ['lms_ct_test_questions', 'fk_lcttq_question',"ALTER TABLE lms_ct_test_questions ADD CONSTRAINT fk_lcttq_question FOREIGN KEY (question_id) REFERENCES lms_ct_questions (id) ON DELETE CASCADE"],
+        ['lms_ct_sittings',       'fk_lcs_test',      "ALTER TABLE lms_ct_sittings ADD CONSTRAINT fk_lcs_test FOREIGN KEY (test_id) REFERENCES lms_ct_tests (id) ON DELETE SET NULL"],
+    ];
+    foreach ($ctFks as [$tbl, $name, $sql]) {
+        if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;
+        try { $conn->exec($sql); } catch (Exception $e) {}
+    }
+
     // Documents. Deleting the document takes its links with it. Note the cascade
     // runs ONE way only, deliberately: removing a link must never remove the
     // document, because something else may still be using the same file.
@@ -2644,6 +2658,10 @@ try {
         // Tickets ↔ assets (#57)
         ['table_views',                 'fk_tv_owner',             "ALTER TABLE table_views ADD CONSTRAINT fk_tv_owner FOREIGN KEY (owner_id) REFERENCES analysts (id) ON DELETE SET NULL"],
         ['table_views',                 'fk_tv_team',              "ALTER TABLE table_views ADD CONSTRAINT fk_tv_team FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE SET NULL"],
+        // Report Packs
+        ['report_packs',                'fk_rp_owner',             "ALTER TABLE report_packs ADD CONSTRAINT fk_rp_owner FOREIGN KEY (owner_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['report_packs',                'fk_rp_updater',           "ALTER TABLE report_packs ADD CONSTRAINT fk_rp_updater FOREIGN KEY (updated_by) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['report_pack_shares',          'fk_rps_pack',             "ALTER TABLE report_pack_shares ADD CONSTRAINT fk_rps_pack FOREIGN KEY (pack_id) REFERENCES report_packs (id) ON DELETE CASCADE"],
         ['contract_assets',             'fk_ca_contract',          "ALTER TABLE contract_assets ADD CONSTRAINT fk_ca_contract FOREIGN KEY (contract_id) REFERENCES contracts (id) ON DELETE CASCADE"],
         ['contract_assets',             'fk_ca_asset',             "ALTER TABLE contract_assets ADD CONSTRAINT fk_ca_asset FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE"],
         ['contract_assets',             'fk_ca_analyst',           "ALTER TABLE contract_assets ADD CONSTRAINT fk_ca_analyst FOREIGN KEY (linked_by_id) REFERENCES analysts (id) ON DELETE SET NULL"],
@@ -2697,6 +2715,8 @@ try {
         ['contracts',            'fk_contracts_supplier',         "ALTER TABLE contracts ADD CONSTRAINT fk_contracts_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE SET NULL"],
         ['contracts',            'fk_contracts_owner',            "ALTER TABLE contracts ADD CONSTRAINT fk_contracts_owner FOREIGN KEY (contract_owner_id) REFERENCES analysts (id) ON DELETE SET NULL"],
         ['contracts',            'fk_contracts_status',           "ALTER TABLE contracts ADD CONSTRAINT fk_contracts_status FOREIGN KEY (contract_status_id) REFERENCES contract_statuses (id) ON DELETE SET NULL"],
+        ['contracts',            'fk_contracts_customer_tenant',  "ALTER TABLE contracts ADD CONSTRAINT fk_contracts_customer_tenant FOREIGN KEY (customer_tenant_id) REFERENCES tenants (id) ON DELETE SET NULL"],
+        ['contracts',            'fk_contracts_customer_user',    "ALTER TABLE contracts ADD CONSTRAINT fk_contracts_customer_user FOREIGN KEY (customer_user_id) REFERENCES users (id) ON DELETE SET NULL"],
         ['contracts',            'fk_contracts_payment_schedule', "ALTER TABLE contracts ADD CONSTRAINT fk_contracts_payment_schedule FOREIGN KEY (payment_schedule_id) REFERENCES payment_schedules (id) ON DELETE SET NULL"],
         ['contract_term_values', 'fk_ctv_contract',               "ALTER TABLE contract_term_values ADD CONSTRAINT fk_ctv_contract FOREIGN KEY (contract_id) REFERENCES contracts (id) ON DELETE CASCADE"],
         ['contract_term_values', 'fk_ctv_term_tab',               "ALTER TABLE contract_term_values ADD CONSTRAINT fk_ctv_term_tab FOREIGN KEY (term_tab_id) REFERENCES contract_term_tabs (id) ON DELETE CASCADE"],
@@ -2721,15 +2741,52 @@ try {
         ['domains',                   'fk_domains_account',         "ALTER TABLE domains ADD CONSTRAINT fk_domains_account FOREIGN KEY (registrar_account_id) REFERENCES domain_registrar_accounts (id) ON DELETE SET NULL"],
         ['domains',                   'fk_domains_owner',           "ALTER TABLE domains ADD CONSTRAINT fk_domains_owner FOREIGN KEY (owner_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
         ['domains',                   'fk_domains_tech_contact',    "ALTER TABLE domains ADD CONSTRAINT fk_domains_tech_contact FOREIGN KEY (tech_contact_id) REFERENCES contacts (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_customer_user',   "ALTER TABLE domains ADD CONSTRAINT fk_domains_customer_user FOREIGN KEY (customer_user_id) REFERENCES users (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_customer_supplier', "ALTER TABLE domains ADD CONSTRAINT fk_domains_customer_supplier FOREIGN KEY (customer_supplier_id) REFERENCES suppliers (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_customer_contact', "ALTER TABLE domains ADD CONSTRAINT fk_domains_customer_contact FOREIGN KEY (customer_contact_id) REFERENCES contacts (id) ON DELETE SET NULL"],
+        ['domains',                   'fk_domains_tech_analyst',    "ALTER TABLE domains ADD CONSTRAINT fk_domains_tech_analyst FOREIGN KEY (tech_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
         ['domains',                   'fk_domains_contract',        "ALTER TABLE domains ADD CONSTRAINT fk_domains_contract FOREIGN KEY (contract_id) REFERENCES contracts (id) ON DELETE SET NULL"],
         ['domain_audit',              'fk_domain_audit_domain',     "ALTER TABLE domain_audit ADD CONSTRAINT fk_domain_audit_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
         ['domain_alerts_sent',        'fk_domain_alerts_domain',    "ALTER TABLE domain_alerts_sent ADD CONSTRAINT fk_domain_alerts_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
         ['domain_lookalikes',         'fk_domain_lookalikes_domain', "ALTER TABLE domain_lookalikes ADD CONSTRAINT fk_domain_lookalikes_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
         ['domain_certificates',       'fk_domain_certificates_domain', "ALTER TABLE domain_certificates ADD CONSTRAINT fk_domain_certificates_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        // Domains joined to the rest of FreeITSM (3.0.0). Every link goes with
+        // either side; the analyst who made it can leave without taking it.
+        ['domain_cmdb_objects',       'fk_dco_domain',      "ALTER TABLE domain_cmdb_objects ADD CONSTRAINT fk_dco_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_cmdb_objects',       'fk_dco_cmdb_object', "ALTER TABLE domain_cmdb_objects ADD CONSTRAINT fk_dco_cmdb_object FOREIGN KEY (cmdb_object_id) REFERENCES cmdb_objects (id) ON DELETE CASCADE"],
+        ['domain_cmdb_objects',       'fk_dco_analyst',     "ALTER TABLE domain_cmdb_objects ADD CONSTRAINT fk_dco_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domain_status_services',    'fk_dss_domain',      "ALTER TABLE domain_status_services ADD CONSTRAINT fk_dss_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_status_services',    'fk_dss_service',     "ALTER TABLE domain_status_services ADD CONSTRAINT fk_dss_service FOREIGN KEY (service_id) REFERENCES status_services (id) ON DELETE CASCADE"],
+        ['domain_status_services',    'fk_dss_analyst',     "ALTER TABLE domain_status_services ADD CONSTRAINT fk_dss_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['ticket_domains',            'fk_td_ticket',       "ALTER TABLE ticket_domains ADD CONSTRAINT fk_td_ticket FOREIGN KEY (ticket_id) REFERENCES tickets (id) ON DELETE CASCADE"],
+        ['ticket_domains',            'fk_td_domain',       "ALTER TABLE ticket_domains ADD CONSTRAINT fk_td_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['ticket_domains',            'fk_td_analyst',      "ALTER TABLE ticket_domains ADD CONSTRAINT fk_td_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domain_knowledge_articles', 'fk_dka_domain',      "ALTER TABLE domain_knowledge_articles ADD CONSTRAINT fk_dka_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_knowledge_articles', 'fk_dka_article',     "ALTER TABLE domain_knowledge_articles ADD CONSTRAINT fk_dka_article FOREIGN KEY (article_id) REFERENCES knowledge_articles (id) ON DELETE CASCADE"],
+        ['domain_knowledge_articles', 'fk_dka_analyst',     "ALTER TABLE domain_knowledge_articles ADD CONSTRAINT fk_dka_analyst FOREIGN KEY (created_by_analyst_id) REFERENCES analysts (id) ON DELETE SET NULL"],
+        ['domain_status_incidents',   'fk_dsi_domain',      "ALTER TABLE domain_status_incidents ADD CONSTRAINT fk_dsi_domain FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE"],
+        ['domain_status_incidents',   'fk_dsi_incident',    "ALTER TABLE domain_status_incidents ADD CONSTRAINT fk_dsi_incident FOREIGN KEY (incident_id) REFERENCES status_incidents (id) ON DELETE CASCADE"],
     ];
     foreach ($domainFks as [$tbl, $name, $sql]) {
         if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;
         try { $conn->exec($sql); } catch (Exception $e) {}
+    }
+
+    // Cost centres (GH #160). Names + rules match freeitsm.sql: a company takes
+    // its cost centres with it; a parent going leaves its children at the top
+    // level (CostCentresService refuses to delete a parent first anyway).
+    $costCentreFks = [
+        ['cost_centres', 'fk_cost_centres_parent', "ALTER TABLE cost_centres ADD CONSTRAINT fk_cost_centres_parent FOREIGN KEY (parent_id) REFERENCES cost_centres (id) ON DELETE SET NULL"],
+        ['cost_centres', 'fk_cost_centres_tenant', "ALTER TABLE cost_centres ADD CONSTRAINT fk_cost_centres_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE CASCADE"],
+    ];
+    foreach ($costCentreFks as [$tbl, $name, $sql]) {
+        if (!$tableExists($tbl) || $fkExists($tbl, $name)) continue;
+        try { $conn->exec($sql); } catch (Exception $e) {}
+    }
+
+    // Photo Album: an analyst's pictures go with them.
+    if ($tableExists('photo_album') && !$fkExists('photo_album', 'fk_photo_album_analyst')) {
+        try { $conn->exec("ALTER TABLE photo_album ADD CONSTRAINT fk_photo_album_analyst FOREIGN KEY (analyst_id) REFERENCES analysts (id) ON DELETE CASCADE"); } catch (Exception $e) {}
     }
 
     // Forms-module foreign keys (db_verify $schema only builds columns + PK;

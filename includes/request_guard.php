@@ -84,3 +84,9 @@ function rejectSimpleRequestForgery(): void
 }
 
 rejectSimpleRequestForgery();
+
+// S4: the origin check and the session token, then the token into every page.
+// See includes/csrf.php - endpoints and pages are covered by being reached.
+require_once __DIR__ . '/csrf.php';
+csrfEnforce();
+csrfStartPageInjection();

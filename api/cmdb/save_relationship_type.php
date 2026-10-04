@@ -42,9 +42,12 @@ try {
 
     $conn = connectToDatabase();
 
-    // Refuse duplicate verbs
-    $check = $conn->prepare("SELECT id FROM cmdb_relationship_types WHERE verb = ? AND ($id IS NULL OR id <> ?)");
-    $check->execute([$verb, $id ?: 0]);
+    // Refuse duplicate verbs - any OTHER type with this verb. On create there is no
+    // id yet, and 0 matches no row, so every existing type is compared (GH #163:
+    // this used to paste $id into the SQL, and a null id became "( IS NULL OR …",
+    // so adding a relationship type failed with a syntax error every time).
+    $check = $conn->prepare("SELECT id FROM cmdb_relationship_types WHERE verb = ? AND id <> ?");
+    $check->execute([$verb, $id ?? 0]);
     if ($check->fetch()) {
         throw new Exception('Another relationship type already uses that verb');
     }

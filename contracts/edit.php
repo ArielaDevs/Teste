@@ -211,9 +211,24 @@ $contract_id = $_GET['id'] ?? null;
         .terms-empty a { color: var(--con-accent, #f59e0b); }
 
         [data-theme-mode="dark"] .sidebar-link:hover { background: #3a2e12; }
+        /* Supplier / Customer (#153) */
+        .party-label { display: block; margin-bottom: 6px; font-weight: 500; color: var(--text, #333); font-size: 14px; }
+        .party-switch { display: inline-flex; border: 1px solid var(--border, #ddd); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+        .party-switch label { display: flex; align-items: center; gap: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px; color: var(--text, #333); margin: 0; }
+        .party-switch label:first-child { border-right: 1px solid var(--border, #ddd); }
+        .party-switch label:has(input:checked) { background: var(--con-accent-soft, #fef3c7); color: var(--text, #222); font-weight: 600; }
+        #partyCustomer > select { margin-bottom: 8px; }
+        .person-picker { position: relative; }
+        .person-picker input[type=text] { width: 100%; box-sizing: border-box; padding-right: 30px; }
+        .person-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: none; font-size: 18px; color: var(--text-muted, #777); cursor: pointer; line-height: 1; }
+        .person-results { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
+        .person-results li { padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text, #333); }
+        .person-results li small { display: block; color: var(--text-muted, #777); font-size: 11.5px; }
+        .person-results li[aria-selected="true"], .person-results li:hover { background: var(--surface-hover, #f3f4f6); }
+        .party-hint { display: block; margin-top: 6px; color: var(--text-muted, #777); font-size: 12px; }
     </style>
     <!-- Mobile layer: linked AFTER this page's own <style> so its @media rules win on ties. -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="contracts" data-mobile-page="contract-edit">
     <?php include 'includes/header.php'; ?>
@@ -305,10 +320,29 @@ $contract_id = $_GET['id'] ?? null;
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="supplierId"><?php echo htmlspecialchars(t('contracts.detail.supplier')); ?></label>
-                            <select id="supplierId">
-                                <option value="">-- <?php echo htmlspecialchars(t('contracts.edit.select_supplier')); ?> --</option>
-                            </select>
+                            <!-- Who the contract is WITH (#153): a supplier (we buy) or a customer (we sell). -->
+                            <span class="party-label"><?php echo htmlspecialchars(t('contracts.party.with')); ?></span>
+                            <div class="party-switch" role="radiogroup" aria-label="<?php echo htmlspecialchars(t('contracts.party.with')); ?>">
+                                <label><input type="radio" name="partyType" value="supplier" checked onchange="showParty()"> <?php echo htmlspecialchars(t('contracts.party.supplier')); ?></label>
+                                <label><input type="radio" name="partyType" value="customer" onchange="showParty()"> <?php echo htmlspecialchars(t('contracts.party.customer')); ?></label>
+                            </div>
+                            <div id="partySupplier">
+                                <select id="supplierId" aria-label="<?php echo htmlspecialchars(t('contracts.detail.supplier')); ?>">
+                                    <option value="">-- <?php echo htmlspecialchars(t('contracts.edit.select_supplier')); ?> --</option>
+                                </select>
+                            </div>
+                            <div id="partyCustomer" hidden>
+                                <select id="customerTenantId" aria-label="<?php echo htmlspecialchars(t('contracts.party.company')); ?>" onchange="clearPersonIfOtherCompany()" hidden>
+                                    <option value="">-- <?php echo htmlspecialchars(t('contracts.party.select_company')); ?> --</option>
+                                </select>
+                                <div class="person-picker">
+                                    <input type="text" id="customerPersonSearch" autocomplete="off" placeholder="<?php echo htmlspecialchars(t('contracts.party.person_ph')); ?>" aria-label="<?php echo htmlspecialchars(t('contracts.party.person')); ?>" oninput="searchPeople()" onkeydown="personKeys(event)">
+                                    <input type="hidden" id="customerUserId">
+                                    <button type="button" class="person-clear" id="customerPersonClear" onclick="clearPerson()" title="<?php echo htmlspecialchars(t('contracts.party.clear_person')); ?>" aria-label="<?php echo htmlspecialchars(t('contracts.party.clear_person')); ?>" hidden>&times;</button>
+                                    <ul class="person-results" id="customerPersonResults" role="listbox" hidden></ul>
+                                </div>
+                                <small class="party-hint" id="partyCustomerHint"></small>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="ownerId"><?php echo htmlspecialchars(t('contracts.detail.owner')); ?></label>
@@ -494,6 +528,7 @@ $contract_id = $_GET['id'] ?? null;
             loadStats();
             populateCurrencies();
             await Promise.all([
+                loadCustomerCompanies(),
                 loadSuppliers(),
                 loadAnalysts(),
                 loadContractStatuses(),
@@ -541,6 +576,83 @@ $contract_id = $_GET['id'] ?? null;
                 }
             } catch (error) { console.error('Error loading suppliers:', error); }
         }
+
+        // ── Supplier or customer (#153) ─────────────────────────────────
+        let multiCompany = false;
+        async function loadCustomerCompanies() {
+            try {
+                const r = await fetch(API_BASE + 'customer_lookup.php');
+                const d = await r.json();
+                if (!d.success) return;
+                multiCompany = d.multi_company;
+                const sel = document.getElementById('customerTenantId');
+                sel.hidden = !multiCompany;
+                sel.innerHTML = '<option value="">-- ' + escapeHtml(window.t('contracts.party.select_company')) + ' --</option>' +
+                    d.companies.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+                document.getElementById('partyCustomerHint').textContent = window.t(multiCompany ? 'contracts.party.hint_multi' : 'contracts.party.hint_single');
+            } catch (e) { console.error('Error loading companies:', e); }
+        }
+        function partyType() { return document.querySelector('input[name="partyType"]:checked').value; }
+        function showParty() {
+            const customer = partyType() === 'customer';
+            document.getElementById('partySupplier').hidden = customer;
+            document.getElementById('partyCustomer').hidden = !customer;
+        }
+        function setPerson(id, label) {
+            document.getElementById('customerUserId').value = id || '';
+            document.getElementById('customerPersonSearch').value = label || '';
+            document.getElementById('customerPersonClear').hidden = !id;
+            hidePeople();
+        }
+        function clearPerson() { setPerson('', ''); document.getElementById('customerPersonSearch').focus(); }
+        function clearPersonIfOtherCompany() { if (document.getElementById('customerUserId').value) clearPerson(); }
+        function hidePeople() { const ul = document.getElementById('customerPersonResults'); ul.hidden = true; ul.replaceChildren(); }
+        let peopleTimer = null, peopleSeq = 0;
+        function searchPeople() {
+            document.getElementById('customerUserId').value = '';   // typing again means choosing again
+            document.getElementById('customerPersonClear').hidden = true;
+            clearTimeout(peopleTimer);
+            const q = document.getElementById('customerPersonSearch').value.trim();
+            if (q.length < 2) { hidePeople(); return; }
+            peopleTimer = setTimeout(async () => {
+                const seq = ++peopleSeq;
+                const tenant = document.getElementById('customerTenantId').value;
+                const r = await fetch(API_BASE + 'customer_lookup.php?q=' + encodeURIComponent(q) + (tenant ? '&tenant_id=' + encodeURIComponent(tenant) : ''));
+                const d = await r.json();
+                if (seq !== peopleSeq) return;
+                const ul = document.getElementById('customerPersonResults');
+                if (!d.success || !d.people.length) {
+                    const li = document.createElement('li'); li.textContent = window.t('contracts.party.no_people'); li.setAttribute('aria-disabled', 'true');
+                    ul.replaceChildren(li); ul.hidden = false; return;
+                }
+                ul.replaceChildren(...d.people.map((p, i) => {
+                    const li = document.createElement('li');
+                    li.setAttribute('role', 'option'); li.dataset.id = p.id;
+                    li.dataset.label = p.name;
+                    li.append(document.createTextNode(p.name));
+                    const meta = document.createElement('small');
+                    meta.textContent = [p.email, multiCompany ? p.company : ''].filter(Boolean).join(' · ');
+                    li.append(meta);
+                    li.addEventListener('mousedown', (e) => { e.preventDefault(); setPerson(p.id, p.name); });
+                    return li;
+                }));
+                ul.hidden = false;
+            }, 220);
+        }
+        function personKeys(e) {
+            const ul = document.getElementById('customerPersonResults');
+            const items = Array.from(ul.querySelectorAll('li[role=option]'));
+            if (ul.hidden || !items.length) return;
+            let i = items.findIndex(li => li.getAttribute('aria-selected') === 'true');
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
+                items.forEach((li, n) => li.setAttribute('aria-selected', n === i ? 'true' : 'false'));
+            } else if (e.key === 'Enter' && i >= 0) {
+                e.preventDefault(); setPerson(items[i].dataset.id, items[i].dataset.label);
+            } else if (e.key === 'Escape') { hidePeople(); }
+        }
+        document.addEventListener('click', (e) => { if (!e.target.closest('.person-picker')) hidePeople(); });
 
         async function loadAnalysts() {
             try {
@@ -594,6 +706,10 @@ $contract_id = $_GET['id'] ?? null;
                     document.getElementById('title').value = c.title;
                     document.getElementById('description').value = c.description || '';
                     document.getElementById('supplierId').value = c.supplier_id || '';
+                    document.querySelector('input[name="partyType"][value="' + (c.party_type === 'customer' ? 'customer' : 'supplier') + '"]').checked = true;
+                    document.getElementById('customerTenantId').value = c.customer_tenant_id || '';
+                    setPerson(c.customer_user_id || '', c.customer_person_name || '');
+                    showParty();
                     document.getElementById('ownerId').value = c.contract_owner_id || '';
                     document.getElementById('contractStatusId').value = c.contract_status_id || '';
                     document.getElementById('contractStart').value = c.contract_start || '';
@@ -624,7 +740,10 @@ $contract_id = $_GET['id'] ?? null;
                 contract_number: document.getElementById('contractNumber').value.trim(),
                 title: document.getElementById('title').value.trim(),
                 description: document.getElementById('description').value.trim(),
-                supplier_id: document.getElementById('supplierId').value || null,
+                party_type: partyType(),
+                supplier_id: partyType() === 'supplier' ? (document.getElementById('supplierId').value || null) : null,
+                customer_tenant_id: partyType() === 'customer' ? (document.getElementById('customerTenantId').value || null) : null,
+                customer_user_id: partyType() === 'customer' ? (document.getElementById('customerUserId').value || null) : null,
                 contract_owner_id: document.getElementById('ownerId').value || null,
                 contract_status_id: document.getElementById('contractStatusId').value || null,
                 contract_start: document.getElementById('contractStart').value || null,
@@ -815,6 +934,6 @@ $contract_id = $_GET['id'] ?? null;
         }
 
     </script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

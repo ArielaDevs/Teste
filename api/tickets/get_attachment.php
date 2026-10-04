@@ -14,6 +14,7 @@ if (!isset($_SESSION['analyst_id'])) {
     http_response_code(401);
     exit('Not authenticated');
 }
+requireModuleAccessJson('tickets');
 
 // Get attachment identifier
 $attachmentId = $_GET['id'] ?? null;

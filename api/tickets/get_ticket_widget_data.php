@@ -16,6 +16,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('tickets');
 
 $widget_id = $_GET['widget_id'] ?? '';
 $statusFilter = $_GET['status'] ?? '';

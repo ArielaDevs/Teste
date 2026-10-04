@@ -184,9 +184,12 @@ $translationNamespaces = ['common', 'contracts'];
         /* Dark-mode overrides for pale amber tints (light values kept hardcoded) */
         [data-theme-mode="dark"] .sidebar-link:hover { background: #3a2e12; }
         [data-theme-mode="dark"] .search-result-item:hover { background: #3a2e12; }
+        /* Supplier or customer (#153) */
+        .party-filter { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border, #ddd); border-radius: 6px; background: var(--surface, #fff); color: var(--text, #333); }
+        .party-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--con-accent-soft, #fef3c7); color: var(--text, #333); vertical-align: 1px; }
     </style>
     <!-- Mobile layer: linked AFTER this page's own <style> so its @media rules win on ties. -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-module="contracts" data-mobile-page="contracts-list">
     <?php include 'includes/header.php'; ?>
@@ -257,13 +260,18 @@ $translationNamespaces = ['common', 'contracts'];
             <div class="section-card">
                 <div class="section-header">
                     <h2><?php echo htmlspecialchars(t('contracts.nav.contracts')); ?></h2>
+                    <select id="partyFilter" class="party-filter" onchange="loadContracts()" aria-label="<?php echo htmlspecialchars(t('contracts.party.filter')); ?>">
+                        <option value=""><?php echo htmlspecialchars(t('contracts.party.filter_all')); ?></option>
+                        <option value="supplier"><?php echo htmlspecialchars(t('contracts.party.filter_supplier')); ?></option>
+                        <option value="customer"><?php echo htmlspecialchars(t('contracts.party.filter_customer')); ?></option>
+                    </select>
                 </div>
                 <table>
                     <thead>
                         <tr>
                             <th><?php echo htmlspecialchars(t('contracts.list.col_number')); ?></th>
                             <th><?php echo htmlspecialchars(t('contracts.list.col_title')); ?></th>
-                            <th><?php echo htmlspecialchars(t('contracts.list.col_supplier')); ?></th>
+                            <th><?php echo htmlspecialchars(t('contracts.party.col_with')); ?></th>
                             <th><?php echo htmlspecialchars(t('contracts.list.col_owner')); ?></th>
                             <th><?php echo htmlspecialchars(t('contracts.list.col_end_date')); ?></th>
                             <th><?php echo htmlspecialchars(t('contracts.list.col_status')); ?></th>
@@ -319,7 +327,8 @@ $translationNamespaces = ['common', 'contracts'];
         // Contract list
         async function loadContracts() {
             try {
-                const response = await fetch(API_BASE + 'get_contracts.php');
+                const party = (document.getElementById('partyFilter') || {}).value || '';
+                const response = await fetch(API_BASE + 'get_contracts.php' + (party ? '?party=' + encodeURIComponent(party) : ''));
                 const data = await response.json();
                 if (data.success) {
                     renderContracts(data.contracts);
@@ -345,7 +354,7 @@ $translationNamespaces = ['common', 'contracts'];
                     <tr>
                         <td><strong>${escapeHtml(c.contract_number)}</strong></td>
                         <td>${escapeHtml(c.title)}</td>
-                        <td>${escapeHtml(c.supplier_name || '-')}</td>
+                        <td>${escapeHtml(c.party_label || '-')}${c.party_type === 'customer' ? ' <span class="party-badge">' + escapeHtml(window.t('contracts.party.customer')) + '</span>' : ''}</td>
                         <td>${escapeHtml(c.owner_name || '-')}</td>
                         <td>${formatDate(c.contract_end)}</td>
                         <td><span class="status-badge ${status.class}">${status.label}</span></td>
@@ -460,7 +469,7 @@ $translationNamespaces = ['common', 'contracts'];
                         results.push({
                             type: 'contract',
                             title: c.contract_number + ' — ' + c.title,
-                            meta: [c.supplier_name, c.owner_name].filter(Boolean).join(' | ') || window.t('contracts.list.no_supplier'),
+                            meta: [c.party_label, c.owner_name].filter(Boolean).join(' | ') || window.t('contracts.list.no_supplier'),
                             url: 'view.php?id=' + c.id
                         });
                     });
@@ -555,6 +564,6 @@ $translationNamespaces = ['common', 'contracts'];
             return div.innerHTML;
         }
     </script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

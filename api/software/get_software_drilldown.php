@@ -13,6 +13,7 @@ if (!isset($_SESSION['analyst_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+requireModuleAccessJson('software');
 
 $widget_id = $_GET['widget_id'] ?? '';
 $app_id = $_GET['app_id'] ?? '';

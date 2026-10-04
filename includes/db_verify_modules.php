@@ -61,6 +61,8 @@ $DB_VERIFY_MODULE_PREFIXES = [
     'ip_login_bans'    => 'system',
     'user_preferences' => 'system',
     'user_sso'         => 'system',
+    'cost_centre'      => 'system',   // GH #160 - System -> Cost Centres
+    'photo_album'      => 'system',   // System -> Photo Album
     // --- Tickets (and everything that feeds the inbox) ---
     'users_assets'     => 'assets',   // must precede the 'users' fallthrough
     'ticket'           => 'tickets',

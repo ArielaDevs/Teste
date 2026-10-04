@@ -1235,7 +1235,10 @@ class TasksService
                 $stmt = $conn->prepare("SELECT id FROM changes WHERE id = ?");
                 break;
             case 'contract_id':
-                $stmt = $conn->prepare("SELECT id FROM contracts WHERE id = ?");
+                // A customer contract outside the actor's companies is unknown (#153).
+                require_once __DIR__ . '/../contract_party.php';
+                [$kVis, $extra] = contractVisibilitySqlForScope($conn, $ctx->companyScope, 'k');
+                $stmt = $conn->prepare("SELECT k.id FROM contracts k WHERE k.id = ?$kVis");
                 break;
             case 'parent_task_id':
                 $stmt = $conn->prepare("SELECT id FROM tasks WHERE id = ?");
@@ -1244,7 +1247,7 @@ class TasksService
                 return null;
         }
         try {
-            $stmt->execute([$id]);
+            $stmt->execute(array_merge([$id], $extra ?? []));
             if (!$stmt->fetchColumn()) {
                 throw new ServiceError('validation', 'invalid_field', "Unknown " . str_replace('_id', '', $field) . " id: {$id}");
             }

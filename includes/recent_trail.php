@@ -104,6 +104,10 @@ const RECENT_TRAIL_MODULES = [
     'knowledge_article' => 'knowledge',
     'contract'          => 'contracts',
     'domain'            => 'domains',
+    'person'            => 'people',
+    'company'           => 'people',
+    'supplier'          => 'people',
+    'supplier_contact'  => 'people',
 ];
 
 /**
@@ -464,13 +468,35 @@ function recentTrailLabelsForType(PDO $conn, int $analystId, string $type, array
             $gate = fn($id) => analystCanAccessDomain($conn, $analystId, $id);
             break;
 
+        case 'person':
+            $sql  = "SELECT id, COALESCE(NULLIF(preferred_name, ''), NULLIF(display_name, ''), email, username) AS label FROM users WHERE id IN ($in)";
+            $gate = fn($id) => analystCanAccessUser($conn, $analystId, $id);
+            break;
+
+        case 'company':
+            $sql  = "SELECT id, name AS label FROM tenants WHERE id IN ($in)";
+            $gate = fn($id) => !isMultiTenant($conn) || analystCanAccessTenant($conn, $analystId, (int)$id);
+            break;
+
+        // Install-wide records owned by Contracts (#153 step 3): the page needs
+        // Contracts as well as People, so the trail does too.
+        case 'supplier':
+            $sql  = "SELECT id, COALESCE(NULLIF(trading_name, ''), legal_name) AS label FROM suppliers WHERE id IN ($in)";
+            $gate = fn($id) => analystCanAccessModule($conn, $analystId, 'contracts');
+            break;
+
+        case 'supplier_contact':
+            $sql  = "SELECT id, TRIM(CONCAT(first_name, ' ', surname)) AS label FROM contacts WHERE id IN ($in)";
+            $gate = fn($id) => analystCanAccessModule($conn, $analystId, 'contracts');
+            break;
+
         case 'contract':
-            // ⚠️ No record gate: contracts carry no tenant_id, so the module gate
-            // already applied is the whole of the check. Same as the preview, and
-            // for the same reason — see includes/contract_assets.php.
+            // Supplier contracts are install-wide; a CUSTOMER contract is gated by
+            // its customer's company (#153).
+            require_once __DIR__ . '/contract_party.php';
             $sql = "SELECT id, TRIM(CONCAT(COALESCE(contract_number,''), ' ', COALESCE(title,''))) AS label
                       FROM contracts WHERE id IN ($in)";
-            $gate = fn($id) => true;
+            $gate = fn($id) => contractCanView($conn, $analystId, (int)$id);
             break;
 
         case 'knowledge_article':

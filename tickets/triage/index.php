@@ -6,8 +6,10 @@
  */
 session_start();
 require_once '../../config.php';
+require_once '../../includes/functions.php';
 require_once '../../includes/i18n.php';
 require_once '../../includes/timezone.php';
+requireModuleAccess('tickets');
 I18n::initFromSession();
 Tz::init();
 
@@ -78,7 +80,7 @@ $translationNamespaces = ['common', 'tickets'];
         .triage-email-summary { font-size: 12px; color: #777; background: #f7f8f9; border-radius: 6px; padding: 10px 12px; margin-bottom: 16px; }
         .freemail-note { font-size: 12px; color: #ef6c00; margin-bottom: 12px; }
     </style>
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=167">
 </head>
 <body data-mobile-page="tickets-triage">
     <?php include '../includes/header.php'; ?>
@@ -314,6 +316,6 @@ $translationNamespaces = ['common', 'tickets'];
         loadTriage();
     })();
     </script>
-    <script src="../../assets/js/mobile.js?v=65"></script>
+    <script src="../../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

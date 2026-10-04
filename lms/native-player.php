@@ -10,6 +10,18 @@
  * answer key. Rendering the lessons server-side would mean writing a second
  * query, and a second chance to leak it.
  */
+
+// A piece of player.php, never a page of its own. Opened directly it has no
+// course, no access check and no I18n - it used to die with a PHP fatal that
+// printed file paths. Send a direct visit through the real player, which does
+// the sign-in, module and course-access checks; keep the course id if given.
+if (!isset($course, $courseId, $conn)) {
+    $id = (int)($_GET['course_id'] ?? 0);
+    header('Location: ' . ($id > 0 ? 'player.php?course_id=' . $id : './'));
+    exit;
+}
+
+require_once __DIR__ . '/../includes/base_url.php';   // BASE_URL if config.php lacks it (GH #129)
 $current_page = 'lms';
 $path_prefix  = '../';
 $translationNamespaces = ['common', 'lms'];
@@ -25,7 +37,7 @@ $translationNamespaces = ['common', 'lms'];
     <link rel="stylesheet" href="../assets/css/inbox.css?v=76">
     <link rel="stylesheet" href="../assets/css/lms.css?v=10">
     <!-- Mobile layer: linked AFTER this page's own CSS so its @media rules win on ties. -->
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
     <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
     <?php echo Tz::scriptTag(); ?>
     <script src="../assets/js/tz.js?v=5"></script>
@@ -69,6 +81,6 @@ $translationNamespaces = ['common', 'lms'];
         window.COURSE_ID = <?php echo (int)$courseId; ?>;
     </script>
     <script src="../assets/js/lms-native-player.js?v=3"></script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

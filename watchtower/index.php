@@ -414,7 +414,7 @@ try {
            inline, which reads on both grounds (the tint is the same hue as the
            text), so there is nothing left here to flip for dark mode. */
     </style>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
@@ -981,15 +981,21 @@ try {
             setBody('wtDomains', '<div class="wt-attention">' + attentionItem('green', T('none')) + '</div>');
             return;
         }
-        const red = dm.expired + dm.expiring_30d;
+        const atRisk = dm.services_at_risk || 0;
+        const red = dm.expired + dm.expiring_30d + atRisk;
         const amber = dm.expiring_90d + dm.ssl_expiring + dm.unlocked + dm.weak;
         setDot('wtDmDot', red > 0 ? 'red' : (amber > 0 ? 'amber' : 'green'));
 
+        // Each figure only under its own setting (Domains -> Settings -> Alerts):
+        // renewals and certificates are two choices since 3.0.0. An older
+        // payload without the flags shows everything, as it always did.
+        const showExp = dm.show_expiry !== false, showCert = dm.show_cert !== false;
         let html = '<div class="wt-metrics">';
-        html += metric(dm.expiring_30d, T('metric_30d'), dm.expiring_30d > 0 ? '#ef4444' : '#94a3b8');
-        html += metric(dm.expiring_90d, T('metric_90d'), dm.expiring_90d > 0 ? '#f59e0b' : '#94a3b8');
-        html += metric(dm.ssl_expiring, T('metric_ssl'), dm.ssl_expiring > 0 ? '#f59e0b' : '#94a3b8');
+        if (showExp)  html += metric(dm.expiring_30d, T('metric_30d'), dm.expiring_30d > 0 ? '#ef4444' : '#94a3b8');
+        if (showExp)  html += metric(dm.expiring_90d, T('metric_90d'), dm.expiring_90d > 0 ? '#f59e0b' : '#94a3b8');
+        if (showCert) html += metric(dm.ssl_expiring, T('metric_ssl'), dm.ssl_expiring > 0 ? '#f59e0b' : '#94a3b8');
         html += '</div><div class="wt-attention">';
+        if (atRisk > 0)          html += attentionItem('red', T('services_at_risk', { count: atRisk }));
         if (dm.expired > 0)      html += attentionItem('red', T('expired', { count: dm.expired }));
         if (dm.expiring_30d > 0) html += attentionItem('red', T('expiring', { count: dm.expiring_30d }));
         if (dm.unlocked > 0)     html += attentionItem('amber', T('unlocked', { count: dm.unlocked }));
@@ -1288,6 +1294,6 @@ try {
     // Auto-refresh every 5 minutes
     refreshTimer = setInterval(loadDashboard, 5 * 60 * 1000);
     </script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

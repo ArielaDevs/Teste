@@ -72,6 +72,19 @@ matters: an operator must never have to guess whether a major number means dange
 Do not treat it as a precedent. The next MAJOR is the next time the upgrade genuinely
 asks something of the operator.
 
+### The second deliberate exception: 3.0.0
+
+**3.0.0 is not a MAJOR by this scheme either** - mechanically it was 2.11.0. It adds
+only, every existing configuration keeps working, and its rollback is safe. Ed chose the
+number because the release added whole new modules (People, competency tests in the LMS)
+and introduced Report Packs, a new kind of design code for FreeITSM - in his words, a
+*step change*. Its notes open with **"Nothing breaks."** for the same reason 2.0.0's do.
+
+Two exceptions make a pattern worth naming honestly: Ed reserves the right to mark a
+milestone with a major number. What must never change is the opening line - a major
+number that does not break anything has to say so first, so an operator never has to
+guess.
+
 ### The mechanical rule
 
 `CHANGELOG.local.md` already types every entry. Take the rows added **since the previous

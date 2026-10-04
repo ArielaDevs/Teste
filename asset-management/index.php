@@ -1476,7 +1476,7 @@ $translationNamespaces = ['common', 'asset-management'];
              <style> block so its @media rules win on ties — the ordering rule
              from the wiki's Mobile-Friendly-Techniques. Every rule inside it is
              gated at 768px, so the desktop layout is untouched. */ ?>
-    <link rel="stylesheet" href="../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../assets/css/mobile.css?v=167">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
@@ -2562,7 +2562,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     </div>`;
 
                 list.innerHTML = addBar + head + rows.map(c => {
-                    const supplier = c.supplier_trading_name || c.supplier_name || '';
+                    const supplier = c.party_label || c.supplier_trading_name || c.supplier_name || '';   // supplier or customer (#153)
                     // Bare dates. The words that used to prefix them are now
                     // column headings (Ed) — "Ends" and "Notice by" repeated on
                     // every row is the same two words said as many times as you
@@ -2758,7 +2758,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     return;
                 }
                 results.innerHTML = data.contracts.map(c => {
-                    const supplier = c.supplier_trading_name || c.supplier_name || '';
+                    const supplier = c.party_label || c.supplier_trading_name || c.supplier_name || '';   // supplier or customer (#153)
                     const ends = c.contract_end
                         ? `${window.t('asset-management.detail.contract_ends')} ${c.contract_end}`
                         : window.t('asset-management.detail.contract_no_end');
@@ -4534,6 +4534,6 @@ $translationNamespaces = ['common', 'asset-management'];
              behaviour inside is gated on matchMedia(768px), so on desktop it is
              inert. (#936) */ ?>
     <script src="../assets/js/network-mapper-icons.js?v=3"></script>
-    <script src="../assets/js/mobile.js?v=65"></script>
+    <script src="../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

@@ -472,22 +472,21 @@ function getWatchtowerData($conn, $analystId = 0, $scope = WT_SCOPE_ALL) {
     ];
 
     // -- Contracts --
+    // Customer contracts outside the viewer's companies are not counted (#153).
+    require_once __DIR__ . '/contract_party.php';
+    [$ctVis, $ctArgs] = contractVisibilitySql($conn, (int)$analystId, 'k');
+    $ctCount = function (string $where) use ($conn, $ctVis, $ctArgs): int {
+        $s = $conn->prepare("SELECT COUNT(*) FROM contracts k WHERE $where$ctVis");
+        $s->execute($ctArgs);
+        return (int)$s->fetchColumn();
+    };
 
-    $ctExp30 = (int)$conn->query(
-        "SELECT COUNT(*) FROM contracts
-         WHERE is_active = 1 AND contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)"
-    )->fetchColumn();
+    $ctExp30 = $ctCount("k.is_active = 1 AND k.contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)");
 
-    $ctExp90 = (int)$conn->query(
-        "SELECT COUNT(*) FROM contracts
-         WHERE is_active = 1 AND contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 90 DAY)"
-    )->fetchColumn();
+    $ctExp90 = $ctCount("k.is_active = 1 AND k.contract_end BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 90 DAY)");
 
-    $ctNotice = (int)$conn->query(
-        "SELECT COUNT(*) FROM contracts
-         WHERE is_active = 1 AND notice_date IS NOT NULL
-           AND notice_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)"
-    )->fetchColumn();
+    $ctNotice = $ctCount("k.is_active = 1 AND k.notice_date IS NOT NULL
+           AND k.notice_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)");
 
     $contracts = [
         'expiring_30d'       => $ctExp30,
@@ -582,22 +581,32 @@ function getWatchtowerData($conn, $analystId = 0, $scope = WT_SCOPE_ALL) {
     // unscoped, as Knowledge treats it.
     //
     // Honours domain_expiry_surface exactly as Software honours its own setting.
-    $dm = ['total' => 0, 'expired' => 0, 'expiring_30d' => 0, 'expiring_90d' => 0, 'ssl_expiring' => 0, 'unlocked' => 0, 'weak' => 0, 'show' => false];
+    // 3.0.0: certificates have their own surface setting (domain_cert_surface),
+    // so the card shows if EITHER kind asks for the dashboard, and each figure
+    // only under its own setting. Certificates use the operator's own warning
+    // window (domain_ssl_warn_days) rather than a fixed 21 days, and skip a
+    // domain being deliberately let go, as renewals always did. "Services at
+    // risk" counts the Service Status services linked to a domain in trouble.
+    $dm = ['total' => 0, 'expired' => 0, 'expiring_30d' => 0, 'expiring_90d' => 0, 'ssl_expiring' => 0, 'unlocked' => 0, 'weak' => 0,
+           'services_at_risk' => 0, 'show' => false, 'show_expiry' => false, 'show_cert' => false];
     try {
-        $dmSurface = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'domain_expiry_surface'")->fetchColumn();
-        $dmSurface = ($dmSurface === false || $dmSurface === null || $dmSurface === '') ? 'dashboard' : (string)$dmSurface;
+        require_once __DIR__ . '/domains/settings.php';
+        $dmS = domainSettings($conn);
+        $dmShowExpiry = in_array($dmS['domain_expiry_surface'], ['dashboard', 'both'], true);
+        $dmShowCert   = in_array($dmS['domain_cert_surface'], ['dashboard', 'both'], true);
         $dmAllowed = $analystId <= 0 || analystCanAccessModule($conn, $analystId, 'domains');
-        if ($dmAllowed && in_array($dmSurface, ['dashboard', 'both'], true)) {
+        if ($dmAllowed && ($dmShowExpiry || $dmShowCert)) {
             [$dmT, $dmA] = $analystId > 0 ? activeTenantFilter($conn, $analystId, 'd') : ['', []];
             // A status with alerts off ("Letting lapse") and "Do not renew" are
             // somebody's deliberate decision, not something to shout about.
             $live = "(s.id IS NULL OR s.alerts_enabled = 1) AND d.renewal_mode <> 'do_not_renew'";
+            $sslDays = max(1, (int)$dmS['domain_ssl_warn_days']);
             $st = $conn->prepare(
                 "SELECT COUNT(*) AS total,
                         SUM($live AND d.expiry_date < {$todaySql}) AS expired,
                         SUM($live AND d.expiry_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 30 DAY)) AS exp30,
                         SUM($live AND d.expiry_date BETWEEN {$todaySql} AND DATE_ADD({$todaySql}, INTERVAL 90 DAY)) AS exp90,
-                        SUM(d.ssl_expiry_date IS NOT NULL AND d.ssl_expiry_date <= DATE_ADD({$todaySql}, INTERVAL 21 DAY)) AS ssl_expiring,
+                        SUM($live AND d.ssl_expiry_date IS NOT NULL AND d.ssl_expiry_date <= DATE_ADD({$todaySql}, INTERVAL {$sslDays} DAY)) AS ssl_expiring,
                         SUM(d.transfer_lock = 0) AS unlocked,
                         SUM(d.security_grade IN ('D', 'F')) AS weak
                    FROM domains d LEFT JOIN domain_statuses s ON s.id = d.status_id
@@ -606,11 +615,38 @@ function getWatchtowerData($conn, $analystId = 0, $scope = WT_SCOPE_ALL) {
             $st->execute($dmA);
             $r = $st->fetch(PDO::FETCH_ASSOC) ?: [];
             $dm = [
-                'total' => (int)($r['total'] ?? 0), 'expired' => (int)($r['expired'] ?? 0),
-                'expiring_30d' => (int)($r['exp30'] ?? 0), 'expiring_90d' => (int)($r['exp90'] ?? 0),
-                'ssl_expiring' => (int)($r['ssl_expiring'] ?? 0), 'unlocked' => (int)($r['unlocked'] ?? 0),
-                'weak' => (int)($r['weak'] ?? 0), 'show' => ((int)($r['total'] ?? 0)) > 0,
+                'total' => (int)($r['total'] ?? 0),
+                'expired' => $dmShowExpiry ? (int)($r['expired'] ?? 0) : 0,
+                'expiring_30d' => $dmShowExpiry ? (int)($r['exp30'] ?? 0) : 0,
+                'expiring_90d' => $dmShowExpiry ? (int)($r['exp90'] ?? 0) : 0,
+                'ssl_expiring' => $dmShowCert ? (int)($r['ssl_expiring'] ?? 0) : 0,
+                'unlocked' => (int)($r['unlocked'] ?? 0),
+                'weak' => (int)($r['weak'] ?? 0), 'services_at_risk' => 0,
+                'show' => ((int)($r['total'] ?? 0)) > 0, 'show_expiry' => $dmShowExpiry, 'show_cert' => $dmShowCert,
             ];
+            // Services at risk: linked to a domain whose trouble Service Status is
+            // set to report (the same test as includes/domains/status_link.php).
+            if ($dmS['domain_status_mode'] !== 'off') {
+                $why = [];
+                if ($dmS['domain_status_on_expired'] === '1') $why[] = "d.expiry_date < {$todaySql}";
+                if ($dmS['domain_status_on_cert'] === '1') {
+                    $cd = (int)$dmS['domain_status_cert_days'];
+                    $why[] = $cd > 0 ? "d.ssl_expiry_date <= DATE_ADD({$todaySql}, INTERVAL {$cd} DAY)" : "d.ssl_expiry_date < {$todaySql}";
+                }
+                if ($why) {
+                    try {
+                        $sr = $conn->prepare(
+                            "SELECT COUNT(DISTINCT ds.service_id)
+                               FROM domain_status_services ds
+                               JOIN domains d ON d.id = ds.domain_id
+                               JOIN status_services ss ON ss.id = ds.service_id AND ss.is_active = 1
+                          LEFT JOIN domain_statuses s ON s.id = d.status_id
+                              WHERE $live AND (" . implode(' OR ', $why) . "){$dmT}");
+                        $sr->execute($dmA);
+                        $dm['services_at_risk'] = (int)$sr->fetchColumn();
+                    } catch (Throwable $e) { /* links not created yet: nothing at risk to report */ }
+                }
+            }
         }
     } catch (Exception $e) {
         $dm['show'] = false;   // tables not there yet — draw nothing rather than zeroes

@@ -230,7 +230,7 @@ function initTinyMCE() {
         toolbar: 'undo redo | blocks | ' +
             'bold italic forecolor backcolor | alignleft aligncenter ' +
             'alignright alignjustify | bullist numlist outdent indent | ' +
-            'link image table | codesample code | removeformat | help',
+            'link image table | codesample code | removeformat | help | fullscreen',
         codesample_languages: [
             { text: 'PowerShell', value: 'powershell' },
             { text: 'Bash/Shell', value: 'bash' },
@@ -256,9 +256,41 @@ function initTinyMCE() {
                        ' @media (pointer: coarse) { body { font-size: 16px; } }',
         setup: function(editor) {
             articleEditor = editor;
+            // Full screen (the button by Save): lift the editor above the app's
+            // own fixed layers while it is on - see knowledge.css.
+            editor.on('FullscreenStateChanged', function(e) {
+                document.body.classList.toggle('kb-editor-fullscreen', !!e.state);
+            });
+            // Esc comes back out. TinyMCE has no key for that itself; the
+            // toolbar button and View -> Fullscreen do the same.
+            editor.on('keydown', function(e) {
+                if (e.key === 'Escape' && kbEditorIsFullScreen()) {
+                    e.preventDefault();
+                    editor.execCommand('mceFullScreen');
+                }
+            });
         }
     });
 }
+
+/** Just the editor, filling the screen - TinyMCE's own fullscreen plugin. */
+function kbEditorFullScreen() {
+    if (!articleEditor) return;
+    if (!kbEditorIsFullScreen()) articleEditor.execCommand('mceFullScreen');
+    articleEditor.focus();
+}
+
+function kbEditorIsFullScreen() {
+    return !!(articleEditor && articleEditor.plugins.fullscreen && articleEditor.plugins.fullscreen.isFullscreen());
+}
+
+// Esc with the focus on the toolbar or a menu rather than in the text. Not
+// while one of TinyMCE's own dialogs is open: Esc belongs to that first.
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && kbEditorIsFullScreen() && !document.querySelector('.tox-dialog, .tox-menu')) {
+        articleEditor.execCommand('mceFullScreen');
+    }
+});
 
 // Initialize tag input functionality
 function initTagInput() {
@@ -2122,6 +2154,7 @@ function renderArticleDetail() {
             ${currentArticle.body}
         </div>
         <div id="kbDocuments" style="margin-top:24px;"></div>
+        <div id="kbDomains" style="margin-top:16px;"></div>
     `;
 
     // Apply syntax highlighting to any code blocks
@@ -2149,6 +2182,15 @@ function renderArticleDetail() {
             apiBase:    '../api/documents/',
             canEdit:    false,
             showHeading: true      // nothing else on this page names the section
+        });
+    }
+
+    // The domains this article is a runbook for (3.0.0). Listed here, linked in
+    // the editor - the documents rule above: reading is not editing. Nothing at
+    // all when none are linked.
+    if (window.KB_SHOW_DOMAINS && window.DomainLinks) {
+        DomainLinks.mount(document.getElementById('kbDomains'), {
+            kind: 'article', id: currentArticle.id, base: window.KB_BASE, editable: false, hideEmpty: true
         });
     }
 }
@@ -2609,6 +2651,8 @@ function syncArticleUrl(view) {
 
 // Show/hide views
 function showView(view) {
+    // Never leave the page behind a full-screen editor that is no longer shown.
+    if (view !== 'editor' && kbEditorIsFullScreen()) articleEditor.execCommand('mceFullScreen');
     document.getElementById('articleListView').style.display = view === 'list' ? 'block' : 'none';
     document.getElementById('articleDetailView').style.display = view === 'detail' ? 'block' : 'none';
     // 'flex' (not 'block') so the column layout that holds the sticky-footer
@@ -3386,9 +3430,21 @@ function mountEditorDocuments() {
         box.innerHTML = '';
         box.classList.remove('fd-panel');
         if (hint) hint.style.display = id ? 'none' : '';
+        // Nor a domains panel left from the last article: a new one has no id
+        // to link to until it is saved.
+        const leftover = document.getElementById('kbEditorDomains');
+        if (leftover) leftover.innerHTML = '';
         return;
     }
     if (hint) hint.style.display = 'none';
+    // Linking domains lives here with attaching documents (3.0.0).
+    const dom = document.getElementById('kbEditorDomains');
+    // onChange redraws the reading view's list too: Cancel returns to it without
+    // fetching the article again, so it would otherwise show the old links.
+    if (dom && window.DomainLinks) DomainLinks.mount(dom, { kind: 'article', id: id, base: window.KB_BASE, onChange: () => {
+        const read = document.getElementById('kbDomains');
+        if (read) DomainLinks.mount(read, { kind: 'article', id: id, base: window.KB_BASE, editable: false, hideEmpty: true });
+    } });
     FreeITSMDocuments.mount(box, {
         parentType: 'knowledge_article',
         parentId:   id,

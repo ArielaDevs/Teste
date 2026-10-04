@@ -11,6 +11,7 @@
 // files that establish or change an identity, because every one of them already
 // includes this file — one require instead of ten, and a new sign-in path gets
 // sessionPromoteToAuthenticated() available without anyone having to remember.
+require_once __DIR__ . '/base_url.php';   // BASE_URL when config.php does not define it - first, before anything uses it
 require_once __DIR__ . '/db.php';    // dbConnectionOptions() — NOT in config.php, see GH #129
 require_once __DIR__ . '/ssl.php';   // sslApplyCurl() — same reason: 43 callers, config.php is the operator's
 require_once __DIR__ . '/session_security.php';
@@ -77,7 +78,7 @@ function connectToDatabase() {
  */
 function getModuleRegistry(): array {
     $keys = ['watchtower','tickets','assets','knowledge','changes','problems','calendar',
-             'morning-checks','reporting','software','forms','contracts','domains','service-status',
+             'morning-checks','reporting','software','forms','contracts','domains','people','service-status',
              'war-room','wiki','lms','process-mapper','checklists','tasks','cmdb','network-mapper','workflow'];
     $out = [];
     foreach ($keys as $k) {

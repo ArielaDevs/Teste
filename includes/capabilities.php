@@ -63,6 +63,9 @@ final class Cap
 {
     // ---- LMS ---------------------------------------------------------------
     const LMS_MANAGE = 'lms.manage';
+    // Competency tests hold candidates' names, emails and scores - people who
+    // are not staff - so they are their own, sensitive grant, not part of LMS_MANAGE.
+    const LMS_TESTS  = 'lms.competency_tests';
 
     // ---- Asset Management --------------------------------------------------
     // One per settings tab. The point of the split is visible here: VCENTER and
@@ -91,6 +94,7 @@ final class Cap
     const CONTRACTS_CONTRACT_TERMS     = 'contracts.contract_terms';
     const CONTRACTS_RFP_DEPARTMENTS    = 'contracts.rfp_departments';
     const CONTRACTS_RFP_AI             = 'contracts.rfp_ai';              // AI provider + API key
+    const CONTRACTS_CUSTOMER_VISIBILITY = 'contracts.customer_visibility'; // who sees customer contracts - crosses company lines (#153)
 
     // ---- Change Management -------------------------------------------------
     const CHANGES_MANAGE     = 'changes.manage';      // umbrella
@@ -203,6 +207,9 @@ final class Cap
     const DOMAINS_ALERTS     = 'domains.alerts';
     const DOMAINS_MONITORING = 'domains.monitoring';
     const DOMAINS_AUTH_CODES = 'domains.auth_codes';   // reveal / change transfer secrets
+    // SERVICE_STATUS decides whether a domain's problems raise incidents on the
+    // Service Status page, which customers read - sensitive for that reason.
+    const DOMAINS_SERVICE_STATUS = 'domains.service_status';
 
     // ---- Tickets -----------------------------------------------------------
     // The module the whole per-tab design was argued FOR. Fourteen tabs, and they are

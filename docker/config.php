@@ -19,8 +19,13 @@ require_once($db_config_path);
 // stored on a persistent volume). Leave it to the env var here — do NOT define
 // ENCRYPTION_KEY_PATH in this file, or it would override the compose setting.
 
-// Timezone
-date_default_timezone_set('UTC');
+// Timezone - the install's default: what an analyst sees until they choose their
+// own in Preferences, and what emails sent by scheduled jobs use. Set TZ in the
+// environment (docker-compose.yml), e.g. TZ=Europe/London. This used to be fixed
+// at UTC, so an install whose container was set to UTC+7 still showed UTC to every
+// analyst who had not picked a zone (GH #161). Dates are STORED in UTC either way.
+$tz = getenv('TZ');
+date_default_timezone_set(is_string($tz) && in_array($tz, timezone_identifiers_list(), true) ? $tz : 'UTC');
 
 // Behind a reverse proxy that terminates HTTPS?
 // ⚠️ The single most likely thing to need setting on this image. Almost nobody exposes
@@ -57,20 +62,10 @@ ini_set('display_errors', 0);
 
 /**
  * BASE_URL — absolute URL path prefix for the app's deployment root.
- * Auto-detected from the filesystem location of this config.php relative to
- * the web server's DOCUMENT_ROOT. In the standard Docker image the app is at
- * /var/www/html and Apache's doc root is /var/www/html, so this resolves to '/'.
+ * Auto-detected by includes/base_url.php (shipped with the app) from where the
+ * app sits under the web server's DOCUMENT_ROOT. In the standard Docker image
+ * the app is at /var/www/html and Apache's doc root is /var/www/html, so this
+ * resolves to '/'.
  */
-if (!defined('BASE_URL')) {
-    $__appRoot = str_replace('\\', '/', realpath(__DIR__));
-    $__docRoot = str_replace('\\', '/', realpath($_SERVER['DOCUMENT_ROOT'] ?? ''));
-    $__rel = '';
-    if ($__docRoot && strpos($__appRoot, $__docRoot) === 0) {
-        $__rel = substr($__appRoot, strlen($__docRoot));
-    }
-    $__rel = '/' . trim($__rel, '/') . '/';
-    if ($__rel === '//') $__rel = '/';
-    define('BASE_URL', $__rel);
-    unset($__appRoot, $__docRoot, $__rel);
-}
+require_once(__DIR__ . '/includes/base_url.php');
 ?>

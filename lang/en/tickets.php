@@ -794,6 +794,17 @@ return [
         'already_linked'     => '{name} is already linked',
         'menu_item'          => 'CMDB object',
     ],
+    // Domains on a ticket (3.0.0) - pills in the Links strip, like CMDB objects.
+    'domains' => [
+        'menu_item'          => 'Domain',
+        'search_placeholder' => 'Type to search domains…',
+        'no_matches'         => 'No matches.',
+        'unlink_title'       => 'Unlink',
+        'unlink_confirm'     => 'Unlink this domain from the ticket?',
+        'unlinked_toast'     => 'Unlinked',
+        'linked_toast'       => 'Linked {name}',
+        'expires'            => 'Expires {date}',
+    ],
 
     // Equipment linked to a ticket (discussion #57). Nested, like every other
     // section here — I18n::t() splits the key on every dot, so a flat

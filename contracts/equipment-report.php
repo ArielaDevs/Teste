@@ -29,7 +29,7 @@ requireModuleAccess('contracts');
 $contractId = (int)($_GET['id'] ?? 0);
 $conn       = connectToDatabase();
 
-$contract = $contractId > 0 ? contractReportLoad($conn, $contractId) : null;
+$contract = $contractId > 0 ? contractReportLoad($conn, $contractId, (int)$_SESSION['analyst_id']) : null;
 if (!$contract) {
     http_response_code(404);
     echo '<!DOCTYPE html><meta charset="UTF-8"><p style="font:14px sans-serif;padding:24px">'

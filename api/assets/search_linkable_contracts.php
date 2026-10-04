@@ -48,23 +48,34 @@ try {
     }
 
     $q   = trim((string)($_GET['q'] ?? ''));
+    require_once '../../includes/contract_party.php';
+    [$partyCols, $partyJoins] = contractPartySql($conn, 'c');
+    [$vis, $visParams] = contractVisibilitySql($conn, $analystId, 'c');   // #153
     $sql =
         "SELECT c.id AS contract_id, c.contract_number, c.title,
                 c.contract_end, c.notice_date,
                 s.legal_name AS supplier_name, s.trading_name AS supplier_trading_name
+                $partyCols
            FROM contracts c
       LEFT JOIN suppliers s ON s.id = c.supplier_id
+                $partyJoins
           WHERE c.is_active = 1
-            AND c.id NOT IN (SELECT contract_id FROM contract_assets WHERE asset_id = ?)";
-    $params = [$assetId];
+            AND c.id NOT IN (SELECT contract_id FROM contract_assets WHERE asset_id = ?)$vis";
+    $params = array_merge([$assetId], $visParams);
 
     if ($q !== '') {
-        // Supplier is searchable as well as number and title, because "the
-        // Vodafone one" is how people actually refer to a contract they have
-        // not opened in a year.
-        $sql .= " AND (c.contract_number LIKE ? OR c.title LIKE ?
-                       OR s.legal_name LIKE ? OR s.trading_name LIKE ?)";
-        $params = array_merge($params, array_fill(0, 4, '%' . $q . '%'));
+        // Supplier (or customer) is searchable as well as number and title,
+        // because "the Vodafone one" is how people actually refer to a contract
+        // they have not opened in a year.
+        if (contractPartyReady($conn)) {
+            $sql .= " AND (c.contract_number LIKE ? OR c.title LIKE ?
+                           OR s.legal_name LIKE ? OR s.trading_name LIKE ? OR cpt.name LIKE ? OR cpu.display_name LIKE ?)";
+            $params = array_merge($params, array_fill(0, 6, '%' . $q . '%'));
+        } else {
+            $sql .= " AND (c.contract_number LIKE ? OR c.title LIKE ?
+                           OR s.legal_name LIKE ? OR s.trading_name LIKE ?)";
+            $params = array_merge($params, array_fill(0, 4, '%' . $q . '%'));
+        }
     }
 
     // Soonest to end first: a contract you are about to lose is the one you are

@@ -86,6 +86,11 @@ function ticketSensitivityRaise(PDO $conn, int $ticketId, string $reason): bool
         "INSERT INTO ticket_audit (ticket_id, analyst_id, field_name, old_value, new_value, created_datetime)
          VALUES (?, NULL, 'Sensitivity', 'Normal', ?, UTC_TIMESTAMP())"
     )->execute([$ticketId, 'Confidential - ' . $reason]);
+    // A scheduled ticket may already sit in its owner's synced calendar under
+    // its real subject. Re-sync it now rather than at the next edit. A cheap
+    // no-op for an unscheduled ticket - which is nearly every one raised here.
+    require_once __DIR__ . '/calendar_sync/push.php';
+    calendarSyncReconcileTicket($conn, $ticketId);
     return true;
 }
 
@@ -244,4 +249,61 @@ function ticketRedactForOutbound(PDO $conn, array $payload): array
         if ($k !== 'ticket' && preg_match($keepTop, (string)$k) && !is_array($v)) $out[$k] = $v;
     }
     return $out;
+}
+
+/* ─── Email and calendars (discussion #62) ───────────────────────────────────
+ * The two exits the list above did not cover. Both are decided here so the
+ * three callers (the workflow Send email action, the calendar push and the
+ * .ics feed) cannot each grow their own idea of what is allowed.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** What a confidential ticket is called wherever its subject would have gone. */
+const TICKET_CONFIDENTIAL_SUBJECT = 'Confidential ticket';
+
+/**
+ * May a workflow email about this ticket go to these addresses?
+ *
+ * For a normal ticket, always. For a confidential one, only when EVERY address
+ * is the ticket's own requester or an active analyst: the requester already
+ * knows what they wrote, and confidential does not restrict the service desk.
+ * Anybody else - a manager, a distribution list, an outside contact - is
+ * exactly who the flag exists to keep it from, and an email cannot be taken
+ * back. A deny-list could not work here: nobody can list who must not see it.
+ *
+ * @param string $to one address, or several separated by commas or semicolons
+ */
+function ticketEmailRecipientsAllowed(PDO $conn, int $ticketId, string $to): bool
+{
+    if (!ticketIsConfidential($conn, $ticketId)) return true;
+    $addrs = array_values(array_filter(array_map(
+        fn($a) => strtolower(trim($a)), preg_split('/[,;]/', $to) ?: []
+    ), fn($a) => $a !== ''));
+    if (!$addrs) return false;
+    try {
+        $st = $conn->prepare("SELECT LOWER(u.email) FROM tickets t JOIN users u ON u.id = t.user_id WHERE t.id = ?");
+        $st->execute([$ticketId]);
+        $requester = trim((string)$st->fetchColumn());
+        $in = implode(',', array_fill(0, count($addrs), '?'));
+        $st = $conn->prepare("SELECT LOWER(email) FROM analysts WHERE is_active = 1 AND LOWER(email) IN ($in)");
+        $st->execute($addrs);
+        $analysts = $st->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        return false;                                  // could not check: do not send
+    }
+    foreach ($addrs as $a) {
+        if ($a !== $requester && !in_array($a, $analysts, true)) return false;
+    }
+    return true;
+}
+
+/** What the workflow run log says when Send email is held back. */
+const TICKET_EMAIL_CONFIDENTIAL_SKIP = 'Not sent: the ticket is confidential, and a workflow only emails a confidential ticket to its requester or to analysts.';
+
+/**
+ * The SELECT expression for a ticket's sensitivity that is safe before
+ * Database Verification has added the column. Pass the tickets alias.
+ */
+function ticketSensitivitySelectSql(PDO $conn, string $alias = 't'): string
+{
+    return ticketSensitivityReady($conn) ? "$alias.sensitivity" : "'normal'";
 }

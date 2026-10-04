@@ -211,7 +211,7 @@ $translationNamespaces = ['common', 'cmdb'];
         .ai-suggestion .sug-meta { color: var(--text-muted,#6b7280); font-size: 12px; margin-top: 4px; }
     </style>
     <!-- Mobile layer: after this page's own <style> (Techniques §9). -->
-    <link rel="stylesheet" href="../../assets/css/mobile.css?v=154">
+    <link rel="stylesheet" href="../../assets/css/mobile.css?v=167">
 </head>
 <!-- 🔑 data-mobile-page="settings" is the FOURTH part of opting a settings screen
      in, and the one that is silent when missing: the entire shared settings layer
@@ -526,7 +526,7 @@ $translationNamespaces = ['common', 'cmdb'];
                             <option value="to_from"></option>
                             <option value="from_to"></option>
                         </select>
-                        <p class="field-hint"><?php echo htmlspecialchars(t('cmdb.settings.rel_type_impact_hint')); ?></p>
+                        <small><?php echo htmlspecialchars(t('cmdb.settings.rel_type_impact_hint')); ?></small>
                     </div>
                     <div class="form-group">
                         <label for="relTypeDisplayOrder"><?php echo htmlspecialchars(t('cmdb.settings.rel_type_display_order')); ?></label>
@@ -620,6 +620,6 @@ $translationNamespaces = ['common', 'cmdb'];
     <script src="../../assets/js/ai-settings.js?v=2"></script>
     <script src="../options-editor.js?v=3"></script>
     <script src="settings.js?v=7"></script>
-    <script src="../../assets/js/mobile.js?v=65"></script>
+    <script src="../../assets/js/mobile.js?v=70"></script>
 </body>
 </html>

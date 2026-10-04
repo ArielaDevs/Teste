@@ -2946,11 +2946,55 @@ return array (
           'type' => 'string',
           'nullable' => true,
         ),
-        'supplier' => 
+        'party_type' =>
+        array (
+          'type' => 'string',
+          'enum' =>
+          array (
+            0 => 'supplier',
+            1 => 'customer',
+          ),
+          'example' => 'supplier',
+        ),
+        'supplier' =>
         array (
           '$ref' => '#/components/schemas/LookupRef',
         ),
-        'owner' => 
+        'customer' =>
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'Set when party_type is customer: the company, the person, or both.',
+          'properties' =>
+          array (
+            'company' =>
+            array (
+              '$ref' => '#/components/schemas/LookupRef',
+            ),
+            'person' =>
+            array (
+              'type' => 'object',
+              'nullable' => true,
+              'properties' =>
+              array (
+                'id' =>
+                array (
+                  'type' => 'integer',
+                ),
+                'name' =>
+                array (
+                  'type' => 'string',
+                ),
+                'email' =>
+                array (
+                  'type' => 'string',
+                  'nullable' => true,
+                ),
+              ),
+            ),
+          ),
+        ),
+        'owner' =>
         array (
           '$ref' => '#/components/schemas/LookupRef',
         ),
@@ -3320,6 +3364,28 @@ return array (
             ),
           ),
         ),
+        'customer' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The person the domain is looked after for (#153): a user in the domain\'s own company.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+            'email' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
         'tech_contact' => 
         array (
           'type' => 'object',
@@ -3331,6 +3397,65 @@ return array (
               'type' => 'integer',
             ),
             'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_analyst' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The technical contact when it is one of your analysts (#162). At most one of tech_contact and tech_analyst is set.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_supplier' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The customer when it is a supplier (#162). Never set together with customer.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The supplier contact the domain is for (#162), usually alongside customer_supplier.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+            'email' => 
             array (
               'type' => 'string',
               'nullable' => true,
@@ -3680,6 +3805,28 @@ return array (
             ),
           ),
         ),
+        'customer' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The person the domain is looked after for (#153): a user in the domain\'s own company.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+            'email' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
         'tech_contact' => 
         array (
           'type' => 'object',
@@ -3691,6 +3838,65 @@ return array (
               'type' => 'integer',
             ),
             'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_analyst' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The technical contact when it is one of your analysts (#162). At most one of tech_contact and tech_analyst is set.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_supplier' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The customer when it is a supplier (#162). Never set together with customer.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The supplier contact the domain is for (#162), usually alongside customer_supplier.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+            'email' => 
             array (
               'type' => 'string',
               'nullable' => true,
@@ -4048,6 +4254,28 @@ return array (
             ),
           ),
         ),
+        'customer' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The person the domain is looked after for (#153): a user in the domain\'s own company.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+            'email' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
         'tech_contact' => 
         array (
           'type' => 'object',
@@ -4059,6 +4287,65 @@ return array (
               'type' => 'integer',
             ),
             'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_analyst' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The technical contact when it is one of your analysts (#162). At most one of tech_contact and tech_analyst is set.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_supplier' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The customer when it is a supplier (#162). Never set together with customer.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The supplier contact the domain is for (#162), usually alongside customer_supplier.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+            'email' => 
             array (
               'type' => 'string',
               'nullable' => true,
@@ -10971,6 +11258,182 @@ return array (
         ),
       ),
     ),
+    'CostCentre' => 
+    array (
+      'type' => 'object',
+      'description' => 'A cost centre (GH #160). Always one company\'s. The code is text, returned exactly as stored - "0010" stays "0010".',
+      'properties' => 
+      array (
+        'id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'code' => 
+        array (
+          'type' => 'string',
+          'description' => 'Unique per company, ignoring capitals.',
+        ),
+        'name' => 
+        array (
+          'type' => 'string',
+        ),
+        'description' => 
+        array (
+          'type' => 'string',
+          'nullable' => true,
+        ),
+        'parent' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'null = top level.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'code' => 
+            array (
+              'type' => 'string',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+          ),
+        ),
+        'is_active' => 
+        array (
+          'type' => 'boolean',
+          'description' => 'false = not offered for new assignments; kept on anything already charged to it.',
+        ),
+        'company' => 
+        array (
+          'type' => 'object',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+            ),
+          ),
+        ),
+        'child_count' => 
+        array (
+          'type' => 'integer',
+        ),
+        'created_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+        ),
+        'updated_at' => 
+        array (
+          'type' => 'string',
+          'format' => 'date-time',
+          'nullable' => true,
+        ),
+      ),
+    ),
+    'CostCentreSyncResult' => 
+    array (
+      'type' => 'object',
+      'description' => 'What a sync did (or, with dry_run, would do).',
+      'properties' => 
+      array (
+        'company_id' => 
+        array (
+          'type' => 'integer',
+        ),
+        'applied' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'dry_run' => 
+        array (
+          'type' => 'boolean',
+        ),
+        'counts' => 
+        array (
+          'type' => 'object',
+          'properties' => 
+          array (
+            'create' => 
+            array (
+              'type' => 'integer',
+            ),
+            'update' => 
+            array (
+              'type' => 'integer',
+            ),
+            'unchanged' => 
+            array (
+              'type' => 'integer',
+            ),
+            'deactivate' => 
+            array (
+              'type' => 'integer',
+            ),
+          ),
+        ),
+        'changes' => 
+        array (
+          'type' => 'array',
+          'items' => 
+          array (
+            'type' => 'object',
+            'properties' => 
+            array (
+              'line' => 
+              array (
+                'type' => 'integer',
+                'nullable' => true,
+                'description' => '1-based position in cost_centres; null for one made inactive because it was missing from the list.',
+              ),
+              'code' => 
+              array (
+                'type' => 'string',
+              ),
+              'name' => 
+              array (
+                'type' => 'string',
+              ),
+              'action' => 
+              array (
+                'type' => 'string',
+                'enum' => 
+                array (
+                  0 => 'create',
+                  1 => 'update',
+                  2 => 'deactivate',
+                ),
+              ),
+              'changes' => 
+              array (
+                'type' => 'array',
+                'items' => 
+                array (
+                  'type' => 'string',
+                  'enum' => 
+                  array (
+                    0 => 'code',
+                    1 => 'name',
+                    2 => 'description',
+                    3 => 'is_active',
+                    4 => 'parent',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
   ),
   'responses' => 
   array (
@@ -11895,15 +12358,23 @@ return array (
                     'nullable' => true,
                   ),
                 ),
-                'domains' => 
+                'domains' =>
                 array (
                   'type' => 'array',
-                  'items' => 
+                  'items' =>
                   array (
                     'type' => 'string',
                   ),
                 ),
-                'contracts' => 
+                'cost_centres' =>
+                array (
+                  'type' => 'array',
+                  'items' =>
+                  array (
+                    'type' => 'string',
+                  ),
+                ),
+                'contracts' =>
                 array (
                   'type' => 'array',
                   'items' => 
@@ -12720,6 +13191,34 @@ return array (
     'POST /workflows/{id}/fire' => 
     array (
       '$ref' => '#/components/schemas/WorkflowFireResult',
+    ),
+    'DELETE /cost-centres/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/DeleteAck',
+    ),
+    'GET /cost-centres' => 
+    array (
+      'type' => 'array',
+      'items' => 
+      array (
+        '$ref' => '#/components/schemas/CostCentre',
+      ),
+    ),
+    'GET /cost-centres/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentre',
+    ),
+    'PATCH /cost-centres/{id}' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentre',
+    ),
+    'POST /cost-centres' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentre',
+    ),
+    'POST /cost-centres/sync' => 
+    array (
+      '$ref' => '#/components/schemas/CostCentreSyncResult',
     ),
   ),
   'requestBodies' => 

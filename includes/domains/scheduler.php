@@ -97,6 +97,10 @@ function domainScheduledRun(PDO $conn, float $budgetSeconds = 240, bool $include
     // ---- 4. alerts + calendar ---------------------------------------------------
     $out['alerts']   = domainAlertsRun($conn, false);
     $out['calendar'] = domainSyncExpiryCalendar($conn);
+    // Service Status (3.0.0): raise for linked services (mode auto) and close
+    // what a recovered domain raised (domain_status_auto_resolve).
+    try { require_once __DIR__ . '/status_link.php'; $out['service_status'] = domainStatusRun($conn); }
+    catch (Throwable $e) { error_log('domains service status: ' . $e->getMessage()); }
     $out['seconds']  = round(microtime(true) - $t0, 1);
     return $out;
 }

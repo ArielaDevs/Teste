@@ -1968,7 +1968,28 @@
            is all the harvester needs, and is exactly why hiding a head is
            not the same as removing it. */
         { table: 'body[data-mobile-page="wiki-scan"] .history-table',
-          columns: [2, 3, 4, 5] }
+          columns: [2, 3, 4, 5] },
+
+        /* ---- Domains (LAYER 41) ----
+           Register: the name, status and grade speak for themselves; the
+           expiry countdown, renewal mode, registrar, protection, certificate
+           and owner do not. The table is in the markup and only its tbody is
+           replaced, so watching the table is enough. */
+        { table: 'body[data-mobile-page="domains-register"] #domTable',
+          columns: [3, 4, 5, 7, 8, 9] },
+        /* Accounts: everything after the account's own name - a reference, a
+           person, a bare domain count and a date mean nothing alone. */
+        { table: 'body[data-mobile-page="domains-accounts"] .dom-table',
+          columns: [1, 2, 3, 4, 5, 6] },
+
+        /* ---- Assets > Users (LAYER 43c) ----
+           A person's equipment: serial, asset tag and the date it was
+           issued are three bare values side by side - two codes that look
+           alike and a date that could mean anything. The table is rebuilt
+           with the whole detail pane, so it does not exist at load: watch
+           the pane. */
+        { table: 'body[data-mobile-page="assets-users"] .au-table',
+          columns: [3, 4, 5], watch: '#auDetail' }
     ];
 
     function labelCardFeed(table, columns) {
@@ -4152,7 +4173,8 @@
 })();
 
 /* ============================================================================
-   LAYER 39a - Tickets > Users: the detail pane was 0px wide at x=360.
+   LAYER 39a - a list-and-detail page as a pane stack: Tickets > Users, and
+   (LAYER 43) Assets > Users, which is the same shape with assets in it.
 
    🔴 Tapping a user "did nothing", and so did tapping a group. Both were
    working perfectly: measured after a tap, `.user-detail-container` held 1748
@@ -4165,18 +4187,39 @@
    The fault is the oldest one in this rollout: a fixed-width pane beside a
    flexible one on a screen narrower than the fixed pane.
 
-   Both users and groups render into that same container - selectGroup()
-   redraws the whole detail pane - so one pane stack serves both.
+   ⭐ One block, a list of pages (extract on the second use - Mobile: Assets).
+   Each entry names the two panes and the globals that open a record:
+     page         the body's data-mobile-page
+     list/detail  the two panes
+     wraps        globals that open a record; wrapped, never edited (§1)
+     deepLink     a query parameter that opens straight to a record. Assets
+                  calls selectPerson() inline for ?user_id=, BEFORE this file
+                  loads, so the wrap never sees it and the stack would sit on
+                  the list with the person loaded out of sight.
    ========================================================================== */
 (function () {
     'use strict';
 
-    if (!document.body || document.body.getAttribute('data-mobile-page') !== 'tickets-users') return;
+    var STACKS = [
+        /* Both users and groups render into the one detail container -
+           selectGroup() redraws the whole pane - so one stack serves both. */
+        { page: 'tickets-users', list: '.users-list-container',
+          detail: '#userDetail, .user-detail-container',
+          wraps: ['selectUser', 'selectGroup'], deepLink: 'user_id' },
+        { page: 'assets-users', list: '.au-wrap > .au-panel:first-child',
+          detail: '#auDetail',
+          wraps: ['selectPerson'], deepLink: 'user_id' }
+    ];
+
+    var cfg = null;
+    for (var i = 0; i < STACKS.length; i++) {
+        if (document.body && document.body.getAttribute('data-mobile-page') === STACKS[i].page) { cfg = STACKS[i]; break; }
+    }
+    if (!cfg) return;
 
     var mq = window.matchMedia('(max-width: 768px)');
-    var detail = document.getElementById('userDetail')
-              || document.querySelector('.user-detail-container');
-    var list = document.querySelector('.users-list-container');
+    var detail = document.querySelector(cfg.detail);
+    var list = document.querySelector(cfg.list);
     if (!detail || !list) return;
 
     function tr(key, fallback) {
@@ -4187,11 +4230,10 @@
 
     var back = null;
 
-    /* 🔴 selectUser() and selectGroup() REDRAW the detail pane wholesale, which
+    /* 🔴 The open-a-record functions REDRAW the detail pane wholesale, which
        throws this button away with everything else. Exactly the same fault as
-       the rota chooser, written up one layer earlier and still walked into
-       here: anything injected into a pane a page re-renders has to be put
-       back, and the only reliable trigger is watching the pane. */
+       the rota chooser: anything injected into a pane a page re-renders has to
+       be put back, and the only reliable trigger is watching the pane. */
     function buildBack() {
         if (back && back.isConnected) return;
         if (back) { detail.insertBefore(back, detail.firstChild); return; }
@@ -4215,18 +4257,18 @@
         }
     }
 
-    /* Wrap rather than edit (§1). users.php calls these globals from the row
-       markup it generates, so wrapping catches every row including the ones
+    /* Wrap rather than edit (§1). The pages call these globals from the row
+       markup they generate, so wrapping catches every row including the ones
        drawn after a search or a re-render - which a listener bound to the rows
        would not. */
-    ['selectUser', 'selectGroup'].forEach(function (name) {
+    cfg.wraps.forEach(function (name) {
         var orig = window[name];
         if (typeof orig !== 'function') return;
         window[name] = function () {
             var out = orig.apply(this, arguments);
             if (mq.matches) {
-                // selectGroup is async and redraws the pane; switching now is
-                // still correct because the pane is what we are revealing.
+                // These are async and redraw the pane; switching now is still
+                // correct because the pane is what we are revealing.
                 showPane('detail');
             }
             return out;
@@ -4238,11 +4280,16 @@
         if (mq.matches) buildBack();
     }).observe(detail, { childList: true });
 
+    var linked = false;
+    if (cfg.deepLink) {
+        try { linked = parseInt(new URLSearchParams(window.location.search).get(cfg.deepLink) || '', 10) > 0; } catch (e) {}
+    }
+
     function sync() {
         if (mq.matches) {
             buildBack();
             if (back) back.style.display = '';
-            if (!document.body.getAttribute('data-users-pane')) showPane('list');
+            if (!document.body.getAttribute('data-users-pane')) showPane(linked ? 'detail' : 'list');
         } else {
             // Desktop is a two-pane screen and must stay one.
             if (back) back.style.display = 'none';
@@ -4551,6 +4598,258 @@
             if (sheet) sheet.style.display = 'none';
             document.body.removeAttribute('data-chk-sheet');
             document.body.style.removeProperty('--chk-bar-h');
+        }
+    }
+    sync();
+    if (mq.addEventListener) { mq.addEventListener('change', sync); }
+    else if (mq.addListener) { mq.addListener(sync); }
+})();
+
+/* ==========================================================================
+   LAYER 41 - Domains: the register's sidebar as a sheet (Techniques §4)
+
+   Search, ten views and six filters stacked above the list on a phone, a
+   screen and a half before the first domain. The REAL `.dom-sidebar` node
+   moves into a full-screen sheet opened from a Filters bar at the bottom,
+   and moves home again when the viewport leaves mobile - so every listener
+   domains-register.js attached to it keeps working, and desktop never sees
+   the sheet or the bar.
+
+   🔑 The sheet closes when a VIEW is tapped - that is an arrival, and what
+   you chose is behind the sheet. It stays open for the search box and the
+   filter drop-downs, because you often set several (System Wiki's lesson:
+   closing on every tap can make the next choice unreachable).
+
+   The bar shows the current view beside "Filters", harvested from the
+   view's own button, so the list's state is visible without opening the
+   sheet and no string is invented.
+   ========================================================================== */
+(function () {
+    'use strict';
+
+    if (!document.body || document.body.getAttribute('data-mobile-page') !== 'domains-register') return;
+
+    var mq = window.matchMedia('(max-width: 768px)');
+    var sidebar = document.querySelector('.dom-sidebar');
+    if (!sidebar) return;
+
+    var home = { parent: sidebar.parentNode, next: sidebar.nextSibling };
+
+    function tr(key, fallback) {
+        if (typeof window.t !== 'function') return fallback;
+        var v = window.t(key);
+        return (!v || v === key) ? fallback : v;
+    }
+
+    var ICONS = {
+        filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18M7 12h10M10 19h4"/></svg>',
+        close:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+    };
+
+    var sheet = null, sheetBody = null, bar = null, viewLabel = null;
+
+    function build() {
+        if (sheet) return;
+
+        sheet = document.createElement('div');
+        sheet.className = 'dom-sheet';
+        sheet.setAttribute('role', 'dialog');
+        sheet.setAttribute('aria-modal', 'true');
+
+        var head = document.createElement('div');
+        head.className = 'dom-sheet-head';
+        var title = document.createElement('span');
+        title.className = 'dom-sheet-title';
+        title.textContent = tr('common.filter', 'Filters');
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'dom-sheet-close';
+        close.innerHTML = ICONS.close;
+        close.setAttribute('aria-label', tr('common.close', 'Close'));
+        close.addEventListener('click', function () { setOpen(false); });
+        head.appendChild(title);
+        head.appendChild(close);
+
+        sheetBody = document.createElement('div');
+        sheetBody.className = 'dom-sheet-body';
+        sheet.appendChild(head);
+        sheet.appendChild(sheetBody);
+        document.body.appendChild(sheet);
+
+        bar = document.createElement('div');
+        bar.className = 'dom-fbar';
+        var open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'dom-fbar-btn';
+        open.innerHTML = ICONS.filter + '<span>' + tr('common.filter', 'Filters') + '</span>';
+        viewLabel = document.createElement('span');
+        viewLabel.className = 'dom-fbar-view';
+        open.appendChild(viewLabel);
+        open.addEventListener('click', function () { setOpen(true); });
+        bar.appendChild(open);
+        document.body.appendChild(bar);
+
+        /* A view is an arrival; delegated, because the page redraws the views
+           on every render and a listener per button would miss the redraw.
+           🔴 CAPTURE phase: the page's own click handler re-renders #domViews,
+           so by the time a bubbling listener runs the tapped button has been
+           replaced and `closest('#domViews button')` finds nothing - the list
+           changed and the sheet stayed open over it. Capture runs first. */
+        sheetBody.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('#domViews button') : null;
+            if (btn) setOpen(false);
+        }, true);
+
+        /* Keep the bar's view label in step with the page's own redraws. */
+        var views = document.getElementById('domViews');
+        if (views && window.MutationObserver) {
+            new MutationObserver(showView).observe(views, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        }
+        showView();
+    }
+
+    function showView() {
+        if (!viewLabel) return;
+        var active = document.querySelector('#domViews button.active');
+        var text = '';
+        if (active) {
+            // The button holds the view's name and a count; take the text
+            // nodes and the first element only, so the count stays behind.
+            for (var i = 0; i < active.childNodes.length; i++) {
+                var n = active.childNodes[i];
+                if (n.nodeType === 3) text += n.nodeValue;
+                else if (n.nodeType === 1 && !n.classList.contains('count')) text += n.textContent;
+            }
+        }
+        text = text.replace(/\s+/g, ' ').trim();
+        viewLabel.textContent = text ? '· ' + text : '';
+        if (bar) bar.querySelector('.dom-fbar-btn').setAttribute('aria-label', tr('common.filter', 'Filters') + (text ? ' - ' + text : ''));
+    }
+
+    function setOpen(open) {
+        document.body.setAttribute('data-dom-sheet', open ? 'open' : 'closed');
+        if (open && sheetBody) sheetBody.scrollTop = 0;
+    }
+
+    function place(intoSheet) {
+        if (intoSheet) {
+            if (sheetBody && sidebar.parentNode !== sheetBody) sheetBody.appendChild(sidebar);
+        } else if (sidebar.parentNode !== home.parent) {
+            home.parent.insertBefore(sidebar, home.next);
+        }
+    }
+
+    function reserve() {
+        if (!bar) return;
+        document.body.style.setProperty('--dom-bar-h', Math.ceil(bar.getBoundingClientRect().height) + 'px');
+    }
+
+    function sync() {
+        if (mq.matches) {
+            build();
+            place(true);
+            bar.style.display = '';
+            sheet.style.display = '';
+            if (!document.body.getAttribute('data-dom-sheet')) setOpen(false);
+            reserve();
+        } else {
+            place(false);
+            if (bar) bar.style.display = 'none';
+            if (sheet) sheet.style.display = 'none';
+            document.body.removeAttribute('data-dom-sheet');
+            document.body.style.removeProperty('--dom-bar-h');
+        }
+    }
+    sync();
+    if (mq.addEventListener) { mq.addEventListener('change', sync); }
+    else if (mq.addListener) { mq.addListener(sync); }
+})();
+
+/* ==========================================================================
+   LAYER 41i - Domains: a domain's actions in a sticky footer (Ed)
+
+   Refresh, Check now, Edit and Delete sat in a wrapping row under the hero,
+   scrolled away as soon as you read down the page. They move to a footer
+   pinned to the bottom, as icons - the Checklists editor's 40c, done the same
+   way:
+
+   - The REAL buttons move, never copies: domains-view.js binds each by id,
+     so a clone would do nothing beside an original that still works.
+   - Each button's own label goes into aria-label (an icon has no name), and
+     Refresh and Check keep the icon they already carry; only Edit and Delete
+     get one here.
+   - busy() swaps a button's contents for "Working..." and back, saving what
+     was there when clicked - so the icon is what comes back.
+   - Above 768px everything returns exactly where it was, title text and all.
+   ========================================================================== */
+(function () {
+    'use strict';
+
+    if (!document.body || document.body.getAttribute('data-mobile-page') !== 'domains-view') return;
+
+    var mq = window.matchMedia('(max-width: 768px)');
+    // Back first, as in the Checklists editor's footer (Ed: "a proper back button").
+    var ids = ['domBack', 'btnRefresh', 'btnCheck', 'btnEdit', 'btnDelete'];
+    var btns = ids.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    if (btns.length !== ids.length) return;
+
+    var ICONS = {
+        domBack:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
+        btnEdit:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+        btnDelete: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>'
+    };
+
+    var footer = null;
+    var saved = [];
+
+    function build() {
+        if (footer) return;
+        footer = document.createElement('div');
+        footer.className = 'dom-view-bar';
+        document.body.appendChild(footer);
+    }
+
+    function toIcons() {
+        if (saved.length) return;
+        btns.forEach(function (el) {
+            saved.push({ el: el, html: el.innerHTML, parent: el.parentNode, next: el.nextSibling,
+                         hadAria: el.hasAttribute('aria-label') });
+            // The back link reads "← All domains": the arrow is the icon now.
+            var label = (el.textContent || '').replace(/\s+/g, ' ').replace(/^[\u2190<]+\s*/, '').trim();
+            var own = el.querySelector('svg');
+            el.innerHTML = ICONS[el.id] || (own ? own.outerHTML : '');
+            if (label) el.setAttribute('aria-label', label);
+            el.classList.add('dom-vb-btn');
+            footer.appendChild(el);
+        });
+    }
+
+    function toText() {
+        saved.forEach(function (s) {
+            s.el.innerHTML = s.html;
+            if (!s.hadAria) s.el.removeAttribute('aria-label');
+            s.el.classList.remove('dom-vb-btn');
+            s.parent.insertBefore(s.el, s.next);      // exactly where it was
+        });
+        saved = [];
+    }
+
+    /* Reserve the footer's real height, so the last card is not behind it. */
+    function reserve() {
+        if (!footer) return;
+        document.body.style.setProperty('--dom-vbar-h', Math.ceil(footer.getBoundingClientRect().height) + 'px');
+    }
+
+    function sync() {
+        if (mq.matches) {
+            build();
+            footer.style.display = '';
+            toIcons();
+            reserve();
+        } else {
+            toText();
+            if (footer) footer.style.display = 'none';
+            document.body.style.removeProperty('--dom-vbar-h');
         }
     }
     sync();

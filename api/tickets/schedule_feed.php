@@ -73,6 +73,7 @@ try {
     // unbounded feed grows for ever and every client re-downloads all of it.
     $stmt = $conn->prepare(
         "SELECT t.id, t.ticket_number, t.subject,
+                " . ticketSensitivitySelectSql($conn) . " AS sensitivity,
                 t.work_start_datetime, t.work_end_datetime, t.work_all_day,
                 t.updated_datetime,
                 ts.name AS status_name, tp.name AS priority_name
@@ -152,9 +153,12 @@ foreach ($rows as $r) {
     // 'ref' publishes the ticket number and nothing else. The times still tell
     // you your day is full, which is most of the value, without the subject
     // leaving the login.
+    // A confidential ticket shows as "Confidential ticket" whatever the detail
+    // level (discussion #62) - the feed is read by a calendar app, not FreeITSM.
     $summary = $detail === 'ref'
         ? $r['ticket_number']
-        : $r['ticket_number'] . ' — ' . $r['subject'];
+        : $r['ticket_number'] . ' — ' . (ticketSensitivityNormalise($r['sensitivity']) === 'confidential'
+            ? TICKET_CONFIDENTIAL_SUBJECT : $r['subject']);
 
     $description = '';
     if ($detail !== 'ref') {
