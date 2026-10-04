@@ -1111,6 +1111,51 @@ try {
                         changes who they are.
                     </p>
 
+                    <h4>Microsoft Teams</h4>
+                    <p>
+                        Teams chats are one-to-one with the bot. You create the bot once in your Microsoft 365 tenant (Azure), then add a channel under
+                        <strong>Settings &rarr; Messaging</strong> with provider <strong>Microsoft Teams</strong>. The form walks you through the steps.
+                    </p>
+                    <ol>
+                        <li>In the <strong>Azure portal</strong> (portal.azure.com), open <strong>Microsoft Entra ID &rarr; App registrations &rarr; New registration</strong>.
+                            Choose <strong>Accounts in this organizational directory only (Single tenant)</strong>. No redirect URI is needed.</li>
+                        <li>Copy the <strong>Application (client) ID</strong> into <strong>Bot App ID</strong>, and the <strong>Directory (tenant) ID</strong> into <strong>Tenant ID</strong>.</li>
+                        <li><strong>Certificates &amp; secrets &rarr; New client secret</strong>. Copy the secret's <strong>Value</strong> (not its ID) into <strong>App secret</strong>. Azure shows it once.</li>
+                        <li>Create an <strong>Azure Bot</strong> resource: type of app <strong>Single Tenant</strong>, use the existing app registration (same App ID).
+                            Set its <strong>Messaging endpoint</strong> to the webhook URL shown in the channel list, and enable the <strong>Microsoft Teams</strong> channel.</li>
+                        <li>Save the channel, then click <strong>Download Teams app package</strong> on it. Upload the zip in the
+                            <strong>Teams Admin Center &rarr; Manage apps</strong>. Allow it for the users who should be able to chat with the bot.</li>
+                        <li><strong>Permissions:</strong> none. FreeITSM talks to the Bot Framework only, so do <strong>not</strong> add Microsoft Graph permissions.</li>
+                    </ol>
+                    <p class="help-note">
+                        Teams delivers only to an <strong>https://</strong> address, so the public URL on the Messaging tab must be one. The same goes for images you send:
+                        they are fetched from that address by Microsoft, so the path <code>/api/messaging/media.php</code> must be reachable from the internet.
+                        Only people in <strong>your own Microsoft 365 organisation</strong> (the Tenant ID above) can open tickets through the bot.
+                        Full walkthrough: the <a href="https://github.com/edmozley/freeitsm/wiki/Microsoft-Teams" target="_blank" rel="noopener">Microsoft Teams</a> wiki page.
+                    </p>
+
+                    <h4>Mattermost</h4>
+                    <p>
+                        Mattermost support works through a <strong>support channel</strong>. Customers post there, and each post opens a ticket.
+                        Replies go <strong>in the thread</strong> under the customer's post, the same way Slack works, so the customer simply answers in the
+                        thread and the conversation carries on. Anyone in the support channel can read the thread. Add a channel under
+                        <strong>Settings &rarr; Messaging</strong> with provider <strong>Mattermost</strong>; the form lists the steps.
+                    </p>
+                    <ol>
+                        <li>As a system admin, enable <strong>Bot Account Creation</strong> and <strong>Outgoing Webhooks</strong> in
+                            <strong>System Console &rarr; Integrations</strong>.</li>
+                        <li><strong>Integrations &rarr; Bot Accounts &rarr; Add Bot Account.</strong> Give it the <strong>Post All</strong> and <strong>Read</strong> permissions.
+                            Copy its <strong>access token</strong> into <strong>Bot access token</strong>. Add the bot to the support channel.</li>
+                        <li>Copy the support channel's <strong>ID</strong> (channel details, 26 characters) into <strong>Support channel ID</strong>, and the server address into <strong>Server address</strong>.</li>
+                        <li><strong>Integrations &rarr; Outgoing Webhooks &rarr; Add.</strong> Choose the support channel, paste the <strong>webhook URL</strong> from the channel list as the callback URL,
+                            and leave the trigger words empty so every post is sent.</li>
+                        <li>Copy the webhook's <strong>token</strong> (Mattermost creates it) into <strong>Outgoing webhook token</strong>, then save and test the connection.</li>
+                    </ol>
+                    <p class="help-note">
+                        Limits: one support channel per configuration. Files that customers post are not downloaded (the outgoing webhook does not
+                        include them). Full guide: the <a href="https://github.com/edmozley/freeitsm/wiki/Mattermost" target="_blank" rel="noopener">Mattermost</a> wiki page.
+                    </p>
+
                     <h4>Sending files</h4>
                     <p>
                         On a Telegram or WhatsApp ticket, <strong>Attach</strong> in the reply box sends a picture or document to the customer; anything

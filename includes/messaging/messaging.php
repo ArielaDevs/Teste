@@ -22,6 +22,8 @@ require_once __DIR__ . '/MetaCloudProvider.php';
 require_once __DIR__ . '/SlackProvider.php';
 require_once __DIR__ . '/FreeitsmProvider.php';
 require_once __DIR__ . '/TelegramProvider.php';
+require_once __DIR__ . '/TeamsProvider.php';
+require_once __DIR__ . '/MattermostProvider.php';
 require_once __DIR__ . '/../encryption.php';
 
 /** The 24h provider service window, in seconds. */
@@ -46,6 +48,10 @@ function messagingProvider(array $channel): MessagingProvider
             return new SlackProvider($channel);
         case 'telegram':
             return new TelegramProvider($channel);
+        case 'teams':
+            return new TeamsProvider($channel);
+        case 'mattermost':
+            return new MattermostProvider($channel);
         default:
             throw new Exception('Unknown messaging provider: ' . ($channel['provider'] ?? '?'));
     }
@@ -226,6 +232,16 @@ function normaliseChannelIdentifier(string $raw, string $channelType = 'whatsapp
         return preg_match('/^[UW][A-Z0-9]{2,}$/', $s) ? $s : '';
     }
 
+    if ($channelType === 'mattermost') {
+        // A Mattermost user id: 26 lowercase letters and digits.
+        return preg_match('/^[a-z0-9]{26}$/', $s) ? $s : '';
+    }
+
+    if ($channelType === 'teams') {
+        // A Teams conversation id (a:…, 19:…@thread…): letters, digits and : _ - . @ =.
+        return preg_match('/^[A-Za-z0-9:_.@=-]{3,190}$/', $s) ? $s : '';
+    }
+
     if ($channelType === 'telegram') {
         // A Telegram chat id — a bare (optionally negative, for group chats)
         // integer. NOT a phone number: running it through the digit-stripping
@@ -372,9 +388,32 @@ function messagingBuildTranscript(PDO $conn, int $ticketId): string
  * and the API disagree, the composer greys out a reply the API would accept, or
  * offers one it will refuse, and it reads as a broken integration.
  */
+/**
+ * Where a reply to a customer goes, given their latest inbound row
+ * (from_address + to_recipients).
+ *
+ * On a phone-like channel - WhatsApp, Telegram, web chat - you answer the
+ * sender, so the sender IS the address. On a threaded one you answer into the
+ * conversation the message came from, which ingest stored as to_recipients:
+ *   slack       "C08HELP:1719500000.000100"   channel + thread
+ *   teams       "<serviceUrl>|<conversationId>" - the serviceUrl is per conversation
+ *   mattermost  "<channelId>:<postId>"          the post to thread under
+ * Replying to the sender there would DM the person instead of answering where
+ * everybody else is reading. ONE function, so the composer and the in-chat CSAT
+ * request (PR #166) can never disagree about where an answer goes.
+ */
+const MESSAGING_THREADED_CHANNELS = ['slack', 'teams', 'mattermost'];
+
+function messagingReplyAddress(string $channelType, array $row): string
+{
+    return in_array($channelType, MESSAGING_THREADED_CHANNELS, true)
+        ? trim((string)($row['to_recipients'] ?? ''))
+        : (string)($row['from_address'] ?? '');
+}
+
 function channelHasServiceWindow(string $channelType): bool
 {
-    return !in_array($channelType, ['webchat', 'slack', 'telegram'], true);
+    return !in_array($channelType, ['webchat', 'slack', 'telegram', 'teams', 'mattermost'], true);
 }
 
 function channelWindowOpen(?string $lastInboundAt): bool

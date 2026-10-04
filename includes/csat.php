@@ -81,6 +81,176 @@ const CSAT_RESULT_ALREADY_SENT  = 'already_sent';   // one-per-ticket guard trip
 const CSAT_RESULT_NO_TEMPLATE   = 'no_template';    // no active csat_request template
 const CSAT_RESULT_NO_MAILBOX    = 'no_mailbox';     // ticket has no mailbox to send from
 
+// ===========================================================================
+//  Asking in the customer's own chat (PR #166, built on turbay-a's original)
+// ===========================================================================
+//
+// A customer who wrote in on WhatsApp, Telegram, Slack, Teams or Mattermost is
+// asked for their rating in that chat - buttons where the channel has them, a
+// "reply 1 to 5" message where it does not - instead of by email.
+//
+// TRAP: an upgrade must not change who is asked, or how.
+//   `csat_in_channel` is OFF after an upgrade (db_verify seeds '0'; a new
+//   install's freeitsm.sql seeds '1'). An install that has emailed every survey
+//   for months must not start messaging its chat customers the day it upgrades.
+//
+// TRAP: match a chat reply only to a request sent IN THAT CHAT.
+//   channel_id + channel_from record where a request went. Never find "the
+//   pending survey" through the emails table alone - that also finds emailed
+//   surveys and other chats' requests.
+//
+// TRAP: no orphan rows. The row exists only to give the buttons an id; if the
+//   send fails it is deleted and the email survey is tried instead. With
+//   one-survey-per-ticket on, a stray row would mean the customer is never asked.
+//
+// TRAP: WhatsApp outside its 24-hour window cannot take a free-form message -
+//   csatTicketChannel() checks channelWindowOpen() and falls back to email.
+
+/** How long a chat rating request is listened for. A digit a week later is a message, not a rating. */
+const CSAT_CHANNEL_REPLY_WINDOW_DAYS = 7;
+
+/**
+ * The chat a ticket's customer is talking on, ready to ask in - or null, which
+ * means "use the email survey": the setting is off, the ticket's latest contact
+ * was not a chat, the channel has gone, or (WhatsApp) the 24-hour window has
+ * closed and a free-form message cannot be sent.
+ *
+ * @return array{channel:array, from:string, address:string}|null
+ */
+function csatTicketChannel(PDO $conn, int $ticketId): ?array {
+    if (csatGetSetting($conn, 'csat_in_channel', '0') !== '1') {
+        return null;
+    }
+    require_once __DIR__ . '/messaging/messaging.php';
+    $stmt = $conn->prepare(
+        "SELECT channel, channel_id, from_address, to_recipients, received_datetime
+         FROM emails
+         WHERE ticket_id = ? AND channel <> 'email' AND channel_id IS NOT NULL AND direction = 'Inbound'
+         ORDER BY received_datetime DESC, id DESC LIMIT 1"
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+    $channel = loadMessagingChannel($conn, (int)$row['channel_id']);
+    if (!$channel || empty($channel['is_active'])) {
+        return null;
+    }
+    $type = (string)($channel['channel_type'] ?? $row['channel']);
+    if (channelHasServiceWindow($type) && !channelWindowOpen($row['received_datetime'])) {
+        return null;   // WhatsApp outside 24h: only a pre-approved template may be sent
+    }
+    $address = messagingReplyAddress($type, $row);
+    if ($address === '' || (string)$row['from_address'] === '') {
+        return null;
+    }
+    return ['channel' => $channel, 'from' => (string)$row['from_address'], 'address' => $address];
+}
+
+/**
+ * The language to write a customer-facing rating message in. Telegram has the
+ * customer's own language_code (stored on the identity link); other channels do
+ * not report one, so they get English.
+ */
+function csatChannelLocale(PDO $conn, array $channel, string $from): string {
+    if (($channel['channel_type'] ?? '') !== 'telegram') {
+        return 'en';
+    }
+    try {
+        $stmt = $conn->prepare("SELECT locale FROM messaging_identity_links WHERE channel_type = 'telegram' AND external_id = ?");
+        $stmt->execute([$from]);
+        $locale = (string)($stmt->fetchColumn() ?: '');
+    } catch (Throwable $e) {
+        $locale = '';
+    }
+    return $locale !== '' ? $locale : 'en';
+}
+
+/**
+ * Ask a chat customer for a 1-5 rating in their chat. Returns the response id,
+ * or throws - having removed its own row - so the caller can fall back to email.
+ */
+function csatSendInChannel(PDO $conn, int $ticketId, array $target, ?int $analystId): int {
+    require_once __DIR__ . '/messaging/messaging.php';
+    require_once __DIR__ . '/i18n.php';
+
+    $channel = $target['channel'];
+    $conn->prepare(
+        "INSERT INTO ticket_csat_responses (ticket_id, token, sent_datetime, analyst_id, created_at, channel_id, channel_from)
+         VALUES (?, ?, UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), ?, ?)"
+    )->execute([$ticketId, csatGenerateToken(), $analystId, (int)$channel['id'], $target['from']]);
+    $responseId = (int)$conn->lastInsertId();
+
+    try {
+        $text = I18n::tFor(csatChannelLocale($conn, $channel, $target['from']), 'tickets.csat_channel.prompt');
+        messagingProvider($channel)->sendRatingRequest($target['address'], $text, $responseId);
+    } catch (Throwable $e) {
+        // Nothing orphaned: the request never reached them, so neither does the row.
+        $conn->prepare("DELETE FROM ticket_csat_responses WHERE id = ?")->execute([$responseId]);
+        throw $e;
+    }
+    return $responseId;
+}
+
+/**
+ * The rating request a customer's bare digit answers, or null - in which case
+ * the digit is an ordinary message. All of these must hold:
+ *   - the request was sent IN THIS CHAT (channel_id + channel_from);
+ *   - it is unanswered and at most CSAT_CHANNEL_REPLY_WINDOW_DAYS old;
+ *   - the customer has written nothing else in this chat since it was sent.
+ *
+ * TRAP: a bare digit is usually NOT a rating. "Which floor?" "3" is an answer
+ *   to the analyst, and a "2" next month starts a new conversation - loosen any
+ *   of the three conditions and real messages vanish into a survey, with no
+ *   error anywhere. tests/messaging-teams-mattermost.php checks each one.
+ */
+function csatPendingRequestForChat(PDO $conn, int $channelId, string $from): ?int {
+    try {
+        $stmt = $conn->prepare(
+            "SELECT r.id FROM ticket_csat_responses r
+             WHERE r.channel_id = ? AND r.channel_from = ?
+               AND r.rating IS NULL AND r.sent_datetime IS NOT NULL
+               AND r.sent_datetime >= UTC_TIMESTAMP() - INTERVAL " . (int)CSAT_CHANNEL_REPLY_WINDOW_DAYS . " DAY
+               AND NOT EXISTS (
+                   SELECT 1 FROM emails e
+                   WHERE e.channel_id = r.channel_id AND e.from_address = r.channel_from
+                     AND e.direction = 'Inbound' AND e.received_datetime > r.sent_datetime
+               )
+             ORDER BY r.id DESC LIMIT 1"
+        );
+        $stmt->execute([$channelId, $from]);
+        $id = $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return null;   // before Database Verification: no chat surveys exist yet
+    }
+    return $id ? (int)$id : null;
+}
+
+/** Was this request sent to this customer on this channel? Guards a button press against a forged or replayed id. */
+function csatResponseBelongsToChat(PDO $conn, int $responseId, int $channelId, string $from): bool {
+    try {
+        $stmt = $conn->prepare("SELECT 1 FROM ticket_csat_responses WHERE id = ? AND channel_id = ? AND channel_from = ?");
+        $stmt->execute([$responseId, $channelId, $from]);
+        return (bool)$stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/** Record a 1-5 rating once. Returns false if it was already answered or out of range. */
+function csatRecordRating(PDO $conn, int $responseId, int $rating): bool {
+    if ($rating < 1 || $rating > 5) {
+        return false;
+    }
+    $upd = $conn->prepare(
+        "UPDATE ticket_csat_responses SET rating = ?, responded_datetime = UTC_TIMESTAMP()
+         WHERE id = ? AND rating IS NULL"
+    );
+    $upd->execute([$rating, $responseId]);
+    return $upd->rowCount() > 0;
+}
+
 /**
  * Create a CSAT response row and send the survey email. Returns an array:
  *   ['result' => <CSAT_RESULT_*>, 'response_id' => int|null]
@@ -103,6 +273,19 @@ function sendCsatSurvey(PDO $conn, int $ticketId, ?int $analystId, bool $force =
         $existing->execute([$ticketId]);
         if ($existing->fetchColumn()) {
             return ['result' => CSAT_RESULT_ALREADY_SENT, 'response_id' => null];
+        }
+    }
+
+    // A chat customer is asked in their chat when the install has chosen that
+    // (csat_in_channel) and the chat can take a message now. If the send fails,
+    // csatSendInChannel() has removed its row and we fall through to email, so
+    // a customer who also has an email address is still asked (PR #166).
+    $target = csatTicketChannel($conn, $ticketId);
+    if ($target) {
+        try {
+            return ['result' => CSAT_RESULT_SENT, 'response_id' => csatSendInChannel($conn, $ticketId, $target, $analystId)];
+        } catch (Throwable $e) {
+            error_log('CSAT in-chat request failed for ticket ' . $ticketId . ', trying email: ' . $e->getMessage());
         }
     }
 

@@ -701,6 +701,12 @@ return [
     // The Telegram bot's OWN outbound text (not UI chrome) — sent in the
     // CUSTOMER's language_code (includes/messaging/ingest.php), not the
     // analyst's interface language. See I18n::tFor().
+    // Customer-facing satisfaction question on a messaging channel (includes/csat.php).
+    'csat_channel' => [
+        'prompt' => 'How would you rate the service you received? Tap a number from 1 (poor) to 5 (excellent), or reply with a single digit.',
+        'thanks' => 'Thank you for your feedback!',
+    ],
+
     'telegram_bot' => [
         'request_contact_prompt' => 'Hi! While we look into this, could you share your phone number using the button below? It helps us recognise you if you\'ve contacted us before.',
         'request_contact_button' => 'Share phone number',
@@ -1405,6 +1411,31 @@ return [
                 'relay_secret_placeholder' => 'shared secret between the relay and this install',
                 'active'                   => 'Active',
                 'webhook_hint_label'       => 'Webhook URL (paste into your provider)',
+                'provider_teams' => 'Microsoft Teams',
+                'provider_mattermost' => 'Mattermost',
+                'mm_server_url' => 'Server address',
+                'mm_channel_id' => 'Support channel ID',
+                'mm_bot_token' => 'Bot access token',
+                'mm_webhook_token' => 'Outgoing webhook token',
+                'mm_webhook_help' => 'Mattermost creates this token for the webhook. Copy it from the webhook\'s page.',
+                'mm_setup_title' => 'Set up Mattermost (once per server)',
+                'mm_step1' => 'System Console → Integrations: enable Bot Account Creation and Outgoing Webhooks.',
+                'mm_step2' => 'Integrations → Bot Accounts → Add Bot Account with Post All and Read. Copy its access token and add the bot to the support channel. Copy the support channel\'s ID (channel details, 26 characters) and the server address above.',
+                'mm_step3' => 'Integrations → Outgoing Webhooks → Add. Pick the support channel, paste the webhook URL from the channel list, leave trigger words empty. Then paste the webhook\'s token into the field above and save. Full guide:',
+                'teams_setup_title' => 'Create the bot in Office 365 (once per tenant)',
+                'teams_step1' => 'Azure portal → Microsoft Entra ID → App registrations → New registration. Choose "Single tenant", no redirect URI. Copy the Application (client) ID into "Bot App ID" and the Directory (tenant) ID into "Tenant ID" below.',
+                'teams_step2' => 'Certificates & secrets → New client secret. Copy the secret\'s Value (not its ID) into "App secret". Azure shows it only once.',
+                'teams_step3' => 'Create an Azure Bot resource: Single Tenant, use the existing app (same App ID). Set its Messaging endpoint to the webhook URL in the channel list and enable the Microsoft Teams channel.',
+                'teams_step4' => 'Package a Teams app manifest.json with botId = the App ID and upload it in Teams Admin Center → Manage apps. Allow it for the users who will chat with the bot.',
+                'teams_step5' => 'Permissions: none. Do not add Microsoft Graph permissions. FreeITSM uses the Bot Framework only.',
+                'teams_help_more' => 'Full guide (with the same steps):',
+                'teams_download' => 'Download Teams app package',
+                'teams_download_help' => 'Upload this .zip in Teams Admin Center → Manage apps. It is built from this channel\'s App ID.',
+                'teams_app_id' => 'Bot App ID',
+                'teams_tenant_id' => 'Tenant ID',
+                'teams_tenant_help' => 'The Azure AD tenant the bot is registered in (from the bot\'s app registration).',
+                'teams_app_secret' => 'App secret',
+                'teams_secret_help' => 'The client secret from the bot\'s app registration. Stored encrypted; leave blank to keep the current one.',
             ],
 
             // Messaging template modal
@@ -1938,6 +1969,8 @@ return [
             'delay_help'          => 'Wait this many minutes after close before sending. <code>0</code> = immediate. Useful if you want the user to verify the fix actually held before being asked to rate it.',
             'one_per_ticket'      => 'One survey per ticket',
             'one_per_ticket_help' => 'If on, a reopened-then-closed ticket only gets another survey when an analyst manually triggers it &mdash; stops survey-spamming a flaky ticket.',
+            'in_channel'          => 'Ask chat customers in their chat',
+            'in_channel_help'     => 'A customer who wrote in on WhatsApp, Telegram, Slack, Teams or Mattermost is asked in that chat &mdash; buttons where the app has them, &ldquo;reply 1 to 5&rdquo; where it does not &mdash; instead of by email. WhatsApp only while its 24-hour window is open; otherwise, and if a chat message fails, the email survey is used.',
             'scale_stars'         => 'Stars',
             'scale_emojis'        => 'Emojis',
             'scale_help'          => 'Both options store the same 1&ndash;5 number, so dashboards and averages work the same either way &mdash; this only changes how the survey page itself looks.',

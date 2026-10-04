@@ -2066,6 +2066,14 @@ $translationNamespaces = ['common', 'tickets'];
                 </div>
 
                 <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="csatInChannel">
+                        <span><?php echo htmlspecialchars(t('tickets.settings.csat_tab.in_channel')); ?></span>
+                    </label>
+                    <small style="display: block; color: var(--text-muted, #666); margin-top: 4px; margin-left: 26px;"><?php echo t('tickets.settings.csat_tab.in_channel_help'); ?></small>
+                </div>
+
+                <div class="form-group">
                     <label><?php echo htmlspecialchars(t('tickets.settings.csat.scale_label')); ?></label>
                     <div style="display: flex; gap: 20px; margin-top: 6px;">
                         <label style="display: flex; gap: 8px; align-items: center; cursor: pointer;">
@@ -2659,6 +2667,8 @@ $translationNamespaces = ['common', 'tickets'];
                             <option value="twilio">Twilio</option>
                             <option value="meta"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_meta')); ?></option>
                             <option value="telegram"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_telegram')); ?></option>
+                            <option value="teams"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_teams')); ?></option>
+                            <option value="mattermost"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.provider_mattermost')); ?></option>
                         </select>
                     </div>
 
@@ -2722,6 +2732,67 @@ $translationNamespaces = ['common', 'tickets'];
                             <button type="button" class="btn btn-secondary" onclick="generateTelegramSecret()" style="white-space:nowrap; padding:8px 12px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.generate')); ?></button>
                         </div>
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.telegram_secret_help')); ?></small>
+                    </div>
+
+                    <!-- Microsoft Teams (Bot Framework) credentials -->
+                    <div class="form-group provider-teams">
+                        <label for="channelTeamsAppId"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_app_id')); ?> *</label>
+                        <input type="text" id="channelTeamsAppId" placeholder="00000000-0000-0000-0000-000000000000">
+                    </div>
+                    <div class="form-group provider-teams">
+                        <label for="channelTeamsTenantId"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_tenant_id')); ?> *</label>
+                        <input type="text" id="channelTeamsTenantId" placeholder="00000000-0000-0000-0000-000000000000">
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_tenant_help')); ?></small>
+                    </div>
+                    <div class="form-group provider-teams" style="grid-column: span 2;">
+                        <label for="channelTeamsAppSecret"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_app_secret')); ?> *</label>
+                        <input type="password" id="channelTeamsAppSecret" placeholder="••••••••">
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_secret_help')); ?></small>
+                    </div>
+
+                    <!-- Mattermost credentials -->
+                    <div class="form-group provider-mattermost" style="grid-column: span 2;">
+                        <label for="channelMmServerUrl"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_server_url')); ?> *</label>
+                        <input type="text" id="channelMmServerUrl" placeholder="https://mattermost.example.com">
+                    </div>
+                    <div class="form-group provider-mattermost">
+                        <label for="channelMmChannelId"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_channel_id')); ?> *</label>
+                        <input type="text" id="channelMmChannelId" placeholder="abcdefghijklmnopqrstuvwxyz" maxlength="26">
+                    </div>
+                    <div class="form-group provider-mattermost">
+                        <label for="channelMmBotToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_bot_token')); ?> *</label>
+                        <input type="password" id="channelMmBotToken" placeholder="••••••••">
+                    </div>
+                    <div class="form-group provider-mattermost" style="grid-column: span 2;">
+                        <label for="channelMmWebhookToken"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_webhook_token')); ?> *</label>
+                        <input type="password" id="channelMmWebhookToken" placeholder="••••••••">
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_webhook_help')); ?></small>
+                    </div>
+                    <div class="form-group provider-mattermost" style="grid-column: span 2; background:var(--bg-secondary, #f5f7fa); border:1px solid var(--border-color, #e0e0e0); border-radius:8px; padding:12px 14px;">
+                        <label style="font-weight:600; display:block; margin-bottom:6px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_setup_title')); ?></label>
+                        <ol style="margin:0 0 4px 18px; padding:0; font-size:13px; color:var(--text-muted, #555); line-height:1.6;">
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step1')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step2')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.mm_step3')); ?></li>
+                        </ol>
+                        <small style="color:var(--text-muted, #666);"><a href="https://github.com/edmozley/freeitsm/wiki/Mattermost" target="_blank" rel="noopener">github.com/edmozley/freeitsm/wiki/Mattermost</a></small>
+                    </div>
+
+                    <!-- Teams setup steps: the Azure side has to exist before the App ID and secret above do. -->
+                    <div class="form-group provider-teams" style="grid-column: span 2; background:var(--bg-secondary, #f5f7fa); border:1px solid var(--border-color, #e0e0e0); border-radius:8px; padding:12px 14px;">
+                        <label style="font-weight:600; display:block; margin-bottom:6px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_setup_title')); ?></label>
+                        <ol style="margin:0 0 4px 18px; padding:0; font-size:13px; color:var(--text-muted, #555); line-height:1.6;">
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step1')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step2')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step3')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step4')); ?></li>
+                            <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step5')); ?></li>
+                        </ol>
+                        <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_help_more')); ?> <a href="https://github.com/edmozley/freeitsm/wiki/Microsoft-Teams" target="_blank" rel="noopener">github.com/edmozley/freeitsm/wiki/Microsoft-Teams</a></small>
+                        <div style="margin-top:10px;">
+                            <button type="button" id="teamsPackageBtn" class="btn btn-secondary" style="display:none;" onclick="downloadTeamsPackage()"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_download')); ?></button>
+                            <small id="teamsPackageHelp" style="display:none; color:var(--text-muted, #666); margin-left:8px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_download_help')); ?></small>
+                        </div>
                     </div>
 
                     <!-- How to connect: only meaningful once the secret is set and (for the
@@ -4312,6 +4383,10 @@ $translationNamespaces = ['common', 'tickets'];
                     ? ' <span class="status-badge" style="background:#e3f2fd;color:#1565c0;">Meta</span>'
                     : c.provider === 'telegram'
                     ? ' <span class="status-badge" style="background:#e1f5fe;color:#0288d1;">Telegram</span>'
+                    : c.provider === 'teams'
+                    ? ' <span class="status-badge" style="background:#ede7f6;color:#4527a0;">Teams</span>'
+                    : c.provider === 'mattermost'
+                    ? ' <span class="status-badge" style="background:#e6f4ea;color:#1e7e34;">Mattermost</span>'
                     : ' <span class="status-badge" style="background:#e8f5e9;color:#2e7d32;">Twilio</span>';
                 const activeBadge = c.is_active ? '' : ' <span class="status-badge status-inactive">Inactive</span>';
                 const credBadge = c.has_credentials
@@ -4362,9 +4437,42 @@ $translationNamespaces = ['common', 'tickets'];
             document.querySelectorAll('.provider-twilio').forEach(el => el.style.display = (p === 'twilio') ? '' : 'none');
             document.querySelectorAll('.provider-meta').forEach(el => el.style.display = (p === 'meta') ? '' : 'none');
             document.querySelectorAll('.provider-telegram').forEach(el => el.style.display = (p === 'telegram') ? '' : 'none');
-            // Telegram has no WhatsApp-style phone number; the field is meaningless there.
-            document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram') ? 'none' : '');
+            document.querySelectorAll('.provider-teams').forEach(el => el.style.display = (p === 'teams') ? '' : 'none');
+            document.querySelectorAll('.provider-mattermost').forEach(el => el.style.display = (p === 'mattermost') ? '' : 'none');
+            // Telegram and Teams have no WhatsApp-style phone number; the field is meaningless there.
+            document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram' || p === 'teams' || p === 'mattermost') ? 'none' : '');
             if (p === 'telegram') updateTelegramSetupCommand();
+            // The package needs a saved channel (its App ID is read server-side), so only offer it when one exists.
+            const pkgBtn = document.getElementById('teamsPackageBtn');
+            const pkgHelp = document.getElementById('teamsPackageHelp');
+            const saved = !!document.getElementById('channelId').value;
+            if (pkgBtn) pkgBtn.style.display = (p === 'teams' && saved) ? '' : 'none';
+            if (pkgHelp) pkgHelp.style.display = (p === 'teams' && saved) ? '' : 'none';
+        }
+
+        /** Fetch this channel's Teams app package and save it. Errors are shown as a toast, not a JSON page. */
+        async function downloadTeamsPackage() {
+            const id = document.getElementById('channelId').value;
+            if (!id) return;
+            try {
+                const res = await fetch(MSG_API + 'teams_package.php?id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+                if ((res.headers.get('Content-Type') || '').indexOf('application/zip') === -1) {
+                    const data = await res.json().catch(() => ({}));
+                    showToast('Error: ' + (data.error || 'the Teams package could not be created'), 'error');
+                    return;
+                }
+                const blob = await res.blob();
+                const name = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name ? name[1] : 'freeitsm-teams.zip';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            } catch (e) {
+                showToast('Failed to create the Teams package', 'error');
+            }
         }
 
         /** A random 32-char hex string — good enough entropy for Telegram's secret_token (max 256 chars, this app's own value, never sent anywhere but Telegram). */
@@ -4437,7 +4545,10 @@ $translationNamespaces = ['common', 'tickets'];
             document.getElementById('channelActive').checked = channel ? !!channel.is_active : true;
             // Secrets are write-only; show a masked placeholder on edit if configured.
             const mask = (channel && channel.has_credentials) ? '********' : '';
-            ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken'].forEach(idv => document.getElementById(idv).value = mask);
+            ['channelAuthToken','channelAccessToken','channelAppSecret','channelBotToken','channelTeamsAppSecret','channelMmBotToken'].forEach(idv => document.getElementById(idv).value = mask);
+            ['channelMmChannelId','channelMmWebhookToken'].forEach(idv => document.getElementById(idv).value = '');
+            document.getElementById('channelMmServerUrl').value = channel ? (channel.mm_server_url || '') : '';
+            document.getElementById('channelMmChannelId').value = channel ? (channel.channel_ref || '') : '';
             ['channelAccountSid','channelPhoneNumberId','channelVerifyToken','channelRelaySecret','channelTelegramSecret'].forEach(idv => document.getElementById(idv).value = '');
             document.getElementById('channelGraphVersion').value = channel ? (channel.graph_version || '') : '';
 
@@ -4541,7 +4652,12 @@ $translationNamespaces = ['common', 'tickets'];
                 // saved into the same column server-side.
                 verify_token: (selectedProvider === 'telegram'
                     ? document.getElementById('channelTelegramSecret').value
+                    : selectedProvider === 'mattermost'
+                    ? document.getElementById('channelMmWebhookToken').value
                     : document.getElementById('channelVerifyToken').value).trim(),
+                mm_server_url: document.getElementById('channelMmServerUrl').value.trim(),
+                mm_channel_id: document.getElementById('channelMmChannelId').value.trim(),
+                mm_bot_token: document.getElementById('channelMmBotToken').value,
                 tenant_id: document.getElementById('channelCompany').value || null,
                 is_active: document.getElementById('channelActive').checked,
                 account_sid: document.getElementById('channelAccountSid').value.trim(),
@@ -4550,7 +4666,10 @@ $translationNamespaces = ['common', 'tickets'];
                 access_token: document.getElementById('channelAccessToken').value,
                 app_secret: document.getElementById('channelAppSecret').value,
                 graph_version: document.getElementById('channelGraphVersion').value.trim(),
-                bot_token: document.getElementById('channelBotToken').value
+                bot_token: document.getElementById('channelBotToken').value,
+                teams_app_id: document.getElementById('channelTeamsAppId').value.trim(),
+                teams_tenant_id: document.getElementById('channelTeamsTenantId').value.trim(),
+                teams_app_secret: document.getElementById('channelTeamsAppSecret').value
             };
             if (!payload.name) { showToast('Name is required', 'error'); return; }
             try {
@@ -6079,6 +6198,7 @@ $translationNamespaces = ['common', 'tickets'];
 
                 document.getElementById('csatDelay').value = data.delay_minutes ?? 0;
                 document.getElementById('csatOnePerTicket').checked = data.one_per_ticket !== '0';
+                document.getElementById('csatInChannel').checked = data.in_channel === '1';
 
                 const scale = document.querySelector(`input[name="csatScale"][value="${data.scale || 'stars'}"]`);
                 if (scale) scale.checked = true;
@@ -6093,6 +6213,7 @@ $translationNamespaces = ['common', 'tickets'];
                 mode:           document.querySelector('input[name="csatMode"]:checked')?.value || 'off',
                 delay_minutes:  parseInt(document.getElementById('csatDelay').value || '0', 10),
                 one_per_ticket: document.getElementById('csatOnePerTicket').checked ? '1' : '0',
+                in_channel:     document.getElementById('csatInChannel').checked ? '1' : '0',
                 scale:          document.querySelector('input[name="csatScale"]:checked')?.value || 'stars',
             };
             try {

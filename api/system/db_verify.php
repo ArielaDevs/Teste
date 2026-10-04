@@ -1807,6 +1807,11 @@ try {
             // If 1, a reopened-then-closed ticket only gets a new survey when the analyst
             // manually triggers it (stops survey-spamming a flaky ticket). If 0, every close fires.
             'csat_one_per_ticket'             => '1',
+            // PR #166: ask chat customers in their chat. OFF on an upgrade - an
+            // install that has emailed every survey for months must not start
+            // messaging its chat customers the day it upgrades. freeitsm.sql
+            // seeds '1' first on a new install, and INSERT IGNORE keeps it.
+            'csat_in_channel'                 => '0',
             // Shared HMAC secret for tokenising survey URLs. Random per install — leaking it
             // would let anyone post ratings on behalf of users, so it stays in system_settings
             // rather than going to a public file or being printed in error pages.
