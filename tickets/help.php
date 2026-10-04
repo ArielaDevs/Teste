@@ -516,6 +516,10 @@ try {
                     </div>
                     <p><?php echo t('tickets.help.csat.survey_store'); ?></p>
 
+                    <p style="margin-top: 20px;"><?php echo t('tickets.help.csat.chat_heading'); ?></p>
+                    <p><?php echo t('tickets.help.csat.chat_body'); ?></p>
+                    <p class="help-note"><?php echo t('tickets.help.csat.chat_rules'); ?></p>
+
                     <p style="margin-top: 20px;"><?php echo t('tickets.help.csat.analytics_heading'); ?></p>
                     <p><?php echo t('tickets.help.csat.analytics_body'); ?></p>
                     <p><?php echo t('tickets.help.csat.analytics_filters'); ?></p>
