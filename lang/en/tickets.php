@@ -1429,6 +1429,8 @@ return [
                 'teams_step4' => 'Package a Teams app manifest.json with botId = the App ID and upload it in Teams Admin Center → Manage apps. Allow it for the users who will chat with the bot.',
                 'teams_step5' => 'Permissions: none. Do not add Microsoft Graph permissions. FreeITSM uses the Bot Framework only.',
                 'teams_help_more' => 'Full guide (with the same steps):',
+                'teams_download' => 'Download Teams app package',
+                'teams_download_help' => 'Upload this .zip in Teams Admin Center → Manage apps. It is built from this channel\'s App ID.',
                 'teams_app_id' => 'Bot App ID',
                 'teams_tenant_id' => 'Tenant ID',
                 'teams_tenant_help' => 'The Azure AD tenant the bot is registered in (from the bot\'s app registration).',

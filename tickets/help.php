@@ -1123,7 +1123,7 @@ try {
                         <li><strong>Certificates &amp; secrets &rarr; New client secret</strong>. Copy the secret's <strong>Value</strong> (not its ID) into <strong>App secret</strong>. Azure shows it once.</li>
                         <li>Create an <strong>Azure Bot</strong> resource: type of app <strong>Single Tenant</strong>, use the existing app registration (same App ID).
                             Set its <strong>Messaging endpoint</strong> to the webhook URL shown in the channel list, and enable the <strong>Microsoft Teams</strong> channel.</li>
-                        <li>Make a <code>manifest.json</code> for the Teams app with <code>bots[0].botId</code> set to the App ID, package it with its two icons, and upload it in the
+                        <li>Save the channel, then click <strong>Download Teams app package</strong> on it. Upload the zip in the
                             <strong>Teams Admin Center &rarr; Manage apps</strong>. Allow it for the users who should be able to chat with the bot.</li>
                         <li><strong>Permissions:</strong> none. FreeITSM talks to the Bot Framework only, so do <strong>not</strong> add Microsoft Graph permissions.</li>
                     </ol>

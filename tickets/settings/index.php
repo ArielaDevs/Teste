@@ -2781,6 +2781,10 @@ $translationNamespaces = ['common', 'tickets'];
                             <li><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_step5')); ?></li>
                         </ol>
                         <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_help_more')); ?> <code>docs/messaging-teams-setup.md</code></small>
+                        <div style="margin-top:10px;">
+                            <button type="button" id="teamsPackageBtn" class="btn btn-secondary" style="display:none;" onclick="downloadTeamsPackage()"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_download')); ?></button>
+                            <small id="teamsPackageHelp" style="display:none; color:var(--text-muted, #666); margin-left:8px;"><?php echo htmlspecialchars(t('tickets.settings.modals.channel.teams_download_help')); ?></small>
+                        </div>
                     </div>
 
                     <!-- How to connect: only meaningful once the secret is set and (for the
@@ -4430,6 +4434,37 @@ $translationNamespaces = ['common', 'tickets'];
             // Telegram and Teams have no WhatsApp-style phone number; the field is meaningless there.
             document.querySelectorAll('.provider-phone').forEach(el => el.style.display = (p === 'telegram' || p === 'teams' || p === 'mattermost') ? 'none' : '');
             if (p === 'telegram') updateTelegramSetupCommand();
+            // The package needs a saved channel (its App ID is read server-side), so only offer it when one exists.
+            const pkgBtn = document.getElementById('teamsPackageBtn');
+            const pkgHelp = document.getElementById('teamsPackageHelp');
+            const saved = !!document.getElementById('channelId').value;
+            if (pkgBtn) pkgBtn.style.display = (p === 'teams' && saved) ? '' : 'none';
+            if (pkgHelp) pkgHelp.style.display = (p === 'teams' && saved) ? '' : 'none';
+        }
+
+        /** Fetch this channel's Teams app package and save it. Errors are shown as a toast, not a JSON page. */
+        async function downloadTeamsPackage() {
+            const id = document.getElementById('channelId').value;
+            if (!id) return;
+            try {
+                const res = await fetch(MSG_API + 'teams_package.php?id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+                if ((res.headers.get('Content-Type') || '').indexOf('application/zip') === -1) {
+                    const data = await res.json().catch(() => ({}));
+                    showToast('Error: ' + (data.error || 'the Teams package could not be created'), 'error');
+                    return;
+                }
+                const blob = await res.blob();
+                const name = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name ? name[1] : 'freeitsm-teams.zip';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            } catch (e) {
+                showToast('Failed to create the Teams package', 'error');
+            }
         }
 
         /** A random 32-char hex string — good enough entropy for Telegram's secret_token (max 256 chars, this app's own value, never sent anywhere but Telegram). */

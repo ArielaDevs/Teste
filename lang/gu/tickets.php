@@ -1167,6 +1167,8 @@ return [
                 'teams_step4' => 'Teams એપ manifest.json ને botId = App ID સાથે પેક કરો અને Teams Admin Center → Manage apps માં અપલોડ કરો. બોટ સાથે ચેટ કરનારા વપરાશકર્તાઓ માટે મંજૂરી આપો.',
                 'teams_step5' => 'પરવાનગીઓ: કોઈ નહીં. Microsoft Graph પરવાનગીઓ ઉમેરશો નહીં. FreeITSM માત્ર Bot Framework વાપરે છે.',
                 'teams_help_more' => 'સંપૂર્ણ માર્ગદર્શિકા (સમાન પગલાં સાથે):',
+                'teams_download' => 'Teams ઍપ પૅકેજ ડાઉનલોડ કરો',
+                'teams_download_help' => 'આ .zip ને Teams Admin Center → Manage apps માં અપલોડ કરો. તે આ ચેનલના App ID પરથી બને છે.',
                 'teams_app_id' => 'બોટ ઍપ ID',
                 'teams_tenant_id' => 'ટેનન્ટ ID',
                 'teams_tenant_help' => 'જે Azure AD ટેનન્ટમાં બોટ રજિસ્ટર થયેલ છે (બોટની ઍપ રજિસ્ટ્રેશનમાંથી).',

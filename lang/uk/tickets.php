@@ -1167,6 +1167,8 @@ return [
                 'teams_step4' => 'Упакуйте manifest.json застосунку Teams з botId = App ID і завантажте в Teams Admin Center → Керування застосунками. Дозвольте його для користувачів, які писатимуть боту.',
                 'teams_step5' => 'Дозволи: жодних. Не додавайте дозволи Microsoft Graph. FreeITSM використовує лише Bot Framework.',
                 'teams_help_more' => 'Повний посібник (ті самі кроки):',
+                'teams_download' => 'Завантажити пакет застосунку Teams',
+                'teams_download_help' => 'Завантажте цей .zip у Teams Admin Center → Керування застосунками. Він створюється з App ID цього каналу.',
                 'teams_app_id' => 'App ID бота',
                 'teams_tenant_id' => 'Tenant ID',
                 'teams_tenant_help' => 'Azure AD tenant, де зареєстровано бота (з реєстрації застосунку бота).',

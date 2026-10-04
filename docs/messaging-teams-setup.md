@@ -39,20 +39,18 @@ FreeITSM talks to the **Bot Framework** only. It makes no Microsoft Graph calls,
    - Click **Apply**.
 6. Open **Channels** → add **Microsoft Teams** → accept the terms → save.
 
-## 4. Make the Teams app and upload it
+## 4. Download the app package and upload it
 
-Teams needs an app package that points at the bot.
+1. Save the Teams channel in FreeITSM first (step 6 below). The package is built from the saved App ID.
+2. Tickets → Settings → Messaging → open the Teams channel → **Download Teams app package**. You get a zip with `manifest.json`, `color.png` and `outline.png`.
+3. Teams Admin Center → **Teams apps** → **Manage apps** → **Upload new app** → choose the zip.
+4. Open the app → **Publishing status** → make sure it is **Published** and **Available to: All**, or to the users who should use it.
 
-1. Create a folder with three files:
-   - `manifest.json` (see the example below),
-   - `color.png` (192 × 192 pixels),
-   - `outline.png` (32 × 32 pixels, transparent background).
-2. In `manifest.json`, set `bots[0].botId` to the **Application (client) ID**. Replace every `PASTE_…` placeholder.
-3. Zip the three files **at the root of the zip** (not inside a subfolder).
-4. Teams Admin Center → **Teams apps** → **Manage apps** → **Upload new app** → choose the zip.
-5. Open the app → **Publishing status** → make sure it is **Published** and **Available to: All**, or to the users who should use it.
+The manifest's website, privacy and terms URLs point at this install's public address, because Teams needs https URLs there. Change them in Teams Admin Center if your company has its own pages.
 
-Example `manifest.json`:
+If you would rather build the package yourself, the manifest looks like this. Set `bots[0].botId` and `id` to the Application (client) ID, and zip the three files at the root.
+
+Manual `manifest.json` example:
 
 ```json
 {

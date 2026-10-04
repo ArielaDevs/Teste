@@ -1167,6 +1167,8 @@ return [
                 'teams_step4' => 'Teams ആപ്പ് manifest.json, botId = App ID ആയി പാക്ക് ചെയ്ത് Teams Admin Center → Manage apps-ൽ അപ്‌ലോഡ് ചെയ്യുക. ബോട്ടുമായി ചാറ്റ് ചെയ്യേണ്ട ഉപയോക്താക്കൾക്ക് അനുമതി നൽകുക.',
                 'teams_step5' => 'അനുമതികൾ: ഒന്നുമില്ല. Microsoft Graph അനുമതികൾ ചേർക്കരുത്. FreeITSM Bot Framework മാത്രമാണ് ഉപയോഗിക്കുന്നത്.',
                 'teams_help_more' => 'പൂർണ്ണ ഗൈഡ് (അതേ ഘട്ടങ്ങളോടെ):',
+                'teams_download' => 'Teams ആപ്പ് പാക്കേജ് ഡൗൺലോഡ് ചെയ്യുക',
+                'teams_download_help' => 'ഈ .zip Teams Admin Center → Manage apps-ൽ അപ്‌ലോഡ് ചെയ്യുക. ഈ ചാനലിന്റെ App ID-ൽ നിന്നാണ് ഇത് നിർമ്മിക്കുന്നത്.',
                 'teams_app_id' => 'ബോട്ട് ആപ്പ് ID',
                 'teams_tenant_id' => 'ടെനന്റ് ID',
                 'teams_tenant_help' => 'ബോട്ട് രജിസ്റ്റർ ചെയ്തിരിക്കുന്ന Azure AD ടെനന്റ് (ബോട്ടിന്റെ ആപ്പ് രജിസ്ട്രേഷനിൽ നിന്ന്).',
