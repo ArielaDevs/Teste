@@ -29,6 +29,9 @@ require_once __DIR__ . '/MessagingProvider.php';
 class TelegramProvider extends MessagingProvider
 {
     private const API_BASE = 'https://api.telegram.org/bot';
+
+    /** Every update type parseInbound() handles - what setWebhook asks Telegram for. */
+    public const TELEGRAM_UPDATE_TYPES = ['message', 'edited_message', 'callback_query'];
     private const FILE_BASE = 'https://api.telegram.org/file/bot';
 
     public function verifyWebhook(string $rawBody, array $headers, array $params, string $url): bool
@@ -422,7 +425,14 @@ class TelegramProvider extends MessagingProvider
             'body'    => json_encode([
                 'url'             => $url,
                 'secret_token'    => $secret,
-                'allowed_updates' => ['message', 'edited_message'],   // all parseInbound() reads
+                // TRAP: this list is everything parseInbound() reads. Leave one
+                //   out and Telegram never sends it - no error anywhere. A
+                //   rating button press is a callback_query; without it the
+                //   button just shimmers on the customer's phone. Telegram keeps
+                //   the list a bot was registered with, so a bot connected
+                //   before a type was added needs Connect pressed again -
+                //   testConnection() checks for that (TELEGRAM_UPDATE_TYPES).
+                'allowed_updates' => self::TELEGRAM_UPDATE_TYPES,
             ]),
         ]);
         $json = json_decode($resp, true);
@@ -453,6 +463,26 @@ class TelegramProvider extends MessagingProvider
         }
 
         $username = $json['result']['username'] ?? '';
-        return 'Connected to Telegram bot ' . ($username !== '' ? "@$username." : '.');
+        $result   = 'Connected to Telegram bot ' . ($username !== '' ? "@$username." : '.');
+
+        // A bot registered before 3.1.0 asked for messages only, so rating
+        // button presses never arrive. Say so here, where an admin looks when
+        // something does not work. A missing list means Telegram's default,
+        // which includes everything we read.
+        try {
+            [$wCode, $wResp] = $this->httpRequest(self::API_BASE . $token . '/getWebhookInfo', ['method' => 'GET']);
+            $info = json_decode($wResp, true)['result'] ?? null;
+            if ($wCode >= 200 && $wCode < 300 && is_array($info)) {
+                if (($info['url'] ?? '') === '') {
+                    $result .= ' Not connected yet - press Connect so messages reach FreeITSM.';
+                } elseif (is_array($info['allowed_updates'] ?? null)
+                          && array_diff(self::TELEGRAM_UPDATE_TYPES, $info['allowed_updates'])) {
+                    $result .= ' This bot was connected by an older version, so rating buttons will not respond - press Connect again to fix it.';
+                }
+            }
+        } catch (Throwable $e) {
+            // The check is advice; the connection itself has already succeeded.
+        }
+        return $result;
     }
 }

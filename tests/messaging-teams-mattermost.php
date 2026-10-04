@@ -93,6 +93,16 @@ $p = $teams->parseInbound(json_encode($press), []);
 ok('a rating button press is read as a rating', ($p[0]['csat']['response_id'] ?? 0) === 42 && ($p[0]['csat']['rating'] ?? 0) === 4);
 TeamsProvider::$testKeys = null;
 
+// ---------------------------------------------------------------- Telegram
+echo "\nTelegram - rating buttons\n";
+$tg = new TelegramProvider(['id' => 0, 'channel_ref' => '', 'credentials' => ['bot_token' => 'x']]);
+$press = ['update_id' => 1, 'callback_query' => ['id' => 'cb1', 'data' => 'csat:42:5',
+          'from' => ['id' => 7, 'language_code' => 'en'], 'message' => ['chat' => ['id' => 7]]]];
+$p = $tg->parseInbound(json_encode($press), []);
+ok('a rating button press is read as a rating', ($p[0]['csat']['response_id'] ?? 0) === 42 && ($p[0]['csat']['rating'] ?? 0) === 5);
+ok('TRAP: the webhook asks Telegram for button presses, or they never arrive',
+   in_array('callback_query', TelegramProvider::TELEGRAM_UPDATE_TYPES, true));
+
 // ---------------------------------------------------------------- Mattermost
 mattermost:
 echo "\nMattermost\n";
