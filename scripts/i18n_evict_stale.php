@@ -1,4 +1,6 @@
 <?php
+/* 🔴 COMMAND LINE ONLY - see scripts/.htaccess. Over HTTP this would run for anyone, unauthenticated. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * Remove translations whose ENGLISH SOURCE HAS CHANGED, so the pipeline can refill them.
  *

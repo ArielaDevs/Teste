@@ -1,4 +1,6 @@
 <?php
+/* 🔴 COMMAND LINE ONLY - see scripts/.htaccess. Over HTTP this would run for anyone, unauthenticated. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * Catch two UI strings that collapse onto one word in translation.
  *

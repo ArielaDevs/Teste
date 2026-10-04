@@ -1,0 +1,30 @@
+# Nothing in tests/ or scripts/ may run over HTTP.
+#
+# tests/web-exposure-guard.php has existed since the tests/ folder was found to
+# be reachable from a browser - but nothing was obliged to run it, and by
+# 2026-10-04 five new tests had shipped without their guard, and 13 of the 26
+# command-line tools in scripts/ answered an anonymous request with HTTP 200
+# (one of them writes files). A guard a human has to remember is not a guard.
+#
+# Every script must refuse unless PHP_SAPI is 'cli' - the one defence that works
+# on every web server, because it travels with the file - and each folder must be
+# refused on Apache, IIS and nginx. Reads files only: no database, no extensions.
+
+name: Web exposure
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+      - name: tests/ and scripts/ refuse to run over HTTP
+        run: php tests/web-exposure-guard.php

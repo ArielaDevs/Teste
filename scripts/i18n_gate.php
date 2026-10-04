@@ -1,4 +1,6 @@
 <?php
+/* 🔴 COMMAND LINE ONLY - see scripts/.htaccess. Over HTTP this would run for anyone, unauthenticated. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * i18n gate — catch English keys added since a baseline that no maintained locale has.
  *

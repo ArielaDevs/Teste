@@ -1,0 +1,37 @@
+# Command-line tools. Their PHP must NEVER run over HTTP.
+#
+# Unlike tests/, this directory ships in production: the Intune workers,
+# directory_sync.php, cron_token.php and db_verify_cli.php are run by an
+# administrator or a scheduled task with `php scripts/<name>.php`. None of them is
+# meant for a browser. Several write - language files, generated images, the
+# database - and none checks who is asking, because on a command line the only
+# person asking is whoever can already log in to the server.
+#
+# The layer that works on EVERY web server is inside each script: a
+# `PHP_SAPI !== 'cli'` guard as its first statement. tests/web-exposure-guard.php
+# fails if a script here is missing it. This file is the second layer, for
+# Apache; web.config beside it is IIS; deploy/nginx/freeitsm.conf is nginx.
+#
+# Invoke-AssetInventory.ps1 stays downloadable on purpose: it is the inventory
+# agent, an admin may fetch it from the server, and it holds no secret (it is in
+# the public repository and takes the server and key as parameters).
+
+<FilesMatch "\.(php|phtml|phps|php\d|sh|md|config)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Belt and braces: if the deny above is ignored, PHP still does not run here.
+# Only inside IfModule - a bare php_flag is a 500 on a server without mod_php,
+# which would also break the .ps1 download.
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+  php_flag engine off
+</IfModule>

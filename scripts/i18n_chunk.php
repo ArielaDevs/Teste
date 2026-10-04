@@ -1,4 +1,6 @@
 <?php
+/* 🔴 COMMAND LINE ONLY - see scripts/.htaccess. Over HTTP this would run for anyone, unauthenticated. */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 /**
  * Build the translation work list: every gap a locale has, split into chunks an
  * agent can do in one go.

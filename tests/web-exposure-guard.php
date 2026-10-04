@@ -132,6 +132,52 @@ check('the shipped nginx config returns 404 for /tests/',
     (bool)preg_match('#location\s+\^~\s*/tests/\s*\{[^}]*return\s+404#', $ngx),
     'nginx has no .htaccess equivalent, so the rule has to be in the config we ship');
 
+/* ---- scripts/: the command-line tools ------------------------------------
+   Added 2026-10-04 after an audit found 13 of 26 scripts with no guard - the
+   i18n tools and gen_portal_flow.php, which writes files - each answering an
+   anonymous request with HTTP 200. Unlike tests/, scripts/ ships in production
+   (the Intune workers, directory sync, cron tokens), so it cannot simply be left
+   out of the image: every script refuses for itself, and the directory refuses
+   PHP on Apache, IIS and nginx.
+
+   🔑 Stricter than the tests/ check above: the guard must be the FIRST
+   STATEMENT, found with the tokenizer, so a long comment header can be any
+   length and a line of code slipped above the guard is still caught. */
+echo "\nNothing in scripts/ may run over HTTP\n";
+echo str_repeat('=', 64) . "\n";
+function firstStatement(string $src): string {
+    $code = '';
+    foreach (token_get_all($src) as $t) {
+        if ($code === '' && is_array($t) && in_array($t[0], [T_OPEN_TAG, T_COMMENT, T_DOC_COMMENT, T_WHITESPACE], true)) continue;
+        $code .= is_array($t) ? $t[1] : $t;
+        if (strlen($code) > 60) break;
+    }
+    return $code;
+}
+$firstGuardRe = "~^if\s*\(\s*PHP_SAPI\s*!==\s*'cli'\s*\)~";
+$tools = glob($root . '/scripts/*.php') ?: [];
+check('there are scripts to check at all', count($tools) > 10, 'found ' . count($tools));
+$bad = [];
+foreach ($tools as $path) {
+    if (!preg_match($firstGuardRe, firstStatement((string)file_get_contents($path)))) {
+        $bad[] = basename($path);
+    }
+}
+check('every .php in scripts/ starts with the PHP_SAPI cli guard', $bad === [],
+    count($bad) . ' without it as the first statement: ' . implode(', ', $bad));
+$sht = (string)@file_get_contents($root . '/scripts/.htaccess');
+check('scripts/.htaccess refuses .php (Apache)',
+    (bool)preg_match('~<FilesMatch\s+"[^"]*php[^"]*">\s*<IfModule mod_authz_core\.c>\s*Require all denied~', $sht));
+$swc = (string)@file_get_contents($root . '/scripts/web.config');
+check('scripts/web.config refuses .php (IIS)',
+    (bool)preg_match('~fileExtension="\.php"\s+allowed="false"~', $swc));
+check('the shipped nginx config returns 404 for /scripts/*.php',
+    (bool)preg_match('#location\s+~\*\s+\^/scripts/[^{]*php[^{]*\{\s*return\s+404#', $ngx));
+check('CONTROL — the first-statement check SEES a guard after a long header',
+    (bool)preg_match($firstGuardRe, firstStatement("<?php\n/** " . str_repeat('x', 5000) . " */\nif (PHP_SAPI !== 'cli') { exit; }")));
+check('CONTROL — …and FAILS a file with code above its guard',
+    !preg_match($firstGuardRe, firstStatement("<?php\n\$x = 1;\nif (PHP_SAPI !== 'cli') { exit; }")));
+
 /* ---- CONTROLS — this checker must be able to fail ------------------------
    Every assertion above is pattern matching, and pattern matching that only
    ever passes is not evidence. These exercise the matcher itself. */
