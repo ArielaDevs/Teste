@@ -46,6 +46,7 @@ When publishing to the website, move entries from **Unpublished** to the **Publi
 | 2154 | Tickets           | Fix         | A ticket reopened by a customer's reply now has its closed date cleared, so it no longer counts as closed in reports or to the chat lookup. |
 | 2155 | Tickets           | Fix         | Telegram rating buttons now respond: the bot asked Telegram for messages only, so button presses (callback_query) were never delivered and the button just shimmered; Connect now asks for them, and Test connection says when a bot connected by an older version needs Connect pressed again. |
 | 2156 | Tickets           | Improvement | Telegram ratings: once a button is tapped, the five buttons are replaced by the answer under the question ("You rated this 4 out of 5 - thank you."), showing the rating that stands if an old copy is tapped again; MessagingProvider::$testTransport lets tests run the real path without the network, and the messaging test sends a press through ingest (43 checks). |
+| 2157 | Tickets           | Fix         | On a ticket with more than seven messages the reading pane folded away the NEWEST messages behind "N older messages" and left the oldest on show, because the thread is listed newest first and the fold assumed oldest first (present since 1.0.0); the newest now stay on show at the top with the older ones folded below. |
 
 
 
