@@ -334,6 +334,9 @@ function proxmoxVmDetailBlock(array $cfg, string $type, array $guestIfaces): arr
     $disks = [];
     $nics = [];
     foreach ($cfg as $key => $value) {
+        if (!is_scalar($value)) {
+            continue;   // a few config keys come back as arrays; they are not disks or NICs
+        }
         $key = (string)$key;
         $value = (string)$value;
         $isDisk = $type === 'qemu'
