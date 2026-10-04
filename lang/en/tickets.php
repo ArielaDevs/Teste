@@ -2793,6 +2793,7 @@ return [
         'inbox' => [
             'heading' => 'The inbox',
             'intro'   => 'The inbox is the primary workspace for analysts. It uses a three-pane layout &mdash; folders on the left, a ticket list in the centre, and a reading pane on the right &mdash; so you can triage and respond without ever leaving the page.',
+            'p_live'         => '<strong>It keeps itself up to date.</strong> Every minute the inbox checks your mailboxes and looks for anything new on tickets you can see &mdash; an email collected in the background, a WhatsApp, Telegram, Slack, Teams or Mattermost message, a colleague\'s reply &mdash; and when something has arrived, the list and folder counts refresh on their own, just as the refresh button does. The ticket you are reading and any reply you are typing are left alone.',
             'p_folders'      => 'The folder panel organises tickets into logical groups. Each folder shows an unread count so you can spot new work immediately:',
             'field_my'       => '<strong>My Tickets</strong> &mdash; tickets assigned to you. This is your personal queue and the best place to start each day.',
             'field_unassigned' => '<strong>Unassigned</strong> &mdash; tickets that have arrived but have no analyst yet. Pick items from here to take ownership.',

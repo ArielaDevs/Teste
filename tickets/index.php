@@ -1016,11 +1016,28 @@ $translationNamespaces = ['common', 'tickets'];
     <script src="../assets/js/inbox.js?v=146"></script>
     <script src="../assets/js/mobile.js?v=70"></script>
     <script>
-    // Auto-check mailboxes every 60 seconds
+    // Auto-check mailboxes every 60 seconds - and refresh the inbox whenever
+    // ANYTHING new has arrived, however it came in.
     (function() {
         const POLL_INTERVAL = 60000;
         const btn = document.getElementById('mailCheckBtn');
         let polling = false;
+        let lastMarker = null;   // newest message id this inbox has seen; null until the first look
+
+        /* TRAP: "new mail from the check this page just ran" is not "something
+           new arrived". Chat messages (WhatsApp, Telegram, Slack, Teams,
+           Mattermost) reach the server by webhook, and mail collected by the
+           scheduled task never passes through this page - so for both, an open
+           inbox showed nothing until someone pressed refresh. The marker is the
+           newest message id on any ticket this analyst can see
+           (api/tickets/get_inbox_activity.php); when it moves, refresh. */
+        async function newestMarker() {
+            try {
+                const r = await fetch('../api/tickets/get_inbox_activity.php');
+                const d = await r.json();
+                return d.success ? d.marker : null;
+            } catch (e) { return null; }
+        }
 
         // Show the icon on the inbox page
         if (btn) btn.style.display = '';
@@ -1031,12 +1048,12 @@ $translationNamespaces = ['common', 'tickets'];
             if (btn) btn.classList.add('checking');
 
             try {
-                // Get active authenticated mailboxes
+                // Get active authenticated mailboxes. No mailboxes (or no right
+                // to list them) is not a reason to stop: chat messages still need
+                // the activity check below.
                 const mbRes = await fetch('../api/tickets/get_mailboxes.php');
                 const mbData = await mbRes.json();
-                if (!mbData.success) { polling = false; if (btn) btn.classList.remove('checking'); return; }
-
-                const active = mbData.mailboxes.filter(m => m.is_authenticated && m.is_active);
+                const active = mbData.success ? mbData.mailboxes.filter(m => m.is_authenticated && m.is_active) : [];
                 let totalNew = 0;
 
                 for (const mb of active) {
@@ -1051,10 +1068,14 @@ $translationNamespaces = ['common', 'tickets'];
                     } catch (e) { /* skip */ }
                 }
 
-                // Refresh inbox if new emails arrived
-                if (totalNew > 0 && typeof refreshCurrentView === 'function') {
-                    refreshCurrentView();
-                    loadFolderCounts();
+                // Refresh if anything new arrived - from this check, a webhook,
+                // or the scheduled task. The first look only sets the baseline:
+                // the page has just loaded, so it is already up to date.
+                const marker = await newestMarker();
+                const moved = marker !== null && lastMarker !== null && marker > lastMarker;
+                if (marker !== null) lastMarker = Math.max(marker, lastMarker || 0);
+                if ((totalNew > 0 || moved) && typeof refreshCurrentView === 'function') {
+                    refreshCurrentView();   // the same as the refresh button: list and folder counts
                 }
             } catch (e) { /* skip */ }
 

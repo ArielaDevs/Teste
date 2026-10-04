@@ -179,6 +179,7 @@ try {
                             <p><?php echo t('tickets.help.inbox.intro'); ?></p>
                         </div>
                     </div>
+                    <p><?php echo t('tickets.help.inbox.p_live'); ?></p>
                     <p><?php echo t('tickets.help.inbox.p_folders'); ?></p>
                     <div class="help-list">
                         <div><?php echo t('tickets.help.inbox.field_my'); ?></div>
