@@ -532,6 +532,7 @@ Gi den nytt navn likevel?',
         'bios_version' => 'BIOS-versjon',
     ],
     'servers' => [
+        'sync_hypervisors' => 'Synkroniser hypervisorer',
         'col_source' => 'Kilde',
         'total_vms' => 'Totalt antall VM-er',
         'active' => 'Aktiv',

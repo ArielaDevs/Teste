@@ -532,6 +532,7 @@ Namakan semula juga?',
         'bios_version' => 'Versi BIOS',
     ],
     'servers' => [
+        'sync_hypervisors' => 'Segerakkan hipervisor',
         'col_source' => 'Sumber',
         'total_vms' => 'Jumlah VM',
         'active' => 'Aktif',

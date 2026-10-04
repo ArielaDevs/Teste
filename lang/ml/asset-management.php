@@ -532,6 +532,7 @@ return [
         'bios_version' => 'BIOS പതിപ്പ്',
     ],
     'servers' => [
+        'sync_hypervisors' => 'ഹൈപ്പർവൈസറുകൾ സിങ്ക് ചെയ്യുക',
         'col_source' => 'ഉറവിടം',
         'total_vms' => 'ആകെ VM-കൾ',
         'active' => 'സജീവം',

@@ -700,7 +700,7 @@ $translationNamespaces = ['common', 'asset-management'];
                             <polyline points="1 20 1 14 7 14"></polyline>
                             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                         </svg>
-                        <?php echo htmlspecialchars(t('asset-management.servers.sync_vcenter')); ?>
+                        <?php echo htmlspecialchars(t('asset-management.servers.sync_hypervisors')); ?>
                     </button>
                 </div>
             </div>
@@ -921,6 +921,11 @@ $translationNamespaces = ['common', 'asset-management'];
             );
         }
 
+        /**
+         * "Sync hypervisors": every source at once. vCenter first (its one configured
+         * server), then each active Proxmox server on its own. One source failing does
+         * not stop the others; the message lists each result.
+         */
         async function syncVCenter() {
             const btn = document.getElementById('syncBtn');
             const msgEl = document.getElementById('syncMessage');
@@ -930,18 +935,45 @@ $translationNamespaces = ['common', 'asset-management'];
             msgEl.className = 'sync-message';
             msgEl.style.display = 'none';
 
-            try {
-                const response = await fetch(API_BASE + 'get_vcenter.php');
-                const data = await response.json();
+            const lines = [];
+            let anyFailed = false;
 
-                if (data.success) {
-                    msgEl.textContent = data.message;
-                    msgEl.className = 'sync-message success';
-                    loadServers(); // Refresh the table
+            try {
+                const vc = await fetch(API_BASE + 'get_vcenter.php').then(r => r.json()).catch(() => ({ success: false, error: 'network' }));
+                if (vc.success) {
+                    lines.push('vCenter: ' + vc.message);
                 } else {
-                    msgEl.textContent = window.t('asset-management.servers.sync_failed', { error: data.error });
-                    msgEl.className = 'sync-message error';
+                    anyFailed = true;
+                    lines.push('vCenter: ' + (vc.error || window.t('asset-management.servers.sync_no_connect')));
                 }
+
+                const px = await fetch(API_BASE + 'proxmox_connections.php').then(r => r.json()).catch(() => ({ success: false }));
+                const servers = (px.success && Array.isArray(px.connections)) ? px.connections.filter(c => c.is_active) : [];
+                for (const server of servers) {
+                    try {
+                        const r = await fetch(API_BASE + 'proxmox_sync.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: server.id, action: 'sync' }),
+                        }).then(res => res.json());
+                        if (r.success) {
+                            lines.push('Proxmox ' + server.name + ': ' + r.summary.message);
+                        } else {
+                            anyFailed = true;
+                            lines.push('Proxmox ' + server.name + ': ' + (r.error || 'error'));
+                        }
+                    } catch (e) {
+                        anyFailed = true;
+                        lines.push('Proxmox ' + server.name + ': ' + window.t('asset-management.servers.sync_no_connect'));
+                    }
+                }
+                if (!lines.length) {
+                    lines.push(window.t('asset-management.servers.sync_none'));
+                }
+
+                msgEl.innerHTML = lines.map(l => escapeHtml(l)).join('<br>');
+                msgEl.className = 'sync-message ' + (anyFailed ? 'error' : 'success');
+                loadServers(); // Refresh the table
             } catch (error) {
                 console.error('Sync error:', error);
                 msgEl.textContent = window.t('asset-management.servers.sync_no_connect');

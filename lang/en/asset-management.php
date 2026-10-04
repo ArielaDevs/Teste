@@ -669,6 +669,8 @@ return [
 
     // Servers (vCenter) view
     'servers' => [
+        'sync_hypervisors' => 'Sync hypervisors',
+        'sync_none' => 'No sources to sync.',
         'col_source' => 'Source',
         'total_vms'         => 'Total VMs',
         'active'            => 'Active',

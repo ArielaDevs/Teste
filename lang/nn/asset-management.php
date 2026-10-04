@@ -532,6 +532,7 @@ Endre namn likevel?',
         'bios_version' => 'BIOS-versjon',
     ],
     'servers' => [
+        'sync_hypervisors' => 'Synkroniser hypervisorar',
         'col_source' => 'Kjelde',
         'total_vms' => 'VM-ar totalt',
         'active' => 'Aktive',

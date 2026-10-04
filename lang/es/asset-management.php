@@ -532,6 +532,7 @@ Hay dos formas de evitarlo: cambie también el nombre en la hoja de cálculo, o 
         'bios_version' => 'Versión de BIOS',
     ],
     'servers' => [
+        'sync_hypervisors' => 'Sincronizar hipervisores',
         'col_source' => 'Origen',
         'total_vms' => 'Total de VM',
         'active' => 'Activos',

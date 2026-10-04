@@ -532,6 +532,8 @@ return [
         'bios_version' => 'Версія BIOS',
     ],
     'servers' => [
+        'sync_hypervisors' => 'Синхронізувати гіпервізори',
+        'sync_none' => 'Немає джерел для синхронізації.',
         'col_source' => 'Джерело',
         'total_vms' => 'Всього ВМ',
         'active' => 'Активні',

@@ -532,6 +532,7 @@ Trotzdem umbenennen?',
         'bios_version' => 'BIOS-Version',
     ],
     'servers' => [
+        'sync_hypervisors' => 'Hypervisoren synchronisieren',
         'col_source' => 'Quelle',
         'total_vms' => 'VMs gesamt',
         'active' => 'Aktiv',
