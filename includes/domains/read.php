@@ -23,6 +23,19 @@ function domainListSelect(?PDO $conn = null): string
         ? "d.customer_user_id, COALESCE(NULLIF(cu.display_name, ''), cu.email) AS customer_user_name, cu.email AS customer_user_email,"
         : "NULL AS customer_user_id, NULL AS customer_user_name, NULL AS customer_user_email,";
     $custJoin = $cust ? " LEFT JOIN users cu ON cu.id = d.customer_user_id" : '';
+    // #162: a supplier customer (and its contact), and an analyst tech contact.
+    if ($conn !== null && domainPartiesReady($conn)) {
+        $custCols .= " d.customer_supplier_id, COALESCE(NULLIF(csup.trading_name, ''), csup.legal_name) AS customer_supplier_name,
+                       d.customer_contact_id, TRIM(CONCAT(COALESCE(cct.first_name, ''), ' ', COALESCE(cct.surname, ''))) AS customer_contact_name,
+                       cct.email AS customer_contact_email,
+                       d.tech_analyst_id, ta.full_name AS tech_analyst_name,";
+        $custJoin .= " LEFT JOIN suppliers csup ON csup.id = d.customer_supplier_id
+                       LEFT JOIN contacts cct ON cct.id = d.customer_contact_id
+                       LEFT JOIN analysts ta ON ta.id = d.tech_analyst_id";
+    } else {
+        $custCols .= " NULL AS customer_supplier_id, NULL AS customer_supplier_name, NULL AS customer_contact_id,
+                       NULL AS customer_contact_name, NULL AS customer_contact_email, NULL AS tech_analyst_id, NULL AS tech_analyst_name,";
+    }
     return "SELECT d.id, d.tenant_id, tn.name AS company_name,
                    d.domain_name, d.display_name, d.purpose,
                    d.status_id, s.name AS status_name, s.colour AS status_colour, s.alerts_enabled,
@@ -86,7 +99,7 @@ function domainShapeRow(array $r): array
     $today = new DateTimeImmutable(gmdate('Y-m-d'));
     $days = fn($d) => $d ? (int)$today->diff(new DateTimeImmutable(substr($d, 0, 10)))->format('%r%a') : null;
     foreach (['id', 'tenant_id', 'status_id', 'registrar_supplier_id', 'registrar_account_id', 'owner_analyst_id',
-              'tech_contact_id', 'customer_user_id', 'contract_id', 'security_score', 'billing_years', 'lookalike_count', 'new_certificate_count'] as $k) {
+              'tech_contact_id', 'customer_user_id', 'customer_supplier_id', 'customer_contact_id', 'tech_analyst_id', 'contract_id', 'security_score', 'billing_years', 'lookalike_count', 'new_certificate_count'] as $k) {
         if (array_key_exists($k, $r)) $r[$k] = $r[$k] === null ? null : (int)$r[$k];
     }
     foreach (['transfer_lock', 'registry_lock', 'dnssec'] as $k) {
@@ -96,6 +109,7 @@ function domainShapeRow(array $r): array
         if (array_key_exists($k, $r)) $r[$k] = $r[$k] === null ? null : (bool)(int)$r[$k];
     }
     $r['tech_contact_name'] = isset($r['tech_contact_name']) && trim($r['tech_contact_name']) !== '' ? trim($r['tech_contact_name']) : null;
+    $r['customer_contact_name'] = isset($r['customer_contact_name']) && trim($r['customer_contact_name']) !== '' ? trim($r['customer_contact_name']) : null;
     $r['days_left']     = $days($r['expiry_date'] ?? null);
     $r['ssl_days_left'] = $days($r['ssl_expiry_date'] ?? null);
     $r['annual_cost']   = ($r['cost'] ?? null) !== null ? round((float)$r['cost'] / max(1, (int)($r['billing_years'] ?? 1)), 2) : null;
@@ -186,5 +200,8 @@ function domainApiLookups(PDO $conn, int $analystId): array
         'contacts'   => analystCanAccessModule($conn, $analystId, 'contracts')
             ? $conn->query("SELECT c.id, CONCAT(c.first_name, ' ', c.surname, COALESCE(CONCAT(' (', COALESCE(NULLIF(s.trading_name, ''), s.legal_name), ')'), '')) AS name
                                FROM contacts c LEFT JOIN suppliers s ON s.id = c.supplier_id WHERE c.is_active = 1 ORDER BY c.first_name, c.surname LIMIT 1000")->fetchAll(PDO::FETCH_ASSOC) : [],
+        // #162: the edit dialog offers an analyst as technical contact and a
+        // supplier as customer only once Database Verification has added the columns.
+        'parties_ready' => domainPartiesReady($conn),
     ];
 }

@@ -100,8 +100,8 @@
 
         const people = '<div class="dom-card"><div class="dom-card-h"><h3>' + esc(T('page.people_money')) + '</h3></div><div class="dom-card-b"><div class="dom-fields">'
             + row('field.owner', esc(D.owner_name || ''))
-            + row('field.tech_contact', esc(D.tech_contact_name || ''))
-            + row('field.customer', D.customer_user_id ? (window.DOM_PEOPLE ? '<a href="' + esc(window.DOM_PEOPLE + 'person.php?id=' + D.customer_user_id) + '">' + esc(D.customer_user_name || ('#' + D.customer_user_id)) + '</a>' : esc(D.customer_user_name || ('#' + D.customer_user_id))) + (D.customer_user_email && D.customer_user_email !== D.customer_user_name ? '<div class="dom-sub">' + esc(D.customer_user_email) + '</div>' : '') : '')
+            + row('field.tech_contact', techCell())
+            + row('field.customer', customerCell())
             + (data.multi_company ? row('field.company', esc(D.company_name || '')) : '')
             + row('field.cost', D.cost !== null ? esc(money(D.cost, D.currency)) + (D.billing_years > 1 ? ' <span class="dom-sub">/ ' + esc(T('page.years', { n: D.billing_years })) + '</span>' : '') : '')
             + row('field.cost_centre', esc(D.cost_centre || ''))
@@ -427,7 +427,62 @@
         });
     }
 
+    // ------------------------------------- who: tech contact + customer (#162)
+    // The technical contact is a supplier contact OR one of your analysts; the
+    // customer is a person OR a supplier, optionally with one of its contacts.
+    function peopleLink(page, id, name) {
+        const label = esc(name || ('#' + id));
+        const ok = page === 'person.php' ? window.DOM_PEOPLE : (window.DOM_PEOPLE && window.DOM_PEOPLE_SUPPLIERS);
+        return ok ? '<a href="' + esc(window.DOM_PEOPLE + page + '?id=' + id) + '">' + label + '</a>' : label;
+    }
+    function techCell() {
+        if (D.tech_analyst_id) return esc(D.tech_analyst_name || ('#' + D.tech_analyst_id)) + '<div class="dom-sub">' + esc(T('field.tech_is_analyst')) + '</div>';
+        if (D.tech_contact_id) return peopleLink('contact.php', D.tech_contact_id, D.tech_contact_name);
+        return '';
+    }
+    function customerCell() {
+        if (D.customer_user_id) {
+            return peopleLink('person.php', D.customer_user_id, D.customer_user_name)
+                + (D.customer_user_email && D.customer_user_email !== D.customer_user_name ? '<div class="dom-sub">' + esc(D.customer_user_email) + '</div>' : '');
+        }
+        if (D.customer_supplier_id && D.customer_contact_id) {
+            return peopleLink('supplier.php', D.customer_supplier_id, D.customer_supplier_name)
+                + '<div class="dom-sub">' + peopleLink('contact.php', D.customer_contact_id, D.customer_contact_name) + '</div>';
+        }
+        if (D.customer_supplier_id) return peopleLink('supplier.php', D.customer_supplier_id, D.customer_supplier_name);
+        if (D.customer_contact_id) return peopleLink('contact.php', D.customer_contact_id, D.customer_contact_name);
+        return '';
+    }
+    function customerLabel() {
+        if (D.customer_user_id) return D.customer_user_name || '';
+        if (D.customer_contact_id) return (D.customer_contact_name || '') + (D.customer_supplier_name ? ' (' + D.customer_supplier_name + ')' : '');
+        if (D.customer_supplier_id) return D.customer_supplier_name || '';
+        return '';
+    }
+
     // ---------------------------------------------------------------- edit
+    let techAtOpen = '', custAtOpen = '';
+    function fillTech() {
+        const sel = document.getElementById('eTech');
+        const opt = (v, label) => { const o = document.createElement('option'); o.value = v; o.textContent = label; return o; };
+        const group = (label, items) => { const g = document.createElement('optgroup'); g.label = label; g.append(...items); return g; };
+        sel.replaceChildren(opt('', '—'));
+        if (L.parties_ready) {
+            const analysts = (L.analysts || []).slice();
+            // Somebody set earlier who has since left stays on the list, so the
+            // dialog shows the truth; saving sends this field only if it changed.
+            if (D.tech_analyst_id && !analysts.some(a => +a.id === D.tech_analyst_id)) analysts.unshift({ id: D.tech_analyst_id, name: D.tech_analyst_name || ('#' + D.tech_analyst_id) });
+            sel.append(group(T('field.tech_group_analysts'), analysts.map(a => opt('a:' + a.id, a.name))));
+        }
+        // Contacts are listed only for analysts who can open Contracts; the one
+        // already set is always kept, so opening and saving never clears it.
+        const contacts = (L.contacts || []).slice();
+        if (D.tech_contact_id && !contacts.some(c => +c.id === D.tech_contact_id)) contacts.unshift({ id: D.tech_contact_id, name: D.tech_contact_name || ('#' + D.tech_contact_id) });
+        if (contacts.length) sel.append(group(T('field.tech_group_contacts'), contacts.map(c => opt('c:' + c.id, c.name))));
+        sel.value = D.tech_analyst_id ? 'a:' + D.tech_analyst_id : (D.tech_contact_id ? 'c:' + D.tech_contact_id : '');
+        techAtOpen = sel.value;
+    }
+
     function openEdit() {
         if (!L) { showToast(T('err.generic'), 'error'); return; }
         const F = window.Dom.fillSelect;
@@ -444,7 +499,7 @@
         const contracts = (L.contracts || []).slice();
         if (D.contract_id && !contracts.some(c => +c.id === D.contract_id)) contracts.unshift({ id: D.contract_id, name: T('field.contract_hidden') });
         F('eContract', contracts, { blank: '—' });
-        F('eTech', L.contacts || [], { blank: '—' });
+        fillTech();
         document.querySelectorAll('#editForm [data-f]').forEach(el => {
             const k = el.dataset.f;
             let v = D[k];
@@ -453,15 +508,20 @@
             el.value = v === null || v === undefined ? '' : v;
         });
         document.getElementById('ePurposeHint').textContent = T('purpose_hint.' + D.purpose);
-        setCustomer(D.customer_user_id, D.customer_user_name);
+        const ck = D.customer_user_id ? 'user:' + D.customer_user_id
+                 : D.customer_contact_id ? 'contact:' + D.customer_contact_id
+                 : D.customer_supplier_id ? 'supplier:' + D.customer_supplier_id : '';
+        setCustomer(ck, customerLabel());
+        custAtOpen = ck;
         window.Dom.openModal('mEdit');
     }
 
-    // ------------------------------------------------- customer person (#153)
-    function setCustomer(id, label) {
-        document.getElementById('eCustomerId').value = id || '';
+    // --------------------------------- customer: person (#153) or supplier (#162)
+    // eCustomerId holds "user:5", "supplier:3" or "contact:9" - one kind only.
+    function setCustomer(key, label) {
+        document.getElementById('eCustomerId').value = key || '';
         document.getElementById('eCustomer').value = label || '';
-        document.getElementById('eCustomerClear').hidden = !id;
+        document.getElementById('eCustomerClear').hidden = !key;
         hideCustomers();
     }
     function hideCustomers() { const ul = document.getElementById('eCustomerResults'); ul.hidden = true; ul.replaceChildren(); }
@@ -474,22 +534,35 @@
         if (q.length < 2) { hideCustomers(); return; }
         custTimer = setTimeout(async () => {
             const seq = ++custSeq;
-            let people = [];
-            try { people = (await api('people.php?domain_id=' + ID + '&q=' + encodeURIComponent(q))).people || []; } catch (e) { people = []; }
+            let people = [], suppliers = [];
+            try {
+                const res = await api('people.php?domain_id=' + ID + '&q=' + encodeURIComponent(q));
+                people = res.people || []; suppliers = res.suppliers || [];
+            } catch (e) { people = []; suppliers = []; }
             if (seq !== custSeq) return;
             const ul = document.getElementById('eCustomerResults');
-            if (!people.length) {
+            if (!people.length && !suppliers.length) {
                 const li = document.createElement('li'); li.textContent = T('field.customer_none'); li.setAttribute('aria-disabled', 'true');
                 ul.replaceChildren(li); ul.hidden = false; return;
             }
-            ul.replaceChildren(...people.map(p => {
+            const item = (key, label, sub) => {
                 const li = document.createElement('li');
-                li.setAttribute('role', 'option'); li.dataset.id = p.id; li.dataset.label = p.name;
-                li.append(document.createTextNode(p.name));
-                if (p.email && p.email !== p.name) { const s = document.createElement('small'); s.textContent = p.email; li.append(s); }
-                li.addEventListener('mousedown', e => { e.preventDefault(); setCustomer(p.id, p.name); });
+                li.setAttribute('role', 'option'); li.dataset.id = key; li.dataset.label = label;
+                li.append(document.createTextNode(label));
+                if (sub) { const s = document.createElement('small'); s.textContent = sub; li.append(s); }
+                li.addEventListener('mousedown', e => { e.preventDefault(); setCustomer(key, label); });
                 return li;
-            }));
+            };
+            const heading = text => { const li = document.createElement('li'); li.className = 'dom-person-group'; li.setAttribute('role', 'presentation'); li.textContent = text; return li; };
+            const out = [];
+            // Headings only when both kinds are there - one list needs no label.
+            if (people.length && suppliers.length) out.push(heading(T('field.customer_group_people')));
+            people.forEach(p => out.push(item('user:' + p.id, p.name, p.email && p.email !== p.name ? p.email : '')));
+            if (suppliers.length && people.length) out.push(heading(T('field.customer_group_suppliers')));
+            suppliers.forEach(s => s.kind === 'supplier'
+                ? out.push(item('supplier:' + s.id, s.name, T('field.customer_is_supplier')))
+                : out.push(item('contact:' + s.id, s.name + (s.supplier ? ' (' + s.supplier + ')' : ''), s.email || '')));
+            ul.replaceChildren(...out);
             ul.hidden = false;
         }, 220);
     }
@@ -521,6 +594,22 @@
             const k = el.dataset.f;
             body[k] = el.dataset.bool ? (el.checked ? 1 : 0) : el.value;
         });
+        // Who (#162): sent only when changed, so a contact or analyst set by
+        // somebody else - one this analyst's lists cannot show - is left alone.
+        const tech = document.getElementById('eTech').value;
+        if (tech !== techAtOpen) {
+            body.tech_contact_id = tech.startsWith('c:') ? tech.slice(2) : null;
+            if (L.parties_ready) body.tech_analyst_id = tech.startsWith('a:') ? tech.slice(2) : null;
+        }
+        const cust = document.getElementById('eCustomerId').value;
+        if (cust !== custAtOpen) {
+            const [kind, id] = cust ? cust.split(':') : ['', ''];
+            body.customer_user_id = kind === 'user' ? id : null;
+            if (L.parties_ready) {
+                body.customer_supplier_id = kind === 'supplier' ? id : null;
+                body.customer_contact_id = kind === 'contact' ? id : null;
+            }
+        }
         const btn = document.getElementById('eSave');
         btn.disabled = true;
         try {

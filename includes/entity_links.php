@@ -91,6 +91,13 @@ function entityLink(string $type, int $id): ?string {
 
         case 'company':
             return 'people/company.php?id=' . $id;
+
+        // Suppliers and their contacts (#153 step 3): shown in People, kept in Contracts.
+        case 'supplier':
+            return 'people/supplier.php?id=' . $id;
+
+        case 'supplier_contact':
+            return 'people/contact.php?id=' . $id;
     }
 
     return null;
@@ -106,6 +113,6 @@ function entityLinkTypes(): array {
     return [
         'ticket', 'task', 'problem', 'change',
         'asset', 'cmdb_object', 'knowledge_article', 'contract', 'domain',
-        'person', 'company',
+        'person', 'company', 'supplier', 'supplier_contact',
     ];
 }

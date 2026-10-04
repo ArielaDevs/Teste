@@ -14628,7 +14628,8 @@
     body[data-mobile-module="people"] .ppl-showall { min-height: 44px; }
     /* Companies: the search under the intro at full width, one card per row
        (minmax(0, ...) - a bare 320px track would set a floor, §14). */
-    body[data-mobile-page="people-companies"] .ppl-co-search { flex: 1 1 100%; min-height: 44px; }
+    body[data-mobile-page="people-companies"] .ppl-co-search,
+    body[data-mobile-page="people-suppliers"] .ppl-co-search { flex: 1 1 100%; min-height: 44px; }
     body[data-mobile-page="people-companies"] .ppl-co-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     body[data-mobile-page="people-companies"] .ppl-co-card { padding: 14px 16px; gap: 12px; }
     body[data-mobile-page="people-companies"] .ppl-co-card:hover { transform: none; }

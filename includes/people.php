@@ -21,6 +21,14 @@
  * anywhere (a contract, a domain, search), and showing nothing because the
  * header's company picker points elsewhere would read as "this person has no
  * tickets". Every company shown is one the analyst may already open.
+ *
+ * SUPPLIERS AND THEIR CONTACTS (#153 step 3, #162). Shown here, not moved here:
+ * they stay in `suppliers` and `contacts`, owned and edited by Contracts, so a
+ * supplier's contact never becomes somebody who can sign in, raise a ticket or
+ * be swept up by directory sync. Contracts owns them, so their pages need
+ * Contracts as well as People (peopleCanSeeSuppliers). They have no company -
+ * they are install-wide, as in Contracts - but every section on their pages
+ * still applies its own module's company rule.
  */
 
 require_once __DIR__ . '/tenancy.php';
@@ -500,6 +508,235 @@ function peopleForms(PDO $conn, int $analystId, array $who): array
             'ticket' => $ticketOk ? $r['ticket_number'] : null,
             'ticket_url' => $ticketOk ? entityLink('ticket', (int)$r['ticket_id']) : null,
             'url' => 'forms/submissions.php?id=' . (int)$r['form_id'],
+        ];
+    }, $st->fetchAll(PDO::FETCH_ASSOC));
+    return ['total' => count($rows), 'rows' => $rows];
+}
+
+// ---------------------------------------------------------------------------
+//  Suppliers and supplier contacts (#153 step 3, #162)
+// ---------------------------------------------------------------------------
+
+/** Suppliers and contacts are Contracts' records: their pages need Contracts too. */
+function peopleCanSeeSuppliers(PDO $conn, int $analystId): bool
+{
+    return analystCanAccessModule($conn, $analystId, 'people') && analystCanAccessModule($conn, $analystId, 'contracts');
+}
+
+function peopleSupplierName(array $r): string
+{
+    $t = trim((string)($r['trading_name'] ?? ''));
+    return $t !== '' ? $t : (string)($r['legal_name'] ?? ('#' . (int)($r['id'] ?? 0)));
+}
+
+function peopleContactName(array $r): string
+{
+    $n = trim(($r['first_name'] ?? '') . ' ' . ($r['surname'] ?? ''));
+    return $n !== '' ? $n : ($r['email'] ?: '#' . (int)($r['id'] ?? 0));
+}
+
+/**
+ * Every supplier, with how many contacts and contracts each has.
+ * @param array $f q, status ('active' default | 'all')
+ */
+function peopleSupplierRows(PDO $conn, int $analystId, array $f = []): array
+{
+    require_once __DIR__ . '/contract_party.php';
+    $where = '1=1'; $args = [];
+    if (($f['status'] ?? 'active') === 'active') $where .= ' AND s.is_active = 1';
+    $q = trim((string)($f['q'] ?? ''));
+    if ($q !== '') {
+        $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+        // A supplier is found by one of its contacts' names too.
+        $where .= " AND (s.legal_name LIKE ? OR s.trading_name LIKE ? OR s.city LIKE ?
+                         OR EXISTS (SELECT 1 FROM contacts c WHERE c.supplier_id = s.id AND (CONCAT(c.first_name, ' ', c.surname) LIKE ? OR c.email LIKE ?)))";
+        array_push($args, $like, $like, $like, $like, $like);
+    }
+    [$vis, $vArgs] = contractVisibilitySql($conn, $analystId, 'k');
+    $st = $conn->prepare(
+        "SELECT s.id, s.legal_name, s.trading_name, s.city, s.country, s.is_active,
+                st.name AS type_name, ss.name AS status_name,
+                (SELECT COUNT(*) FROM contacts c WHERE c.supplier_id = s.id AND c.is_active = 1) AS contacts,
+                (SELECT GROUP_CONCAT(CONCAT_WS(' ', c.first_name, c.surname, c.email) SEPARATOR ' ') FROM contacts c WHERE c.supplier_id = s.id) AS contact_text,
+                (SELECT COUNT(*) FROM contracts k WHERE k.supplier_id = s.id$vis) AS contracts
+           FROM suppliers s
+      LEFT JOIN supplier_types st ON st.id = s.supplier_type_id
+      LEFT JOIN supplier_statuses ss ON ss.id = s.supplier_status_id
+          WHERE $where
+          ORDER BY COALESCE(NULLIF(s.trading_name, ''), s.legal_name)
+          LIMIT 500"
+    );
+    // The visibility args sit inside the SELECT list, so they come first.
+    $st->execute(array_merge($vArgs, $args));
+    return array_map(fn($r) => [
+        'id' => (int)$r['id'], 'name' => peopleSupplierName($r), 'legal_name' => $r['legal_name'],
+        'type' => $r['type_name'], 'status' => $r['status_name'], 'is_active' => (int)$r['is_active'] === 1,
+        'place' => implode(', ', array_filter([$r['city'], $r['country']])),
+        'contacts' => (int)$r['contacts'], 'contracts' => (int)$r['contracts'],
+        'contact_text' => (string)$r['contact_text'],
+    ], $st->fetchAll(PDO::FETCH_ASSOC));
+}
+
+/** Everything about one supplier this analyst may see, or null. */
+function supplierDetail(PDO $conn, int $analystId, int $supplierId): ?array
+{
+    if ($supplierId <= 0 || !peopleCanSeeSuppliers($conn, $analystId)) return null;
+    $st = $conn->prepare(
+        "SELECT s.*, st.name AS type_name, ss.name AS status_name
+           FROM suppliers s
+      LEFT JOIN supplier_types st ON st.id = s.supplier_type_id
+      LEFT JOIN supplier_statuses ss ON ss.id = s.supplier_status_id
+          WHERE s.id = ?"
+    );
+    $st->execute([$supplierId]);
+    $s = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$s) return null;
+
+    $supplier = [
+        'id' => (int)$s['id'], 'name' => peopleSupplierName($s),
+        'legal_name' => $s['legal_name'], 'trading_name' => $s['trading_name'],
+        'reg_number' => $s['reg_number'], 'vat_number' => $s['vat_number'],
+        'type' => $s['type_name'], 'status' => $s['status_name'], 'is_active' => (int)$s['is_active'] === 1,
+        'address' => array_values(array_filter([$s['address_line_1'], $s['address_line_2'], $s['city'], $s['county'], $s['postcode'], $s['country']])),
+        'supplies_assets' => (int)$s['supplies_assets'] === 1,
+    ];
+
+    $c = $conn->prepare("SELECT id, first_name, surname, email, mobile, job_title, direct_dial, switchboard, is_active
+                           FROM contacts WHERE supplier_id = ? ORDER BY is_active DESC, first_name, surname");
+    $c->execute([$supplierId]);
+    $sections = ['contacts' => array_map(fn($r) => [
+        'id' => (int)$r['id'], 'name' => peopleContactName($r), 'email' => $r['email'], 'job_title' => $r['job_title'],
+        'phone' => $r['direct_dial'] ?: ($r['mobile'] ?: $r['switchboard']), 'is_active' => (int)$r['is_active'] === 1,
+    ], $c->fetchAll(PDO::FETCH_ASSOC))];
+
+    $can = fn(string $m) => analystCanAccessModule($conn, $analystId, $m);
+    $sections['contracts'] = peopleSupplierContracts($conn, $analystId, $supplierId);
+    if ($can('assets'))  $sections['assets']  = peopleSupplierAssets($conn, $analystId, $supplierId);
+    if ($can('domains')) $sections['domains'] = peopleSupplierDomains($conn, $analystId, ['supplier' => $supplierId]);
+    return ['supplier' => $supplier, 'sections' => $sections];
+}
+
+/** Everything about one supplier contact this analyst may see, or null. */
+function supplierContactDetail(PDO $conn, int $analystId, int $contactId): ?array
+{
+    if ($contactId <= 0 || !peopleCanSeeSuppliers($conn, $analystId)) return null;
+    $st = $conn->prepare(
+        "SELECT c.*, s.legal_name, s.trading_name
+           FROM contacts c LEFT JOIN suppliers s ON s.id = c.supplier_id
+          WHERE c.id = ?"
+    );
+    $st->execute([$contactId]);
+    $c = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$c) return null;
+    $contact = [
+        'id' => (int)$c['id'], 'name' => peopleContactName($c), 'email' => $c['email'], 'job_title' => $c['job_title'],
+        'mobile' => $c['mobile'], 'direct_dial' => $c['direct_dial'], 'switchboard' => $c['switchboard'],
+        'is_active' => (int)$c['is_active'] === 1, 'created' => $c['created_datetime'],
+        'supplier_id' => $c['supplier_id'] !== null ? (int)$c['supplier_id'] : null,
+        'supplier' => $c['supplier_id'] !== null ? peopleSupplierName(['id' => $c['supplier_id'], 'legal_name' => $c['legal_name'], 'trading_name' => $c['trading_name']]) : null,
+    ];
+    $sections = [];
+    if (analystCanAccessModule($conn, $analystId, 'domains')) {
+        $sections['domains'] = peopleSupplierDomains($conn, $analystId, ['contact' => $contactId]);
+    }
+    return ['contact' => $contact, 'sections' => $sections];
+}
+
+/** Contracts with the supplier - the ordinary, "we buy from them" kind. */
+function peopleSupplierContracts(PDO $conn, int $analystId, int $supplierId): array
+{
+    require_once __DIR__ . '/contract_party.php';
+    [$vis, $vArgs] = contractVisibilitySql($conn, $analystId, 'c');
+    $st = $conn->prepare(
+        "SELECT c.id, c.contract_number, c.title, c.contract_start, c.contract_end, c.notice_date, c.is_active,
+                c.contract_value, c.currency, st.name AS status
+           FROM contracts c
+      LEFT JOIN contract_statuses st ON st.id = c.contract_status_id
+          WHERE c.supplier_id = ? $vis
+          ORDER BY c.is_active DESC, c.contract_end IS NULL, c.contract_end
+          LIMIT " . PEOPLE_SECTION_LIMIT
+    );
+    $st->execute(array_merge([$supplierId], $vArgs));
+    $rows = array_map(fn($r) => [
+        'id' => (int)$r['id'], 'number' => $r['contract_number'], 'title' => $r['title'],
+        'start' => $r['contract_start'], 'end' => $r['contract_end'], 'notice' => $r['notice_date'],
+        'is_active' => (int)$r['is_active'] === 1, 'status' => $r['status'],
+        'value' => $r['contract_value'] !== null ? (float)$r['contract_value'] : null, 'currency' => $r['currency'],
+        'party' => null, 'url' => entityLink('contract', (int)$r['id']),
+    ], $st->fetchAll(PDO::FETCH_ASSOC));
+    return ['total' => count($rows), 'rows' => $rows];
+}
+
+/** Assets bought from the supplier, in companies the analyst can access. */
+function peopleSupplierAssets(PDO $conn, int $analystId, int $supplierId): array
+{
+    [$scope, $args] = peopleScope($conn, $analystId, 'a.tenant_id');
+    $from = "FROM assets a LEFT JOIN asset_types at ON at.id = a.asset_type_id LEFT JOIN asset_status_types ast ON ast.id = a.asset_status_id
+             WHERE a.supplier_id = ? $scope";
+    $all = array_merge([$supplierId], $args);
+    try {
+        $c = $conn->prepare("SELECT COUNT(*) $from");
+        $c->execute($all);
+        $total = (int)$c->fetchColumn();
+        $st = $conn->prepare("SELECT a.id, a.hostname, a.manufacturer, a.model, a.service_tag, a.asset_tag, at.name AS asset_type, ast.name AS asset_status,
+                                     (SELECT COALESCE(NULLIF(hu.display_name, ''), hu.email) FROM users_assets hua JOIN users hu ON hu.id = hua.user_id WHERE hua.asset_id = a.id ORDER BY hua.id LIMIT 1) AS holder
+                              $from ORDER BY at.name, a.hostname LIMIT " . PEOPLE_SECTION_LIMIT);
+        $st->execute($all);
+    } catch (Throwable $e) {
+        return ['total' => 0, 'rows' => []];   // assets.supplier_id arrives with Database Verification
+    }
+    $rows = array_map(fn($r) => [
+        'id' => (int)$r['id'], 'name' => $r['hostname'] ?: ($r['asset_tag'] ?: '#' . $r['id']),
+        'type' => $r['asset_type'], 'status' => $r['asset_status'],
+        'model' => trim(($r['manufacturer'] ?? '') . ' ' . ($r['model'] ?? '')), 'serial' => $r['service_tag'],
+        'tag' => $r['asset_tag'], 'assigned' => null, 'holder' => $r['holder'],
+        'url' => entityLink('asset', (int)$r['id']),
+    ], $st->fetchAll(PDO::FETCH_ASSOC));
+    return ['total' => $total, 'rows' => $rows];
+}
+
+/**
+ * Domains a supplier or a contact is involved in, and how: registrar, customer,
+ * technical contact. $who = ['supplier' => id] or ['contact' => id]. A domain
+ * belongs to a company, so only companies the analyst can access count.
+ */
+function peopleSupplierDomains(PDO $conn, int $analystId, array $who): array
+{
+    require_once __DIR__ . '/domains/customer.php';
+    $parties = domainPartiesReady($conn);
+    [$scope, $args] = peopleScope($conn, $analystId, 'd.tenant_id');
+    if (isset($who['supplier'])) {
+        $id = (int)$who['supplier'];
+        $roles = ["(d.registrar_supplier_id = ?)" => 'registrar'];
+        if ($parties) $roles["(d.customer_supplier_id = ?)"] = 'customer';
+        // Through its contacts: the agency or host named as technical contact.
+        $roles["(d.tech_contact_id IN (SELECT id FROM contacts WHERE supplier_id = ?))"] = 'tech';
+    } else {
+        $id = (int)$who['contact'];
+        $roles = ["(d.tech_contact_id = ?)" => 'tech'];
+        if ($parties) $roles["(d.customer_contact_id = ?)"] = 'customer';
+    }
+    $cols = []; $colArgs = [];
+    foreach ($roles as $cond => $role) { $cols[] = "$cond AS is_$role"; $colArgs[] = $id; }
+    $where = implode(' OR ', array_keys($roles));
+    $whereArgs = array_fill(0, count($roles), $id);
+    $st = $conn->prepare(
+        "SELECT d.id, d.domain_name, d.display_name, d.expiry_date, d.security_grade, s.name AS status, s.colour AS status_colour,
+                " . implode(', ', $cols) . "
+           FROM domains d LEFT JOIN domain_statuses s ON s.id = d.status_id
+          WHERE ($where) $scope
+          ORDER BY d.expiry_date IS NULL, d.expiry_date, d.domain_name
+          LIMIT " . PEOPLE_SECTION_LIMIT
+    );
+    $st->execute(array_merge($colArgs, $whereArgs, $args));
+    $rows = array_map(function ($r) use ($roles) {
+        $as = [];
+        foreach ($roles as $role) if (!empty($r['is_' . $role])) $as[] = $role;
+        return [
+            'id' => (int)$r['id'], 'name' => $r['display_name'] ?: $r['domain_name'], 'domain' => $r['domain_name'],
+            'expiry' => $r['expiry_date'], 'grade' => $r['security_grade'], 'status' => $r['status'],
+            'status_colour' => $r['status_colour'], 'roles' => array_values(array_unique($as)),
+            'url' => entityLink('domain', (int)$r['id']),
         ];
     }, $st->fetchAll(PDO::FETCH_ASSOC));
     return ['total' => count($rows), 'rows' => $rows];

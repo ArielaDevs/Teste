@@ -7,9 +7,15 @@
  * deliberately no second company column — the domain's company IS the
  * customer's company.
  *
- * Every read and write checks domainCustomerReady() first, so an install that
- * has not run Database Verification since upgrading keeps working without the
- * column instead of failing every domain query.
+ * #162 widened it: the customer may instead be a SUPPLIER - in practice the
+ * install's list of organisations - and optionally one of that supplier's
+ * contacts. A domain names a person OR a supplier, never both. Suppliers and
+ * their contacts are install-wide (they have no company), so naming one leaks
+ * nothing between companies.
+ *
+ * Every read and write checks domainCustomerReady() / domainPartiesReady()
+ * first, so an install that has not run Database Verification since upgrading
+ * keeps working without the columns instead of failing every domain query.
  */
 
 require_once __DIR__ . '/../tenancy.php';
@@ -20,6 +26,16 @@ function domainCustomerReady(PDO $conn): bool
     static $ok = null;
     if ($ok !== null) return $ok;
     try { $conn->query("SELECT customer_user_id FROM domains LIMIT 0"); return $ok = true; }
+    catch (Throwable $e) { return $ok = false; }
+}
+
+/** Has Database Verification added the #162 columns (customer_supplier_id,
+ *  customer_contact_id, tech_analyst_id) yet? All three arrive together. */
+function domainPartiesReady(PDO $conn): bool
+{
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try { $conn->query("SELECT customer_supplier_id, customer_contact_id, tech_analyst_id FROM domains LIMIT 0"); return $ok = true; }
     catch (Throwable $e) { return $ok = false; }
 }
 
@@ -39,6 +55,35 @@ function domainCustomerPersonOk(PDO $conn, int $userId, ?int $tenantId): bool
     $userCo  = $u['tenant_id'] === null ? $default : (int)$u['tenant_id'];
     $domCo   = $tenantId === null ? $default : $tenantId;
     return $userCo === $domCo;
+}
+
+/**
+ * Suppliers and supplier contacts matching $q, for the same picker (#162).
+ * A contact carries its supplier, so choosing one sets both.
+ * @return array<int,array{kind:string,id:int,name:string,email:?string,supplier_id:?int,supplier:?string}>
+ */
+function domainCustomerSupplierSearch(PDO $conn, string $q, int $limit = 15): array
+{
+    $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+    $out = [];
+    $st = $conn->prepare("SELECT id, COALESCE(NULLIF(trading_name, ''), legal_name) AS name
+                            FROM suppliers WHERE is_active = 1 AND (legal_name LIKE ? OR trading_name LIKE ?)
+                           ORDER BY name LIMIT " . (int)$limit);
+    $st->execute([$like, $like]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $out[] = ['kind' => 'supplier', 'id' => (int)$r['id'], 'name' => $r['name'], 'email' => null, 'supplier_id' => (int)$r['id'], 'supplier' => $r['name']];
+    }
+    $st = $conn->prepare("SELECT c.id, TRIM(CONCAT(c.first_name, ' ', c.surname)) AS name, c.email, c.supplier_id,
+                                  COALESCE(NULLIF(s.trading_name, ''), s.legal_name) AS supplier
+                             FROM contacts c LEFT JOIN suppliers s ON s.id = c.supplier_id
+                            WHERE c.is_active = 1 AND (CONCAT(c.first_name, ' ', c.surname) LIKE ? OR c.email LIKE ?)
+                            ORDER BY name LIMIT " . (int)$limit);
+    $st->execute([$like, $like]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $out[] = ['kind' => 'contact', 'id' => (int)$r['id'], 'name' => $r['name'], 'email' => $r['email'],
+                  'supplier_id' => $r['supplier_id'] !== null ? (int)$r['supplier_id'] : null, 'supplier' => $r['supplier']];
+    }
+    return $out;
 }
 
 /**

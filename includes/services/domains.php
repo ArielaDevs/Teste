@@ -65,7 +65,10 @@ class DomainsService
             'registrant_name'       => ['type' => 'string', 'max' => 255],
             'owner_analyst_id'      => ['type' => 'analyst'],
             'tech_contact_id'       => ['type' => 'lookup', 'table' => 'contacts'],
+            'tech_analyst_id'       => ['type' => 'analyst'],    // #162 - OR one of your own analysts
             'customer_user_id'      => ['type' => 'customer'],   // #153 - a person in the domain's company
+            'customer_supplier_id'  => ['type' => 'lookup', 'table' => 'suppliers'],   // #162 - OR a supplier
+            'customer_contact_id'   => ['type' => 'lookup', 'table' => 'contacts'],    // #162 - and one of its contacts
             'nameservers'           => ['type' => 'lines'],
             'dns_provider'          => ['type' => 'string', 'max' => 255],
             'hosting_provider'      => ['type' => 'string', 'max' => 255],
@@ -130,9 +133,10 @@ class DomainsService
         $cols = ['domain_name', 'display_name', 'tenant_id', 'created_by'];
         $vals = [$n['name'], $n['display'], $store, $ctx->actorId > 0 ? $ctx->actorId : null];
         $row  = ['tenant_id' => $store];
+        $in   = self::normaliseParties($conn, $in, []);
         foreach (self::fieldMap() as $field => $def) {
             if (!array_key_exists($field, $in)) continue;
-            if ($field === 'customer_user_id' && !domainCustomerReady($conn)) continue;   // before Database Verification
+            if (!self::fieldReady($conn, $field)) continue;   // before Database Verification
             $v = self::validateField($conn, $field, $in[$field], $def, $row, $n['name']);
             if ($field === 'contract_id') self::assertContractVisible($conn, $ctx, $v);
             $cols[] = $field;
@@ -183,9 +187,10 @@ class DomainsService
             }
         }
 
+        $in = self::normaliseParties($conn, $in, $cur);
         foreach (self::fieldMap() as $field => $def) {
             if (!array_key_exists($field, $in)) continue;
-            if ($field === 'customer_user_id' && !domainCustomerReady($conn)) continue;   // before Database Verification
+            if (!self::fieldReady($conn, $field)) continue;   // before Database Verification
             $v = self::validateField($conn, $field, $in[$field], $def, $cur, $cur['domain_name']);
             if (self::same($cur[$field], $v)) continue;
             if ($field === 'contract_id') self::assertContractVisible($conn, $ctx, $v);
@@ -700,6 +705,70 @@ class DomainsService
         return $v;
     }
 
+    /** Is this field's column there yet? The #153 and #162 columns arrive with Database Verification. */
+    private static function fieldReady(PDO $conn, string $field): bool
+    {
+        if ($field === 'customer_user_id') return domainCustomerReady($conn);
+        if (in_array($field, ['customer_supplier_id', 'customer_contact_id', 'tech_analyst_id'], true)) return domainPartiesReady($conn);
+        return true;
+    }
+
+    /**
+     * #162: a domain has ONE customer - a person, or a supplier (optionally with
+     * one of its contacts) - and ONE technical contact - a supplier contact, or
+     * an analyst. Setting one kind clears the other, so a caller (the edit
+     * dialog, or a REST PATCH naming just one field) never has to know which
+     * kind was there before. Naming both kinds at once is refused rather than
+     * guessed. Clearing a field clears only that field, except that clearing the
+     * supplier also clears its contact.
+     */
+    private static function normaliseParties(PDO $conn, array $in, array $cur): array
+    {
+        if (!domainPartiesReady($conn)) return $in;
+        $given = fn(string $k) => array_key_exists($k, $in) && !($in[$k] === null || $in[$k] === '' || $in[$k] === 0 || $in[$k] === '0');
+
+        if ($given('tech_analyst_id') && $given('tech_contact_id')) {
+            throw new ServiceError('validation', 'invalid_field', 'A domain has one technical contact: an analyst or a supplier contact, not both.');
+        }
+        if ($given('tech_analyst_id')) $in['tech_contact_id'] = null;
+        if ($given('tech_contact_id')) $in['tech_analyst_id'] = null;
+
+        $user = $given('customer_user_id');
+        $sup  = $given('customer_supplier_id');
+        $con  = $given('customer_contact_id');
+        if ($user && ($sup || $con)) {
+            throw new ServiceError('validation', 'invalid_field', 'A domain\'s customer is a person or a supplier, not both.');
+        }
+        if ($user) {
+            $in['customer_supplier_id'] = null;
+            $in['customer_contact_id']  = null;
+        } elseif ($con) {
+            // A contact brings its supplier with it.
+            $st = $conn->prepare("SELECT supplier_id FROM contacts WHERE id = ?");
+            $st->execute([(int)$in['customer_contact_id']]);
+            $owner = $st->fetchColumn();
+            if ($owner !== false) {
+                $owner = $owner === null ? null : (int)$owner;
+                if ($sup && (int)$in['customer_supplier_id'] !== $owner) {
+                    throw new ServiceError('validation', 'invalid_field', 'That contact does not belong to that supplier.');
+                }
+                $in['customer_supplier_id'] = $owner;
+            }
+            $in['customer_user_id'] = null;
+        } elseif ($sup) {
+            $in['customer_user_id'] = null;
+            // A contact left over from a different supplier no longer fits.
+            if (!array_key_exists('customer_contact_id', $in) && !empty($cur['customer_contact_id'])) {
+                $st = $conn->prepare("SELECT supplier_id FROM contacts WHERE id = ?");
+                $st->execute([(int)$cur['customer_contact_id']]);
+                if ((int)$st->fetchColumn() !== (int)$in['customer_supplier_id']) $in['customer_contact_id'] = null;
+            }
+        } elseif (array_key_exists('customer_supplier_id', $in) && !array_key_exists('customer_contact_id', $in)) {
+            $in['customer_contact_id'] = null;
+        }
+        return $in;
+    }
+
     private static function lookup(PDO $conn, string $table, $value, string $label): ?int
     {
         if ($value === null || $value === '' || $value === 0 || $value === '0') return null;
@@ -787,6 +856,9 @@ class DomainsService
             'registrar_account_id'  => "SELECT account_name FROM domain_registrar_accounts WHERE id = ?",
             'owner_analyst_id'      => "SELECT full_name FROM analysts WHERE id = ?",
             'tech_contact_id'       => "SELECT CONCAT(first_name, ' ', surname) FROM contacts WHERE id = ?",
+            'tech_analyst_id'       => "SELECT full_name FROM analysts WHERE id = ?",
+            'customer_supplier_id'  => "SELECT COALESCE(NULLIF(trading_name, ''), legal_name) FROM suppliers WHERE id = ?",
+            'customer_contact_id'   => "SELECT CONCAT(first_name, ' ', surname) FROM contacts WHERE id = ?",
             'contract_id'           => "SELECT CONCAT(contract_number, ' ', title) FROM contracts WHERE id = ?",
             'customer_user_id'      => "SELECT COALESCE(NULLIF(display_name, ''), email) FROM users WHERE id = ?",
         ][$field] ?? null;
@@ -811,6 +883,8 @@ class DomainsService
             'registrar'        => $row['registrar_name'],
             'company_id'       => $row['tenant_id'] !== null ? (int)$row['tenant_id'] : null,
             'customer_user_id' => isset($row['customer_user_id']) ? (int)$row['customer_user_id'] : null,
+            'customer_supplier_id' => isset($row['customer_supplier_id']) ? (int)$row['customer_supplier_id'] : null,
+            'customer_contact_id'  => isset($row['customer_contact_id']) ? (int)$row['customer_contact_id'] : null,
             'security_grade'   => $row['security_grade'],
         ];
     }

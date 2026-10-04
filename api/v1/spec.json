@@ -5875,9 +5875,9 @@
                             "req": false
                         },
                         {
-                            "name": "status_id \/ owner_analyst_id \/ registrar_supplier_id \/ registrar_account_id \/ tech_contact_id \/ contract_id \/ customer_user_id",
+                            "name": "status_id \/ owner_analyst_id \/ registrar_supplier_id \/ registrar_account_id \/ tech_contact_id \/ tech_analyst_id \/ contract_id \/ customer_user_id \/ customer_supplier_id \/ customer_contact_id",
                             "in": "body",
-                            "desc": "Lookups, validated (422 on an unknown id). customer_user_id is the customer: a user in the domain's own company",
+                            "desc": "Lookups, validated (422 on an unknown id). The customer is ONE of: customer_user_id (a user in the domain's own company), or customer_supplier_id and/or customer_contact_id (a supplier, one of its contacts - a contact sets its supplier). The technical contact is ONE of tech_contact_id (a supplier contact) or tech_analyst_id (an analyst). Setting one kind clears the other; naming both kinds is a 422",
                             "req": false
                         },
                         {

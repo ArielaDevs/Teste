@@ -4860,6 +4860,12 @@ return [
         // company (tenant_id) stays its company - there is deliberately no second
         // "customer company" column beside it.
         'customer_user_id'      => 'INT NULL',
+        // #162: the customer may instead be a supplier (an organisation), optionally
+        // one of its contacts; and the technical contact may be one of your own
+        // analysts rather than a supplier contact. One of each kind is set, never two.
+        'customer_supplier_id'  => 'INT NULL',
+        'customer_contact_id'   => 'INT NULL',
+        'tech_analyst_id'       => 'INT NULL',
         'nameservers'           => 'TEXT NULL',
         'dns_provider'          => 'VARCHAR(255) NULL',
         'hosting_provider'      => 'VARCHAR(255) NULL',

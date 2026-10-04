@@ -29,6 +29,7 @@ $sections = [
     'people'    => 3,
     'person'    => 3,
     'companies' => 3,
+    'suppliers' => 4,
     'getting'   => 0,
     'access'    => 2,
     'edit'      => 2,
@@ -105,6 +106,11 @@ $pplHelpIcon = fn(string $paths) => '<svg xmlns="http://www.w3.org/2000/svg" wid
                             <div class="help-card-icon"><?php echo $pplHelpIcon('<path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path>'); ?></div>
                             <h4><?php echo $h('overview.card_company_title'); ?></h4>
                             <p><?php echo $h('overview.card_company_desc'); ?></p>
+                        </div>
+                        <div class="help-card">
+                            <div class="help-card-icon"><?php echo $pplHelpIcon('<rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle>'); ?></div>
+                            <h4><?php echo $h('overview.card_supplier_title'); ?></h4>
+                            <p><?php echo $h('overview.card_supplier_desc'); ?></p>
                         </div>
                         <div class="help-card">
                             <div class="help-card-icon"><?php echo $pplHelpIcon('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>'); ?></div>
