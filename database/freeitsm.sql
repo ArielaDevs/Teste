@@ -1907,6 +1907,60 @@ CREATE TABLE IF NOT EXISTS `proxmox_vms` (
     CONSTRAINT `fk_proxmox_vms_connection` FOREIGN KEY (`connection_id`) REFERENCES `proxmox_connections` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- VMware Cloud Director servers (asset management). Several per install.
+CREATE TABLE IF NOT EXISTS `vcloud_connections` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `name`                  VARCHAR(100) NOT NULL,
+    `host`                  VARCHAR(255) NOT NULL,
+    `org`                   VARCHAR(100) NOT NULL,
+    `username`              VARCHAR(100) NOT NULL,
+    `password_enc`          LONGTEXT NULL,
+    `api_version`           VARCHAR(10) NOT NULL DEFAULT '38.0',
+    `verify_ssl`            TINYINT(1) NOT NULL DEFAULT 1,
+    `is_active`             TINYINT(1) NOT NULL DEFAULT 1,
+    `sync_interval_minutes` INT NOT NULL DEFAULT 60,
+    `last_sync_datetime`    DATETIME NULL,
+    `last_sync_status`      VARCHAR(20) NULL,
+    `last_sync_message`     TEXT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `vcloud_vms` (
+    `id`                 INT NOT NULL AUTO_INCREMENT,
+    `connection_id`      INT NOT NULL,
+    `vm_uuid`            VARCHAR(64) NOT NULL,
+    `name`               VARCHAR(255) NULL,
+    `org_vdc`            VARCHAR(255) NULL,
+    `vapp_name`          VARCHAR(255) NULL,
+    `status`             VARCHAR(20) NULL,
+    `vcpus`              INT NULL,
+    `memory_mb`          INT NULL,
+    `disk_gb`            DECIMAL(10,2) NULL,
+    `ip_addresses`       TEXT NULL,
+    `mac_addresses`      TEXT NULL,
+    `details_json`       LONGTEXT NULL,
+    `last_seen_datetime` DATETIME NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_vcloud_vm` (`connection_id`, `vm_uuid`),
+    CONSTRAINT `fk_vcloud_vms_connection` FOREIGN KEY (`connection_id`) REFERENCES `vcloud_connections` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `vcloud_edge_gateways` (
+    `id`                 INT NOT NULL AUTO_INCREMENT,
+    `connection_id`      INT NOT NULL,
+    `gateway_id`         VARCHAR(64) NOT NULL,
+    `name`               VARCHAR(255) NULL,
+    `org_vdc`            VARCHAR(255) NULL,
+    `status`             VARCHAR(20) NULL,
+    `uplink_ips`         TEXT NULL,
+    `details_json`       LONGTEXT NULL,
+    `last_seen_datetime` DATETIME NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_vcloud_edge` (`connection_id`, `gateway_id`),
+    CONSTRAINT `fk_vcloud_edge_connection` FOREIGN KEY (`connection_id`) REFERENCES `vcloud_connections` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ----------------------------------------------------------
 -- Web chat widgets (embeddable website chat → tickets)
 -- ----------------------------------------------------------

@@ -37,6 +37,8 @@ return [
     ['ticket_prefixes', 'uq_ticket_prefixes_prefix', 'unique', '(`prefix`)'],
     ['proxmox_nodes', 'uq_proxmox_node', 'unique', '(`connection_id`,`node_name`)'],
     ['proxmox_vms', 'uq_proxmox_vm', 'unique', '(`connection_id`,`vmid`)'],
+    ['vcloud_vms', 'uq_vcloud_vm', 'unique', '(`connection_id`,`vm_uuid`)'],
+    ['vcloud_edge_gateways', 'uq_vcloud_edge', 'unique', '(`connection_id`,`gateway_id`)'],
     ['users', 'uq_users_email', 'unique', '(`email`)'],
     ['users', 'uq_users_username', 'unique', '(`username`)'],
     ['users', 'uq_users_dir_username', 'unique', '(`auth_provider_id`,`directory_username`)'],

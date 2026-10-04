@@ -132,6 +132,15 @@ return [
             'setting_keys' => [],
         ],
         [
+            // Several VMware Cloud Director servers. Credentials live in vcloud_connections.
+            'id'           => 'vcloud',
+            'cap'          => Cap::ASSETS_VCLOUD,
+            'label_key'    => 'asset-management.settings.tab_vcloud',
+            'grant'        => 'Configure VMware Cloud Director servers, including their credentials, and run syncs',
+            'sensitive'    => true,
+            'setting_keys' => [],
+        ],
+        [
             // A per-analyst display preference — where your sidebar sits. Not
             // administration, so there is nothing here to grant and nobody to gate.
             'id'        => 'left-panel',

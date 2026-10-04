@@ -57,6 +57,32 @@ try {
             'source_name'         => 'Proxmox · ' . $v['conn_name'],
         ];
     }
+    // VMware Cloud Director VMs, shaped like the rows above (same table, filters, totals).
+    $vcStmt = $conn->prepare(
+        "SELECT v.vm_uuid, v.connection_id, c.name AS conn_name, v.name, v.org_vdc, v.status, v.vcpus, v.memory_mb,
+                v.disk_gb, v.ip_addresses, v.details_json, DATE_FORMAT(v.last_seen_datetime, '%Y-%m-%d %H:%i:%s') AS last_seen
+         FROM vcloud_vms v JOIN vcloud_connections c ON c.id = v.connection_id"
+    );
+    $vcStmt->execute();
+    foreach ($vcStmt->fetchAll(PDO::FETCH_ASSOC) as $v) {
+        $servers[] = [
+            'id'                  => 'vc-' . $v['connection_id'] . '-' . $v['vm_uuid'],
+            'vm_id'               => 'vcloud-' . $v['connection_id'] . '-' . $v['vm_uuid'],
+            'name'                => (string)$v['name'],
+            'power_state'         => $v['status'] === 'running' ? 'active' : 'offline',
+            'memory_gb'           => $v['memory_mb'] !== null ? round($v['memory_mb'] / 1024, 2) : 0,
+            'num_cpu'             => (int)$v['vcpus'],
+            'ip_address'          => $v['ip_addresses'] ? explode(', ', $v['ip_addresses'])[0] : '',
+            'hard_disk_size_gb'   => $v['disk_gb'] !== null ? (float)$v['disk_gb'] : 0,
+            'host'                => (string)$v['org_vdc'],
+            'cluster'             => (string)$v['org_vdc'],
+            'guest_os'            => '',
+            'raw_data'            => $v['details_json'],
+            'last_synced'         => $v['last_seen'],
+            'source'              => 'vcloud',
+            'source_name'         => 'vCloud · ' . $v['conn_name'],
+        ];
+    }
     usort($servers, function ($a, $b) { return strcasecmp((string)$a['name'], (string)$b['name']); });
 
     // Build summary stats - separate ESXi hosts from VMs

@@ -83,6 +83,7 @@ final class Cap
     const ASSETS_VCENTER   = 'assets.vcenter';     // credentials
     const ASSETS_INTUNE    = 'assets.intune';      // credentials
     const ASSETS_PROXMOX   = 'assets.proxmox';     // Proxmox VE servers, credentials and syncs
+    const ASSETS_VCLOUD    = 'assets.vcloud';      // VMware Cloud Director servers, credentials and syncs
 
     // ---- Contracts ---------------------------------------------------------
     const CONTRACTS_MANAGE             = 'contracts.manage';              // umbrella

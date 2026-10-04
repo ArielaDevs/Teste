@@ -228,6 +228,44 @@ $translationNamespaces = ['common', 'asset-management'];
                     </p>
                 </div>
 
+                <div class="help-section" id="vcloud">
+                    <div class="help-section-header">
+                        <div>
+                            <h3>VMware Cloud Director servers</h3>
+                            <p>Pull VMs, their NICs and disks, and edge gateways from one or more vCloud Director servers.</p>
+                        </div>
+                    </div>
+                    <p>
+                        Add servers under <strong>Settings &rarr; VMware Cloud Director servers</strong>. You can add several; each is synced on its
+                        own schedule. The sync reads only. <strong>Sync hypervisors</strong> on the Servers page syncs vCenter, every Proxmox server
+                        and every vCloud Director server at once.
+                    </p>
+                    <h4>1. Choose a user</h4>
+                    <ul>
+                        <li>For one organization: a user with the <strong>Organization Administrator</strong> role, or a custom read-only role that can
+                            view VMs and networks in that organization.</li>
+                        <li>For all organizations: a provider administrator, and the organization <code>System</code>.</li>
+                    </ul>
+                    <h4>2. Fill in the server</h4>
+                    <ul>
+                        <li><strong>Server address</strong>: <code>https://&lt;vcd-host&gt;</code>. Use the public address of the vCloud Director portal.</li>
+                        <li><strong>Organization</strong>: the organization's name (for example <code>ukrcleaninghouse</code>), or <code>System</code> for a provider administrator.
+                            This is not the organization's display name; it is the name shown in the URL when you log in.</li>
+                        <li><strong>User</strong> and <strong>Password</strong>: the user from step 1. Passwords are stored encrypted.</li>
+                        <li><strong>API version</strong>: <code>38.0</code> for vCloud Director 10.5, <code>36.2</code> for 10.3. A wrong version gives a clear HTTP error on Test.</li>
+                        <li><strong>Verify SSL certificate</strong>: keep it on for a trusted certificate; untick it for a self-signed one.</li>
+                    </ul>
+                    <p>Click <strong>Test</strong>, then <strong>Sync now</strong> and <strong>Show VMs</strong>. The VM view also lists the edge gateways.</p>
+                    <h4>When something is missing</h4>
+                    <ul>
+                        <li><strong>&ldquo;refused the login (HTTP 401/403)&rdquo;</strong>: wrong user, password or organization. The organization is the name, not the display name.</li>
+                        <li><strong>&ldquo;Could not reach the vCloud Director server&rdquo;</strong>: wrong address, or a firewall between FreeITSM and the portal.</li>
+                        <li><strong>&ldquo;inventory was only partly readable&rdquo;</strong>: a page of the VM list failed. Nothing was removed; sync again.</li>
+                        <li><strong>&ldquo;SAFETY GUARD&rdquo; warning</strong>: fewer than half of the known VMs were seen. Nothing was deleted. Usually the user lost rights, or the organization changed.</li>
+                    </ul>
+                    <p class="help-note">The full guide with the same steps is in <code>docs/vcloud-setup.md</code> in the repository.</p>
+                </div>
+
                 <div class="help-section" id="asset-detail">
                     <div class="help-section-header">
                         <span class="help-section-num">2</span>

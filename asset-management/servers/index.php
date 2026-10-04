@@ -948,6 +948,26 @@ $translationNamespaces = ['common', 'asset-management'];
                 }
 
                 const px = await fetch(API_BASE + 'proxmox_connections.php').then(r => r.json()).catch(() => ({ success: false }));
+                const vcl = await fetch(API_BASE + 'vcloud_connections.php').then(r => r.json()).catch(() => ({ success: false }));
+                const vcServers = (vcl.success && Array.isArray(vcl.connections)) ? vcl.connections.filter(c => c.is_active) : [];
+                for (const server of vcServers) {
+                    try {
+                        const r = await fetch(API_BASE + 'vcloud_sync.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: server.id, action: 'sync' }),
+                        }).then(res => res.json());
+                        if (r.success) {
+                            lines.push('vCloud ' + server.name + ': ' + r.summary.message);
+                        } else {
+                            anyFailed = true;
+                            lines.push('vCloud ' + server.name + ': ' + (r.error || 'error'));
+                        }
+                    } catch (e) {
+                        anyFailed = true;
+                        lines.push('vCloud ' + server.name + ': ' + window.t('asset-management.servers.sync_no_connect'));
+                    }
+                }
                 const servers = (px.success && Array.isArray(px.connections)) ? px.connections.filter(c => c.is_active) : [];
                 for (const server of servers) {
                     try {

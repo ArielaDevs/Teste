@@ -1122,6 +1122,13 @@ try {
             try { $conn->exec("ALTER TABLE {$pxTable} ADD CONSTRAINT {$pxFk} FOREIGN KEY (connection_id) REFERENCES proxmox_connections (id) ON DELETE CASCADE"); } catch (Exception $e) {}
         }
     }
+    // vCloud Director servers: VMs and edge gateways belong to one server.
+    foreach (['vcloud_vms', 'vcloud_edge_gateways'] as $vcTable) {
+        $vcFk = 'fk_' . $vcTable . '_connection';
+        if ($tableExists($vcTable) && $tableExists('vcloud_connections') && !$fkExists($vcTable, $vcFk)) {
+            try { $conn->exec("ALTER TABLE {$vcTable} ADD CONSTRAINT {$vcFk} FOREIGN KEY (connection_id) REFERENCES vcloud_connections (id) ON DELETE CASCADE"); } catch (Exception $e) {}
+        }
+    }
     if ($tableExists('messaging_identity_links') && $tableExists('users') && $colExists('messaging_identity_links', 'user_id')) {
         if (!$fkExists('messaging_identity_links', 'fk_messaging_identity_links_user')) {
             try { $conn->exec("ALTER TABLE messaging_identity_links ADD CONSTRAINT fk_messaging_identity_links_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE"); } catch (Exception $e) {}
