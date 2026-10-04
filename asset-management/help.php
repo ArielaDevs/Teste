@@ -171,6 +171,63 @@ $translationNamespaces = ['common', 'asset-management'];
                 </div>
 
                 <!-- Section 2: Asset Detail View -->
+                <div class="help-section" id="proxmox">
+                    <div class="help-section-header">
+                        <div>
+                            <h3>Proxmox VE servers</h3>
+                            <p>Pull virtual machines, containers, nodes, IP addresses and MAC addresses from one or more Proxmox servers.</p>
+                        </div>
+                    </div>
+                    <p>
+                        Add servers under <strong>Settings &rarr; Proxmox VE servers</strong>. You can add several. Each one is synced on its own
+                        schedule, and its VMs never mix with another server's. <strong>Sync now</strong> runs a sync at once; the scheduled sync runs on
+                        the interval you set.
+                    </p>
+                    <h4>1. Create a user and a role for FreeITSM</h4>
+                    <ol>
+                        <li>Proxmox web UI &rarr; <strong>Datacenter &rarr; Permissions &rarr; Users &rarr; Add</strong>. Use a name such as <code>freeitsm</code>
+                            and the realm <strong>Proxmox VE authentication server</strong> (<code>pve</code>). You do not need a password: the user only holds the API token.</li>
+                        <li><strong>Datacenter &rarr; Permissions &rarr; Roles &rarr; Create</strong>: name it <code>FreeITSMSync</code> and give it these privileges:
+                            <code>Sys.Audit</code>, <code>VM.Audit</code>, <code>VM.Monitor</code>, <code>Datastore.Audit</code>.
+                            <code>VM.Monitor</code> is what lets FreeITSM read IP addresses through the guest agent. Without it you still get the VMs, just no IPs.</li>
+                        <li><strong>Datacenter &rarr; Permissions &rarr; Add &rarr; User Permission</strong>: path <code>/</code>, user <code>freeitsm@pve</code>, role <code>FreeITSMSync</code>.</li>
+                    </ol>
+                    <h4>2. Create an API token (the recommended login)</h4>
+                    <ol>
+                        <li><strong>Datacenter &rarr; Permissions &rarr; API Tokens &rarr; Add</strong>. User: <code>freeitsm@pve</code>. Token ID: <code>itsm</code>.</li>
+                        <li><strong>Privilege Separation</strong>: untick it, so the token gets the user's permissions. Or tick it and grant the role to the token itself, as step 1.3 does for the user.</li>
+                        <li>Click <strong>Add</strong>. Proxmox shows the <strong>secret</strong> once. Copy it now: it cannot be shown again. If you lose it, delete the token and create a new one.</li>
+                    </ol>
+                    <p>The result is two values:</p>
+                    <ul>
+                        <li><strong>Token ID</strong> <code>freeitsm@pve!itsm</code>. Type it in the <strong>User or API token</strong> field.</li>
+                        <li><strong>Token secret</strong>, a UUID such as <code>1a2b3c4d-…</code>. Paste it in the <strong>Password</strong> field.</li>
+                    </ul>
+                    <h4>3. Add the server in FreeITSM</h4>
+                    <ul>
+                        <li><strong>Name</strong>: anything that identifies the server, for example <code>pve-lab</code>.</li>
+                        <li><strong>Server address</strong>: <code>https://&lt;host&gt;:8006</code>. Port 8006 is the Proxmox web UI port and is the default.</li>
+                        <li><strong>Verify SSL certificate</strong>: keep it on for a certificate from a trusted CA. Untick it for the default self-signed Proxmox certificate.</li>
+                        <li><strong>Sync every</strong>: minutes between scheduled syncs (5 to 10080).</li>
+                    </ul>
+                    <p>Click <strong>Test</strong>. A green result means FreeITSM logged in and can read the node list. Then click <strong>Sync now</strong> and <strong>Show VMs</strong>.</p>
+                    <h4>Guest IP addresses</h4>
+                    <p>
+                        For a KVM VM, Proxmox knows an IP address only through the <strong>QEMU Guest Agent</strong>. Enable it in the VM's <strong>Options</strong>,
+                        and install <code>qemu-guest-agent</code> in the guest. LXC containers do not need it: their address comes from the configuration.
+                    </p>
+                    <h4>When something is missing</h4>
+                    <ul>
+                        <li><strong>Test fails with &ldquo;refused (HTTP 401/403)&rdquo;</strong>: the token ID or secret is wrong, or the token has no permissions. Check the realm: <code>pve</code>, not <code>pam</code>.</li>
+                        <li><strong>&ldquo;Could not reach the Proxmox server&rdquo;</strong>: the address or port is wrong, or a firewall blocks FreeITSM from the Proxmox host.</li>
+                        <li><strong>A node is listed as not reachable</strong>: the node is offline. Its VMs are kept, not deleted.</li>
+                        <li><strong>&ldquo;SAFETY GUARD&rdquo; warning</strong>: fewer than half of the known VMs were seen. Nothing was deleted. The usual cause is a node or the user's permissions, not a real deletion in Proxmox.</li>
+                    </ul>
+                    <p class="help-note">
+                        The step-by-step guide with the same steps, plus a troubleshooting table, is in <code>docs/proxmox-setup.md</code> in the repository.
+                    </p>
+                </div>
+
                 <div class="help-section" id="asset-detail">
                     <div class="help-section-header">
                         <span class="help-section-num">2</span>

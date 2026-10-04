@@ -11,6 +11,53 @@
  * the help guide.
  */
 return [
+    'proxmox' => [
+        'title' => 'Proxmox VE servers',
+        'intro' => 'Add one or more Proxmox servers. Each is synced on its own schedule; VMs, containers, nodes, IPs and MACs are stored per server.',
+        'add' => 'Add server',
+        'edit_title' => 'Edit server',
+        'col_name' => 'Name',
+        'col_address' => 'Address',
+        'col_last_sync' => 'Last sync',
+        'col_status' => 'Status',
+        'vm_vmid' => 'VMID',
+        'vm_name' => 'Name',
+        'vm_node' => 'Node',
+        'vm_status' => 'Status',
+        'vm_resources' => 'Resources',
+        'vm_network' => 'Network',
+        'field_name' => 'Name',
+        'field_host' => 'Server address',
+        'field_user' => 'User or API token',
+        'field_password' => 'Password or API token secret',
+        'token_help' => 'For an API token, enter its ID (user@realm!tokenid) and paste the secret into the password field. See docs/proxmox-setup.md.',
+        'field_interval' => 'Sync every (minutes)',
+        'field_verify' => 'Verify SSL certificate',
+        'field_active' => 'Active',
+        'perm_help' => 'Use a user with at least Sys.Audit on / and VM.Audit (a read-only role such as PVEAuditor). Passwords are stored encrypted.',
+        'password_keep' => 'Leave blank to keep the stored password.',
+        'saved' => 'Server saved',
+        'save_failed' => 'Could not save the server',
+        'confirm_delete' => 'Remove {name}? Its synced VMs and nodes will be removed too.',
+        'removed' => 'Server removed',
+        'working' => 'Working…',
+        'test_failed' => 'Connection failed',
+        'sync_failed' => 'Sync failed',
+        'test' => 'Test',
+        'sync_now' => 'Sync now',
+        'show_vms' => 'Show VMs',
+        'edit' => 'Edit',
+        'delete' => 'Delete',
+        'load_failed' => 'Could not load the Proxmox servers',
+        'none_yet' => 'No Proxmox servers yet.',
+        'inactive' => 'Inactive',
+        'status_ok' => 'OK',
+        'status_warning' => 'Warning',
+        'status_error' => 'Error',
+        'status_never' => 'Never synced',
+        'vms_title' => 'VMs on {name}',
+        'no_vms' => 'No VMs synced from this server yet.',
+    ],
     'title' => 'Assets',
 
     'nav' => [
@@ -694,6 +741,7 @@ return [
 
     // Settings (seven tabs)
     'settings' => [
+        'tab_proxmox' => 'Proxmox VE servers',
         'title'                => 'Asset settings',
 
         'tab_asset_types'      => 'Asset types',

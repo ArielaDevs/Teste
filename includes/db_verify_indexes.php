@@ -35,6 +35,8 @@ return [
     ['watchtower_items', 'uq_watchtower_items', 'unique', '(`analyst_id`,`item_key`)'],
     ['watchtower_item_members', 'uq_watchtower_members', 'unique', '(`analyst_id`,`item_key`,`entity_type`,`entity_id`)'],
     ['ticket_prefixes', 'uq_ticket_prefixes_prefix', 'unique', '(`prefix`)'],
+    ['proxmox_nodes', 'uq_proxmox_node', 'unique', '(`connection_id`,`node_name`)'],
+    ['proxmox_vms', 'uq_proxmox_vm', 'unique', '(`connection_id`,`vmid`)'],
     ['users', 'uq_users_email', 'unique', '(`email`)'],
     ['users', 'uq_users_username', 'unique', '(`username`)'],
     ['users', 'uq_users_dir_username', 'unique', '(`auth_provider_id`,`directory_username`)'],

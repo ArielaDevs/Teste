@@ -1854,6 +1854,58 @@ CREATE TABLE IF NOT EXISTS `messaging_identity_links` (
     CONSTRAINT `fk_messaging_identity_links_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Proxmox VE servers (asset management). Several per install; one row each.
+CREATE TABLE IF NOT EXISTS `proxmox_connections` (
+    `id`                    INT NOT NULL AUTO_INCREMENT,
+    `name`                  VARCHAR(100) NOT NULL,
+    `host`                  VARCHAR(255) NOT NULL,
+    `username`              VARCHAR(100) NOT NULL,
+    `password_enc`          LONGTEXT NULL,
+    `verify_ssl`            TINYINT(1) NOT NULL DEFAULT 1,
+    `is_active`             TINYINT(1) NOT NULL DEFAULT 1,
+    `sync_interval_minutes` INT NOT NULL DEFAULT 60,
+    `last_sync_datetime`    DATETIME NULL,
+    `last_sync_status`      VARCHAR(20) NULL,
+    `last_sync_message`     TEXT NULL,
+    `created_datetime`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `proxmox_nodes` (
+    `id`                 INT NOT NULL AUTO_INCREMENT,
+    `connection_id`      INT NOT NULL,
+    `node_name`          VARCHAR(100) NOT NULL,
+    `cluster_name`       VARCHAR(100) NULL,
+    `status`             VARCHAR(20) NULL,
+    `cpu_cores`          INT NULL,
+    `memory_mb`          INT NULL,
+    `last_seen_datetime` DATETIME NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_proxmox_node` (`connection_id`, `node_name`),
+    CONSTRAINT `fk_proxmox_nodes_connection` FOREIGN KEY (`connection_id`) REFERENCES `proxmox_connections` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `proxmox_vms` (
+    `id`                 INT NOT NULL AUTO_INCREMENT,
+    `connection_id`      INT NOT NULL,
+    `vmid`               INT NOT NULL,
+    `vm_type`            VARCHAR(10) NOT NULL,
+    `node_name`          VARCHAR(100) NULL,
+    `cluster_name`       VARCHAR(100) NULL,
+    `name`               VARCHAR(255) NULL,
+    `status`             VARCHAR(20) NULL,
+    `vcpus`              INT NULL,
+    `memory_mb`          INT NULL,
+    `disk_gb`            DECIMAL(10,2) NULL,
+    `os_type`            VARCHAR(50) NULL,
+    `ip_addresses`       TEXT NULL,
+    `mac_addresses`      TEXT NULL,
+    `last_seen_datetime` DATETIME NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_proxmox_vm` (`connection_id`, `vmid`),
+    CONSTRAINT `fk_proxmox_vms_connection` FOREIGN KEY (`connection_id`) REFERENCES `proxmox_connections` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ----------------------------------------------------------
 -- Web chat widgets (embeddable website chat → tickets)
 -- ----------------------------------------------------------

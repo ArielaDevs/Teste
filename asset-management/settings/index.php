@@ -1065,6 +1065,96 @@ $translationNamespaces = ['common', 'asset-management'];
 
         <?php if (settingsTabVisible($visibleTabs, 'intune')): ?>
         <!-- InTune Tab -->
+        <div class="tab-content<?php echo $activeTabId === 'proxmox' ? ' active' : ''; ?>" id="proxmox-tab" data-capability="<?php echo Cap::ASSETS_PROXMOX; ?>">
+            <div class="settings-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div>
+                        <h3 style="margin:0;"><?php echo htmlspecialchars(t('asset-management.proxmox.title')); ?></h3>
+                        <p style="color:var(--text-muted, #666); margin:4px 0 0;"><?php echo htmlspecialchars(t('asset-management.proxmox.intro')); ?></p>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="proxmoxOpenForm()"><?php echo htmlspecialchars(t('asset-management.proxmox.add')); ?></button>
+                </div>
+                <div class="table-responsive" style="margin-top:12px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.col_name')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.col_address')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.col_last_sync')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.col_status')); ?></th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="proxmoxList"><tr><td colspan="5" style="text-align:center;"><?php echo htmlspecialchars(t('common.loading')); ?></td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="settings-section" id="proxmoxVmsPanel" style="display:none; margin-top:16px;">
+                <h3 id="proxmoxVmsTitle" style="margin-top:0;"></h3>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.vm_vmid')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.vm_name')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.vm_node')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.vm_status')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.vm_resources')); ?></th>
+                                <th><?php echo htmlspecialchars(t('asset-management.proxmox.vm_network')); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody id="proxmoxVmsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proxmox server form -->
+        <div class="modal" id="proxmoxModal">
+            <div class="modal-content" style="max-width: 560px;">
+                <div class="modal-header" id="proxmoxModalTitle"><?php echo htmlspecialchars(t('asset-management.proxmox.add')); ?></div>
+                <div class="modal-body">
+                    <form id="proxmoxForm" autocomplete="off" onsubmit="proxmoxSave(event)">
+                        <input type="hidden" id="proxmoxId">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+                            <div class="form-group" style="grid-column: span 2;">
+                                <label for="proxmoxName"><?php echo htmlspecialchars(t('asset-management.proxmox.field_name')); ?> *</label>
+                                <input type="text" id="proxmoxName" maxlength="100" required>
+                            </div>
+                            <div class="form-group" style="grid-column: span 2;">
+                                <label for="proxmoxHost"><?php echo htmlspecialchars(t('asset-management.proxmox.field_host')); ?> *</label>
+                                <input type="text" id="proxmoxHost" placeholder="https://pve.example.com:8006" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="proxmoxUser"><?php echo htmlspecialchars(t('asset-management.proxmox.field_user')); ?> *</label>
+                                <input type="text" id="proxmoxUser" placeholder="freeitsm@pve!itsm" required>
+                                <small style="color:var(--text-muted, #666);"><?php echo htmlspecialchars(t('asset-management.proxmox.token_help')); ?></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="proxmoxPassword"><?php echo htmlspecialchars(t('asset-management.proxmox.field_password')); ?></label>
+                                <input type="password" id="proxmoxPassword" placeholder="••••••••">
+                                <small style="color:var(--text-muted, #666);" id="proxmoxPasswordHelp"></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="proxmoxInterval"><?php echo htmlspecialchars(t('asset-management.proxmox.field_interval')); ?></label>
+                                <input type="number" id="proxmoxInterval" min="5" max="10080" value="60">
+                            </div>
+                            <div class="form-group" style="display:flex; flex-direction:column; gap:8px; justify-content:flex-end;">
+                                <label><input type="checkbox" id="proxmoxVerify" checked> <?php echo htmlspecialchars(t('asset-management.proxmox.field_verify')); ?></label>
+                                <label><input type="checkbox" id="proxmoxActive" checked> <?php echo htmlspecialchars(t('asset-management.proxmox.field_active')); ?></label>
+                            </div>
+                        </div>
+                        <p style="color:var(--text-muted, #666); font-size:12px; margin-top:10px;"><?php echo htmlspecialchars(t('asset-management.proxmox.perm_help')); ?></p>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="proxmoxCloseForm()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
+                    <button type="submit" form="proxmoxForm" class="btn btn-primary"><?php echo htmlspecialchars(t('common.save')); ?></button>
+                </div>
+            </div>
+        </div>
+
         <div class="tab-content<?php echo $activeTabId === 'intune' ? ' active' : ''; ?>" id="intune-tab" data-capability="<?php echo Cap::ASSETS_INTUNE; ?>">
             <div class="settings-section">
                 <div class="settings-section-header">
@@ -3717,6 +3807,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
     <?php /* Loaded last so it can wrap this page's globals; inert on desktop. */ ?>
     <script>window.assetTypeIcons = <?php echo json_encode($assetTypeIcons, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
+    <script src="../../assets/js/proxmox-settings.js?v=1"></script>
     <script src="../../assets/js/network-mapper-icons.js?v=3"></script>
     <script src="../../assets/js/mobile.js?v=70"></script>
 </body>
