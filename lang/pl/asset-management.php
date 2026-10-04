@@ -532,6 +532,7 @@ Czy mimo to zmienić nazwę?',
         'bios_version' => 'Wersja BIOS',
     ],
     'servers' => [
+        'col_source' => 'Źródło',
         'total_vms' => 'Łącznie maszyn wirtualnych',
         'active' => 'Aktywne',
         'offline' => 'Offline',

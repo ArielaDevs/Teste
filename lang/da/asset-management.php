@@ -532,6 +532,7 @@ Omdøb det alligevel?',
         'bios_version' => 'BIOS-version',
     ],
     'servers' => [
+        'col_source' => 'Kilde',
         'total_vms' => 'VM\'er i alt',
         'active' => 'Aktive',
         'offline' => 'Offline',

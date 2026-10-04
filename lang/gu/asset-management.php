@@ -532,6 +532,7 @@ return [
         'bios_version' => 'BIOS વર્ઝન',
     ],
     'servers' => [
+        'col_source' => 'સ્ત્રોત',
         'total_vms' => 'કુલ VMs',
         'active' => 'સક્રિય',
         'offline' => 'ઓફલાઇન',

@@ -532,6 +532,7 @@ return [
         'bios_version' => 'Версія BIOS',
     ],
     'servers' => [
+        'col_source' => 'Джерело',
         'total_vms' => 'Всього ВМ',
         'active' => 'Активні',
         'offline' => 'Офлайн',

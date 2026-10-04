@@ -669,6 +669,7 @@ return [
 
     // Servers (vCenter) view
     'servers' => [
+        'col_source' => 'Source',
         'total_vms'         => 'Total VMs',
         'active'            => 'Active',
         'offline'           => 'Offline',

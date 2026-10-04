@@ -711,6 +711,7 @@ $translationNamespaces = ['common', 'asset-management'];
                     <thead>
                         <tr>
                             <th onclick="sortTable('name')"><?php echo htmlspecialchars(t('asset-management.servers.col_name')); ?> <span class="sort-arrow">&#9650;</span></th>
+                            <th onclick="sortTable('source_name')"><?php echo htmlspecialchars(t('asset-management.servers.col_source')); ?> <span class="sort-arrow">&#9650;</span></th>
                             <th onclick="sortTable('power_state')"><?php echo htmlspecialchars(t('asset-management.servers.col_status')); ?> <span class="sort-arrow">&#9650;</span></th>
                             <th onclick="sortTable('num_cpu')"><?php echo htmlspecialchars(t('asset-management.servers.col_vcpu')); ?> <span class="sort-arrow">&#9650;</span></th>
                             <th onclick="sortTable('memory_gb')"><?php echo htmlspecialchars(t('asset-management.servers.col_memory')); ?> <span class="sort-arrow">&#9650;</span></th>
@@ -722,7 +723,7 @@ $translationNamespaces = ['common', 'asset-management'];
                         </tr>
                     </thead>
                     <tbody id="serversBody">
-                        <tr><td colspan="9" style="text-align: center; padding: 40px; color: #888;"><?php echo htmlspecialchars(t('asset-management.common.loading')); ?></td></tr>
+                        <tr><td colspan="10" style="text-align: center; padding: 40px; color: #888;"><?php echo htmlspecialchars(t('asset-management.common.loading')); ?></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -865,7 +866,7 @@ $translationNamespaces = ['common', 'asset-management'];
             if (filteredServers.length === 0) {
                 if (allServers.length === 0) {
                     tbody.innerHTML = `
-                        <tr><td colspan="9">
+                        <tr><td colspan="10">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
@@ -878,7 +879,7 @@ $translationNamespaces = ['common', 'asset-management'];
                             </div>
                         </td></tr>`;
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 30px; color: #888;">${window.t('asset-management.servers.no_match')}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 30px; color: #888;">${window.t('asset-management.servers.no_match')}</td></tr>`;
                 }
                 return;
             }
@@ -886,6 +887,7 @@ $translationNamespaces = ['common', 'asset-management'];
             tbody.innerHTML = filteredServers.map((s, i) => `
                 <tr onclick="showDetail(${i})">
                     <td><span class="server-name">${escapeHtml(s.name)}</span></td>
+                    <td><span class="status-badge" style="background:${s.source === 'proxmox' ? '#e8f0fe' : '#f3f4f6'};color:${s.source === 'proxmox' ? '#1a56db' : '#374151'};">${escapeHtml(s.source_name || 'vCenter')}</span></td>
                     <td>
                         <span class="status-badge ${s.power_state}">
                             <span class="status-dot ${s.power_state}"></span>
@@ -905,7 +907,7 @@ $translationNamespaces = ['common', 'asset-management'];
 
         function showEmptyState(message) {
             document.getElementById('serversBody').innerHTML = `
-                <tr><td colspan="9" style="text-align: center; padding: 30px; color: #888;">${escapeHtml(message)}</td></tr>`;
+                <tr><td colspan="10" style="text-align: center; padding: 30px; color: #888;">${escapeHtml(message)}</td></tr>`;
         }
 
         function formatGuestOS(os) {

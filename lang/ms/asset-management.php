@@ -532,6 +532,7 @@ Namakan semula juga?',
         'bios_version' => 'Versi BIOS',
     ],
     'servers' => [
+        'col_source' => 'Sumber',
         'total_vms' => 'Jumlah VM',
         'active' => 'Aktif',
         'offline' => 'Luar Talian',

@@ -532,6 +532,7 @@ return [
         'bios_version' => 'BIOS संस्करण',
     ],
     'servers' => [
+        'col_source' => 'स्रोत',
         'total_vms' => 'कुल VM',
         'active' => 'सक्रिय',
         'offline' => 'ऑफ़लाइन',

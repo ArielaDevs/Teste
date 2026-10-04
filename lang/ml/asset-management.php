@@ -532,6 +532,7 @@ return [
         'bios_version' => 'BIOS പതിപ്പ്',
     ],
     'servers' => [
+        'col_source' => 'ഉറവിടം',
         'total_vms' => 'ആകെ VM-കൾ',
         'active' => 'സജീവം',
         'offline' => 'ഓഫ്‌ലൈൻ',

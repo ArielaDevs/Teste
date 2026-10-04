@@ -1900,6 +1900,7 @@ CREATE TABLE IF NOT EXISTS `proxmox_vms` (
     `os_type`            VARCHAR(50) NULL,
     `ip_addresses`       TEXT NULL,
     `mac_addresses`      TEXT NULL,
+    `details_json`       LONGTEXT NULL,
     `last_seen_datetime` DATETIME NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_proxmox_vm` (`connection_id`, `vmid`),

@@ -531,6 +531,7 @@ Le renommer quand même ?',
         'bios_version' => 'Version du BIOS',
     ],
     'servers' => [
+        'col_source' => 'Source',
         'total_vms' => 'Total des VM',
         'active' => 'Actives',
         'offline' => 'Hors ligne',

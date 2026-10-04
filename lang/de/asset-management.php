@@ -532,6 +532,7 @@ Trotzdem umbenennen?',
         'bios_version' => 'BIOS-Version',
     ],
     'servers' => [
+        'col_source' => 'Quelle',
         'total_vms' => 'VMs gesamt',
         'active' => 'Aktiv',
         'offline' => 'Offline',

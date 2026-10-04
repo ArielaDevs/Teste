@@ -532,6 +532,7 @@ Endre namn likevel?',
         'bios_version' => 'BIOS-versjon',
     ],
     'servers' => [
+        'col_source' => 'Kjelde',
         'total_vms' => 'VM-ar totalt',
         'active' => 'Aktive',
         'offline' => 'Fråkopla',

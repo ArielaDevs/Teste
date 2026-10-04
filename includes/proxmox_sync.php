@@ -198,16 +198,16 @@ function proxmoxSyncConnection(PDO $conn, int $connectionId): array
         // Write every VM we saw.
         $upsert = $conn->prepare(
             "INSERT INTO proxmox_vms (connection_id, vmid, vm_type, node_name, cluster_name, name, status, vcpus, memory_mb,
-                disk_gb, os_type, ip_addresses, mac_addresses, last_seen_datetime)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
+                disk_gb, os_type, ip_addresses, mac_addresses, details_json, last_seen_datetime)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
              ON DUPLICATE KEY UPDATE vm_type = VALUES(vm_type), node_name = VALUES(node_name), cluster_name = VALUES(cluster_name),
                 name = VALUES(name), status = VALUES(status), vcpus = VALUES(vcpus), memory_mb = VALUES(memory_mb),
                 disk_gb = VALUES(disk_gb), os_type = VALUES(os_type), ip_addresses = VALUES(ip_addresses),
-                mac_addresses = VALUES(mac_addresses), last_seen_datetime = VALUES(last_seen_datetime)"
+                mac_addresses = VALUES(mac_addresses), details_json = VALUES(details_json), last_seen_datetime = VALUES(last_seen_datetime)"
         );
         foreach ($pending as $v) {
             $upsert->execute([$connectionId, $v['vmid'], $v['vm_type'], $v['node_name'], $v['cluster_name'], $v['name'],
-                $v['status'], $v['vcpus'], $v['memory_mb'], $v['disk_gb'], $v['os_type'], $v['ip_addresses'], $v['mac_addresses']]);
+                $v['status'], $v['vcpus'], $v['memory_mb'], $v['disk_gb'], $v['os_type'], $v['ip_addresses'], $v['mac_addresses'], $v['details_json']]);
             $summary['vms']++;
         }
 
@@ -268,10 +268,20 @@ function proxmoxVmDetails(array $c, array $auth, string $type, string $node, int
     }
 
     $ips = [];
+    $guestIfaces = [];   // every non-loopback interface the guest agent reports, for the detail view
     if ($type === 'qemu') {
         if (($listEntry['status'] ?? '') === 'running') {
             $agent = proxmoxTryGet($c, $auth, $base . '/agent/network-get-interfaces');
             foreach (is_array($agent['result'] ?? null) ? $agent['result'] : [] as $iface) {
+                if (($iface['name'] ?? '') !== 'lo') {
+                    $guestIfaces[] = [
+                        'name' => (string)($iface['name'] ?? ''),
+                        'mac_address' => (string)($iface['hardware-address'] ?? ''),
+                        'ip' => ['ip_addresses' => array_values(array_map(function ($a) {
+                            return ['ip_address' => (string)($a['ip-address'] ?? ''), 'ip_address_type' => (string)($a['ip-address-type'] ?? '')];
+                        }, is_array($iface['ip-addresses'] ?? null) ? $iface['ip-addresses'] : []))],
+                    ];
+                }
                 $mac = strtolower((string)($iface['hardware-address'] ?? ''));
                 if ($mac === '' || !in_array($mac, $macs, true)) {
                     continue;   // docker0, veth*, br-*: not one of this VM's NICs
@@ -310,7 +320,58 @@ function proxmoxVmDetails(array $c, array $auth, string $type, string $node, int
         'os_type'      => (string)($cfg['ostype'] ?? ''),
         'ip_addresses' => $ips ? implode(', ', array_values(array_unique($ips))) : null,
         'mac_addresses'=> $macs ? implode(', ', array_values(array_unique($macs))) : null,
+        'details_json' => json_encode(proxmoxVmDetailBlock($cfg, $type, $guestIfaces), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
     ];
+}
+
+/**
+ * The disks, adapters and guest interfaces in the shape the asset detail view reads
+ * (the same shape the vCenter sync stores as raw_data), so Proxmox VMs show the same
+ * sections without any special casing in the page.
+ */
+function proxmoxVmDetailBlock(array $cfg, string $type, array $guestIfaces): array
+{
+    $disks = [];
+    $nics = [];
+    foreach ($cfg as $key => $value) {
+        $key = (string)$key;
+        $value = (string)$value;
+        $isDisk = $type === 'qemu'
+            ? (bool)preg_match('/^(scsi|virtio|ide|sata)\d+$/', $key)
+            : ($key === 'rootfs' || (bool)preg_match('/^mp\d+$/', $key));
+        if ($isDisk && strpos($value, 'media=cdrom') === false && preg_match('/size=(\d+(?:\.\d+)?)([KMGT]?)/i', $value, $m)) {
+            $gb = proxmoxSizeToGb((float)$m[1], strtoupper($m[2]));
+            $disks[$key] = [
+                'label'    => $key,
+                'capacity' => (int)round($gb * 1073741824),
+                'type'     => preg_match('/^(scsi|virtio|ide|sata)/', $key, $t) ? $t[1] : 'rootfs',
+                'backing'  => ['type' => explode(':', $value)[0]],
+            ];
+        }
+        if (preg_match('/^net\d+$/', $key)) {
+            $model = $type === 'qemu' && preg_match('/^(virtio|e1000e?|vmxnet3|rtl8139)=/i', $value, $mm)
+                ? strtolower($mm[1]) : ($type === 'lxc' ? 'veth' : 'unknown');
+            $mac = preg_match('/([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})/', $value, $mc) ? strtolower($mc[1]) : '';
+            $bridge = preg_match('/bridge=([^,]+)/', $value, $bm) ? $bm[1] : '';
+            $nics[$key] = [
+                'label'       => $key,
+                'type'        => $model,
+                'mac_address' => $mac,
+                'state'       => strpos($value, 'link_down=1') !== false ? 'disconnected' : 'connected',
+                'backing'     => ['network_name' => $bridge],
+            ];
+        }
+    }
+    return [
+        'vm_detail'        => ['disks' => $disks, 'nics' => $nics],
+        'guest_networking' => $guestIfaces,
+    ];
+}
+
+/** Proxmox size suffix to GB: K, M, G, T (no suffix means GB). */
+function proxmoxSizeToGb(float $n, string $unit): float
+{
+    return $unit === 'T' ? $n * 1024 : ($unit === 'M' ? $n / 1024 : ($unit === 'K' ? $n / 1048576 : $n));
 }
 
 /** Provisioned disk size in GB, from the config keys (not live usage). */

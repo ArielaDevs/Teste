@@ -532,6 +532,7 @@ Renomear mesmo assim?',
         'bios_version' => 'Versão do BIOS',
     ],
     'servers' => [
+        'col_source' => 'Origem',
         'total_vms' => 'Total de VMs',
         'active' => 'Ativo',
         'offline' => 'Offline',
