@@ -3403,6 +3403,65 @@ return array (
             ),
           ),
         ),
+        'tech_analyst' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The technical contact when it is one of your analysts (#162). At most one of tech_contact and tech_analyst is set.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_supplier' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The customer when it is a supplier (#162). Never set together with customer.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The supplier contact the domain is for (#162), usually alongside customer_supplier.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+            'email' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
         'nameservers' => 
         array (
           'type' => 'array',
@@ -3779,6 +3838,65 @@ return array (
               'type' => 'integer',
             ),
             'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_analyst' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The technical contact when it is one of your analysts (#162). At most one of tech_contact and tech_analyst is set.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_supplier' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The customer when it is a supplier (#162). Never set together with customer.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The supplier contact the domain is for (#162), usually alongside customer_supplier.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+            'email' => 
             array (
               'type' => 'string',
               'nullable' => true,
@@ -4169,6 +4287,65 @@ return array (
               'type' => 'integer',
             ),
             'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'tech_analyst' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The technical contact when it is one of your analysts (#162). At most one of tech_contact and tech_analyst is set.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_supplier' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The customer when it is a supplier (#162). Never set together with customer.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+          ),
+        ),
+        'customer_contact' => 
+        array (
+          'type' => 'object',
+          'nullable' => true,
+          'description' => 'The supplier contact the domain is for (#162), usually alongside customer_supplier.',
+          'properties' => 
+          array (
+            'id' => 
+            array (
+              'type' => 'integer',
+            ),
+            'name' => 
+            array (
+              'type' => 'string',
+              'nullable' => true,
+            ),
+            'email' => 
             array (
               'type' => 'string',
               'nullable' => true,

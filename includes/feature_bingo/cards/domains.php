@@ -39,11 +39,29 @@ return [
         'tier'     => 'extra',
         'category' => 'organisation',
         'title'    => 'Domains named for a customer',
-        'what'     => 'The person a domain is looked after for, chosen from the people in the domain\'s company.',
+        'what'     => 'Who a domain is looked after for: a person in the domain\'s company, or a supplier or one of its contacts. Their People page lists every domain they are named on.',
         'why'      => 'When a customer asks "which of our domains do you manage?", or leaves, the answer is a filter rather than a memory.',
         'done'     => 'At least one domain names its customer (demo data not counted).',
         'link'     => 'domains/?view=all',
-        'check'    => ['rows', 'domains', 'customer_user_id IS NOT NULL AND is_demo = 0'],
+        'check'    => ['any', [
+            ['rows', 'domains', 'customer_user_id IS NOT NULL AND is_demo = 0'],
+            ['rows', 'domains', 'customer_supplier_id IS NOT NULL AND is_demo = 0'],   // #162
+        ]],
+    ],
+    [
+        'id'       => 'domains.tech_contact',
+        'module'   => 'domains',
+        'tier'     => 'extra',
+        'category' => 'organisation',
+        'title'    => 'A technical contact on each domain',
+        'what'     => 'Who looks after a domain\'s DNS and hosting: one of your analysts, or a contact at a supplier such as the web agency or host.',
+        'why'      => 'When the name servers change or a certificate fails, you know straight away who to call - and a supplier\'s page shows every domain its people look after.',
+        'done'     => 'At least one domain names its technical contact (demo data not counted).',
+        'link'     => 'domains/?view=all',
+        'check'    => ['any', [
+            ['rows', 'domains', 'tech_contact_id IS NOT NULL AND is_demo = 0'],
+            ['rows', 'domains', 'tech_analyst_id IS NOT NULL AND is_demo = 0'],   // #162
+        ]],
     ],
     [
         'id'       => 'domains.alerts',

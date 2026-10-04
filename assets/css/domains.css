@@ -183,6 +183,7 @@ body { --accent: var(--dom-accent, #4d7c0f); --accent-hover: var(--dom-accent-ho
 .dom-person-results li small { display: block; color: var(--text-dim, #888); font-size: 11.5px; }
 .dom-person-results li[aria-selected="true"], .dom-person-results li:hover { background: var(--surface-hover, #f3f4f6); }
 .dom-person-results li[aria-disabled="true"] { cursor: default; color: var(--text-dim, #888); }
+.dom-person-results li.dom-person-group { cursor: default; padding: 6px 8px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim, #888); background: none; }
 .dom-progress { height: 8px; border-radius: 4px; background: var(--surface-2, #eee); overflow: hidden; margin: 10px 0 6px; }
 .dom-progress > div { height: 100%; background: var(--dom-accent, #4d7c0f); width: 0; transition: width .25s; }
 .dom-skip-list { max-height: 180px; overflow-y: auto; font-size: 12px; border: 1px solid var(--border-soft, #eee); border-radius: 6px; padding: 8px 10px; }

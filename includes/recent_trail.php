@@ -106,6 +106,8 @@ const RECENT_TRAIL_MODULES = [
     'domain'            => 'domains',
     'person'            => 'people',
     'company'           => 'people',
+    'supplier'          => 'people',
+    'supplier_contact'  => 'people',
 ];
 
 /**
@@ -474,6 +476,18 @@ function recentTrailLabelsForType(PDO $conn, int $analystId, string $type, array
         case 'company':
             $sql  = "SELECT id, name AS label FROM tenants WHERE id IN ($in)";
             $gate = fn($id) => !isMultiTenant($conn) || analystCanAccessTenant($conn, $analystId, (int)$id);
+            break;
+
+        // Install-wide records owned by Contracts (#153 step 3): the page needs
+        // Contracts as well as People, so the trail does too.
+        case 'supplier':
+            $sql  = "SELECT id, COALESCE(NULLIF(trading_name, ''), legal_name) AS label FROM suppliers WHERE id IN ($in)";
+            $gate = fn($id) => analystCanAccessModule($conn, $analystId, 'contracts');
+            break;
+
+        case 'supplier_contact':
+            $sql  = "SELECT id, TRIM(CONCAT(first_name, ' ', surname)) AS label FROM contacts WHERE id IN ($in)";
+            $gate = fn($id) => analystCanAccessModule($conn, $analystId, 'contracts');
             break;
 
         case 'contract':

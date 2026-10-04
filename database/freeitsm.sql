@@ -7306,6 +7306,9 @@ CREATE TABLE IF NOT EXISTS `domains` (
     `owner_analyst_id`       INT NULL,
     `tech_contact_id`        INT NULL,               -- a Contracts contact (the agency, the host)
     `customer_user_id`       INT NULL,               -- the person at the customer this domain is for
+    `customer_supplier_id`   INT NULL,               -- OR a supplier (organisation) it is for (#162)
+    `customer_contact_id`    INT NULL,               -- and optionally one of that supplier's contacts
+    `tech_analyst_id`        INT NULL,               -- OR the technical contact is one of your analysts (#162)
     `nameservers`            TEXT NULL,              -- one per line
     `dns_provider`           VARCHAR(255) NULL,
     `hosting_provider`       VARCHAR(255) NULL,
@@ -7339,6 +7342,9 @@ CREATE TABLE IF NOT EXISTS `domains` (
     KEY `idx_domains_expiry` (`expiry_date`),
     KEY `idx_domains_status` (`status_id`),
     KEY `idx_domains_customer_user` (`customer_user_id`),
+    KEY `idx_domains_customer_supplier` (`customer_supplier_id`),
+    KEY `idx_domains_customer_contact` (`customer_contact_id`),
+    KEY `idx_domains_tech_analyst` (`tech_analyst_id`),
     CONSTRAINT `fk_domains_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_status` FOREIGN KEY (`status_id`) REFERENCES `domain_statuses` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_registrar` FOREIGN KEY (`registrar_supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
@@ -7346,6 +7352,9 @@ CREATE TABLE IF NOT EXISTS `domains` (
     CONSTRAINT `fk_domains_owner` FOREIGN KEY (`owner_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_customer_user` FOREIGN KEY (`customer_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_tech_contact` FOREIGN KEY (`tech_contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_customer_supplier` FOREIGN KEY (`customer_supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_customer_contact` FOREIGN KEY (`customer_contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_domains_tech_analyst` FOREIGN KEY (`tech_analyst_id`) REFERENCES `analysts` (`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_domains_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

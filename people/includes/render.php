@@ -14,13 +14,16 @@ function pplE($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF
 function pplUrl(?string $rel): string { return $rel === null ? '#' : BASE_URL . $rel; }
 
 /** The coloured strip of counts across the top of a page. */
-function pplStats(array $sections, bool $person): string
+function pplStats(array $sections, bool $person, array $labels = []): string
 {
     $out = '';
-    $add = function (string $key, string $label, string $value, string $class = '') use (&$out) {
+    // $labels renames a section's figure - a supplier's contracts are not "as customer".
+    $add = function (string $key, string $label, string $value, string $class = '') use (&$out, $labels) {
+        $label = $labels[$key] ?? $label;
         $out .= '<a class="ppl-stat ' . $class . '" href="#sec-' . $key . '"><span class="v">' . pplE($value) . '</span><span class="l">' . pplE($label) . '</span></a>';
     };
     if (isset($sections['people']))    $add('people', t('people.company.people'), (string)count($sections['people']));
+    if (isset($sections['contacts']))  $add('contacts', t('people.supplier.contacts'), (string)count($sections['contacts']));
     if (isset($sections['tickets']))   $add('tickets', t('people.section.tickets'), t('people.section.tickets_open', ['open' => $sections['tickets']['open'], 'total' => $sections['tickets']['total']]), $sections['tickets']['open'] > 0 ? 'accent' : '');
     if (isset($sections['assets']))    $add('assets', t($person ? 'people.section.assets_person' : 'people.section.assets'), (string)$sections['assets']['total']);
     if (isset($sections['contracts'])) $add('contracts', t('people.section.contracts'), (string)$sections['contracts']['total']);
@@ -80,7 +83,7 @@ function pplSectionTickets(array $s, bool $person): string
     return pplCard('tickets', t('people.section.tickets'), $s['total'], $head, $rows, $s['total'] > count($s['rows']), $extra);
 }
 
-function pplSectionAssets(array $s, bool $person): string
+function pplSectionAssets(array $s, bool $person, ?string $title = null): string
 {
     $head = [t('people.section.col_asset'), t('people.section.col_type'), t('people.section.col_model'), t('people.section.col_status')];
     $head[] = $person ? t('people.section.col_since') : t('people.section.col_holder');
@@ -91,31 +94,39 @@ function pplSectionAssets(array $s, bool $person): string
         pplE($r['status']),
         pplE($person ? fmt_date($r['assigned']) : ($r['holder'] ?? '')),
     ], $s['rows']);
-    return pplCard('assets', t($person ? 'people.section.assets_person' : 'people.section.assets'), $s['total'], $head, $rows, $s['total'] > count($s['rows']));
+    return pplCard('assets', $title ?? t($person ? 'people.section.assets_person' : 'people.section.assets'), $s['total'], $head, $rows, $s['total'] > count($s['rows']));
 }
 
-function pplSectionContracts(array $s): string
+function pplSectionContracts(array $s, bool $withParty = true, ?string $title = null): string
 {
-    $head = [t('people.section.col_contract'), t('people.section.col_with'), t('people.section.col_status'), t('people.section.col_ends')];
-    $rows = array_map(fn($r) => [
-        pplLink($r['url'], trim(($r['number'] ? $r['number'] . ' - ' : '') . $r['title'])) . ($r['is_active'] ? '' : ' ' . pplPill(t('people.section.inactive'), null, 'muted')),
-        pplE($r['party']),
-        pplE($r['status']),
-        pplE(peopleBareDate($r['end'])),
-    ], $s['rows']);
-    return pplCard('contracts', t('people.section.contracts'), $s['total'], $head, $rows);
+    // A supplier's own page leaves out "With" - every row would name the supplier.
+    $head = $withParty
+        ? [t('people.section.col_contract'), t('people.section.col_with'), t('people.section.col_status'), t('people.section.col_ends')]
+        : [t('people.section.col_contract'), t('people.section.col_status'), t('people.section.col_ends')];
+    $rows = array_map(function ($r) use ($withParty) {
+        $cells = [pplLink($r['url'], trim(($r['number'] ? $r['number'] . ' - ' : '') . $r['title'])) . ($r['is_active'] ? '' : ' ' . pplPill(t('people.section.inactive'), null, 'muted'))];
+        if ($withParty) $cells[] = pplE($r['party']);
+        $cells[] = pplE($r['status']);
+        $cells[] = pplE(peopleBareDate($r['end']));
+        return $cells;
+    }, $s['rows']);
+    return pplCard('contracts', $title ?? t('people.section.contracts'), $s['total'], $head, $rows);
 }
 
-function pplSectionDomains(array $s, bool $person): string
+function pplSectionDomains(array $s, bool $person, ?string $title = null): string
 {
-    $head = [t('people.section.col_domain'), t('people.section.col_status'), t('people.section.col_expires'), t('people.section.col_grade')];
-    $rows = array_map(fn($r) => [
-        pplLink($r['url'], $r['name']) . ($r['name'] !== $r['domain'] ? '<div class="ppl-dim">' . pplE($r['domain']) . '</div>' : ''),
-        pplPill($r['status'], $r['status_colour']),
-        pplE(peopleBareDate($r['expiry'])),
-        pplE($r['grade']),
-    ], $s['rows']);
-    return pplCard('domains', t($person ? 'people.section.domains_person' : 'people.section.domains'), $s['total'], $head, $rows);
+    // Supplier and contact pages say HOW each domain involves them (#162).
+    $roles = $s['rows'] && array_key_exists('roles', $s['rows'][0]);
+    $head = [t('people.section.col_domain')];
+    if ($roles) $head[] = t('people.section.col_as');
+    array_push($head, t('people.section.col_status'), t('people.section.col_expires'), t('people.section.col_grade'));
+    $rows = array_map(function ($r) use ($roles) {
+        $cells = [pplLink($r['url'], $r['name']) . ($r['name'] !== $r['domain'] ? '<div class="ppl-dim">' . pplE($r['domain']) . '</div>' : '')];
+        if ($roles) $cells[] = implode(' ', array_map(fn($x) => pplPill(t('people.section.domain_role.' . $x), null, 'muted'), $r['roles']));
+        array_push($cells, pplPill($r['status'], $r['status_colour']), pplE(peopleBareDate($r['expiry'])), pplE($r['grade']));
+        return $cells;
+    }, $s['rows']);
+    return pplCard('domains', $title ?? t($person ? 'people.section.domains_person' : 'people.section.domains'), $s['total'], $head, $rows);
 }
 
 function pplSectionCoursesPerson(array $s): string
@@ -189,7 +200,7 @@ function pplHead(string $title, array $namespaces = ['common', 'people'], array 
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/people.css?v=4">
     <?php foreach ($extraCss as $css): ?><link rel="stylesheet" href="<?php echo BASE_URL . pplE($css); ?>">
     <?php endforeach; ?>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/mobile.css?v=166">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/mobile.css?v=167">
     <script>function pplShowAll(b) { b.closest('.ppl-card').querySelectorAll('tr.ppl-extra').forEach(function (r) { r.hidden = false; }); b.remove(); }</script>
     <?php
 }
