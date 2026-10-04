@@ -52,7 +52,10 @@ function getContributors(): array
                       . 'templates, mandatory-step gating, analyst input capture and workflow '
                       . 'integration — and offered it to the project unprompted. It is the first '
                       . 'whole module FreeITSM has received from the community, and it started with '
-                      . 'a careful argument about why neither Knowledge nor Tasks solved the problem.',
+                      . 'a careful argument about why neither Knowledge nor Tasks solved the problem. '
+                      . 'Since then: separate auto-create and profile-sync settings for single '
+                      . 'sign-on (2.10.0), and asset reconciliation by serial number, automatic '
+                      . 'asset tags and configurable physical labels (3.1.0).',
         ],
         [
             'name'   => 'Abdul Aziz',
