@@ -25,6 +25,7 @@
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/tenancy.php';
+require_once __DIR__ . '/ticket_numbering.php';
 
 // The workflow engine powers the outcome notifications. Load it if nothing else has;
 // dispatch is always guarded, so a missing engine degrades to "no notification", never
@@ -287,7 +288,9 @@ function catalogueCreateTicketFromSubmission(PDO $conn, array $sub, array $overr
     // — without naming a person. Null unless the rule set one.
     $teamId       = isset($overrides['assigned_team_id'])    && $overrides['assigned_team_id']    ? (int)$overrides['assigned_team_id']    : null;
 
-    $ticketNumber = catalogueGenerateTicketNumber($conn);
+    // TRAP: the install's numbering, never a number made here - see
+    //   messagingGenerateTicketNumber() for what went wrong when it was.
+    $ticketNumber = TicketNumbering::next($conn, $typeId, $tenantId !== null ? (int)$tenantId : null);
 
     $conn->prepare(
         "INSERT INTO tickets (ticket_number, subject, status_id, priority_id,
@@ -524,17 +527,6 @@ function catalogueSubmissionBodyHtml(PDO $conn, int $submissionId, string $formT
     return $html;
 }
 
-/** A unique XXX-000-00000 ticket number. Mirrors the portal path's generator. */
-function catalogueGenerateTicketNumber(PDO $conn): string {
-    for ($i = 0; $i < 10; $i++) {
-        $number = chr(rand(65, 90)) . chr(rand(65, 90)) . chr(rand(65, 90))
-                . '-' . rand(100, 999) . '-' . str_pad((string)rand(0, 99999), 5, '0', STR_PAD_LEFT);
-        $c = $conn->prepare("SELECT COUNT(*) FROM tickets WHERE ticket_number = ?");
-        $c->execute([$number]);
-        if (!(int)$c->fetchColumn()) return $number;
-    }
-    throw new Exception('Failed to generate a ticket number');
-}
 
 /**
  * The approver's inbox list.

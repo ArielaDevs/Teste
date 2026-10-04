@@ -96,7 +96,12 @@ function reopenTicketForCustomerReply(PDO $conn, int $ticketId): bool {
         )->fetchColumn();
         if ($openId === false || $openId === null) return false;   // every status is closed?!
 
-        $conn->prepare("UPDATE tickets SET status_id = ?, updated_datetime = UTC_TIMESTAMP() WHERE id = ?")
+        // closed_datetime goes too, exactly as a status change in the ticket
+        // service does it. TRAP: leaving it set made a reopened ticket still
+        // count as closed everywhere that reads closed_datetime - reports, and
+        // the chat lookup, which would open a NEW ticket for the customer's
+        // next message rather than continue the one just reopened.
+        $conn->prepare("UPDATE tickets SET status_id = ?, closed_datetime = NULL, updated_datetime = UTC_TIMESTAMP() WHERE id = ?")
              ->execute([(int)$openId, $ticketId]);
         return true;
     } catch (Exception $e) {

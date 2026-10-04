@@ -18,6 +18,7 @@ require_once __DIR__ . '/../ticket_snooze.php';
 require_once __DIR__ . '/../uploads.php';   // uploadStoreBytes() — see F1
 require_once __DIR__ . '/../csat.php';      // csatPendingRequestForChat(), rating helpers
 require_once __DIR__ . '/../i18n.php';      // I18n::tFor() — Telegram bot replies in the customer's own language_code
+require_once __DIR__ . '/../ticket_numbering.php';
 
 /**
  * Ingest one normalised inbound message for a (decrypted) channel row.
@@ -139,8 +140,10 @@ function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
     $subject   = null;
 
     if (!$ticketId) {
-        $ticketNumber = messagingGenerateTicketNumber($conn);
+        // The company is decided BEFORE the number: per-company numbering and
+        // {COMPANY} both need it.
         $tenantId     = resolveTicketTenantForChannel($conn, $channel['id'], $from);
+        $ticketNumber = messagingGenerateTicketNumber($conn, $tenantId);
         $originId     = getChannelOriginId($conn, $channelType);
         $subject      = buildChannelSubject($channelType, $displayName, $body);
 
@@ -839,21 +842,20 @@ function buildChannelSubject(string $channelType, string $displayName, string $b
     return "$label: $snippet";
 }
 
-/** Unique ticket number in the existing XXX-NNN-NNNNN format. */
-function messagingGenerateTicketNumber(PDO $conn): string
+/**
+ * The number for a ticket opened by a chat (WhatsApp, Telegram, Slack, Teams,
+ * Mattermost, web chat).
+ *
+ * TRAP: never make a ticket number here, or anywhere else, by hand. This used
+ *   to roll its own XXX-NNN-NNNNN, so on an install set to TICKET-{######}
+ *   every chat ticket still came out as JNL-471-47705 (GH #71 moved three
+ *   generators onto TicketNumbering and missed this one, plus catalogue
+ *   approvals, merge and split). Pass the ticket's company: per-company
+ *   numbering and {COMPANY} need it.
+ */
+function messagingGenerateTicketNumber(PDO $conn, ?int $tenantId = null): string
 {
-    for ($attempt = 0; $attempt < 10; $attempt++) {
-        $letters = chr(rand(65, 90)) . chr(rand(65, 90)) . chr(rand(65, 90));
-        $n1 = rand(0, 9) . rand(0, 9) . rand(0, 9);
-        $n2 = rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9);
-        $ticketNumber = "$letters-$n1-$n2";
-        $check = $conn->prepare("SELECT COUNT(*) FROM tickets WHERE ticket_number = ?");
-        $check->execute([$ticketNumber]);
-        if (!$check->fetchColumn()) {
-            return $ticketNumber;
-        }
-    }
-    throw new Exception('Failed to generate unique ticket number');
+    return TicketNumbering::next($conn, null, $tenantId);
 }
 
 /**

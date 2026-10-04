@@ -2411,17 +2411,11 @@ class WorkflowEngine
             $statusId = $conn->query("SELECT id FROM ticket_statuses WHERE is_active = 1 ORDER BY is_default DESC, display_order, id LIMIT 1")->fetchColumn();
             $statusId = $statusId ? (int)$statusId : null;
 
-            // Mirror create_ticket.php's number generator pattern.
-            $ticketNumber = null;
-            for ($attempt = 0; $attempt < 10; $attempt++) {
-                $candidate = chr(rand(65, 90)) . chr(rand(65, 90)) . chr(rand(65, 90)) . '-'
-                           . rand(0, 9) . rand(0, 9) . rand(0, 9) . '-'
-                           . rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9);
-                $check = $conn->prepare("SELECT 1 FROM tickets WHERE ticket_number = ?");
-                $check->execute([$candidate]);
-                if (!$check->fetchColumn()) { $ticketNumber = $candidate; break; }
-            }
-            if (!$ticketNumber) throw new Exception('Failed to generate unique ticket number');
+            // TRAP: the install's numbering, never a number made here - see
+            //   messagingGenerateTicketNumber() for what went wrong when it was.
+            //   No company is stored on this ticket, which means the default one.
+            require_once dirname(__DIR__, 2) . '/includes/ticket_numbering.php';
+            $ticketNumber = TicketNumbering::next($conn, $typeId ? (int)$typeId : null, null);
 
             $conn->prepare(
                 "INSERT INTO tickets (ticket_number, subject, status_id, priority_id,
