@@ -245,6 +245,31 @@ try {
         // Non-fatal: ticket history keeps working; only the workflow action stays broken.
     }
 
+    // `asset_history.analyst_id` was NOT NULL, so a change nobody on the desk
+    // made - an Intune rename, an inventory agent reporting a new hostname
+    // (PR #164) - had no way to be recorded, and the write failed the whole
+    // request. Same probe-then-MODIFY shape as ticket_audit above, and safe for
+    // the same reason: every existing row already has an analyst. The foreign
+    // key is left exactly as it is - a NULL never violates it.
+    try {
+        $ahCol = $conn->prepare(
+            "SELECT IS_NULLABLE FROM information_schema.columns
+             WHERE table_schema = ? AND table_name = 'asset_history' AND column_name = 'analyst_id'"
+        );
+        $ahCol->execute([$dbName]);
+        $ahRow = $ahCol->fetch(PDO::FETCH_ASSOC);
+        if ($ahRow && strtoupper($ahRow['IS_NULLABLE']) === 'NO') {
+            $conn->exec("ALTER TABLE `asset_history` MODIFY `analyst_id` INT NULL");
+            $results[] = [
+                'table'   => 'asset_history',
+                'status'  => 'updated',
+                'details' => ["analyst_id: NOT NULL → NULL (Intune and the inventory agent record changes no analyst made)"],
+            ];
+        }
+    } catch (Exception $e) {
+        // Non-fatal: asset history keeps working for people; only automated entries stay broken.
+    }
+
     // `users_assets.user_id` was NOT NULL, so an asset could only ever be
     // recorded against a REQUESTER. Analysts hold equipment too — and they are
     // not requesters: on a real install five of seven analysts had no `users`
@@ -3834,9 +3859,6 @@ try {
                 $results[$pos]['status'] = 'error';
             }
         }
-    }
-
-
     }
 
     // Tag each result with its module for the card grid's colour + filter. This
