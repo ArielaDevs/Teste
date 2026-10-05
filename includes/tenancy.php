@@ -618,14 +618,85 @@ function slaCalendarTenantFilter(PDO $conn, int $analystId, string $alias = 'c')
 }
 
 /**
- * May this analyst access this *SLA notification rule*? F7.
+ * May this analyst READ this *SLA notification rule*? F7.
  *
- * NULL tenant_id = GLOBAL rule: it fires for every company, so reading or
- * changing it affects companies the analyst may never see. Writable — and
- * deletable — only by someone who can already reach every company
- * (analystHasAllTenantAccess), never by a merely company-scoped analyst with
- * the settings capability. A set tenant follows analystCanAccessTenant().
- * Same defensive shape as the other twins (unknown id → false).
+ * Contract form per docs/migrations/guard-patterns.md §2: a GLOBAL rule
+ * (tenant_id NULL) fires for every company, so every analyst may read it —
+ * the gate on globals is the settings capability, not the tenant. A set
+ * tenant follows analystCanAccessTenant(). Unknown id → false. This is the
+ * READ gate only; writing takes analystCanWriteSlaRule().
+ */
+function analystCanAccessSlaRule(PDO $conn, int $analystId, $ruleId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    $ruleId = (int) $ruleId;
+    if ($ruleId <= 0) {
+        return false;
+    }
+    try {
+        $stmt = $conn->prepare("SELECT tenant_id FROM sla_notification_rules WHERE id = ?");
+        $stmt->execute([$ruleId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        if ($row['tenant_id'] === null) {
+            return true;
+        }
+        return analystCanAccessTenant($conn, $analystId, (int) $row['tenant_id']);
+    } catch (Exception $e) {
+        return tenancyDegradeAllowed($e);
+    }
+}
+
+/**
+ * May this analyst WRITE (create/update/delete) an SLA notification rule for
+ * this company? F7, contract form per guard-patterns.md §2.
+ *
+ * Writing a GLOBAL rule (NULL) affects every company, so it takes reach over
+ * every company (analystHasAllTenantAccess), never just the settings
+ * capability. A set company follows analystCanAccessTenant(). Dormant
+ * installs always pass.
+ */
+function analystCanWriteSlaRule(PDO $conn, int $analystId, $tenantId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    if ($tenantId === null || $tenantId === '' || (int)$tenantId <= 0) {
+        return analystHasAllTenantAccess($conn, $analystId);
+    }
+    return analystCanAccessTenant($conn, $analystId, (int)$tenantId);
+}
+
+/**
+ * Scope an sla_notification_rules list query: the active company's rules plus
+ * the global (NULL-tenant) ones, which fire for every company. F7, contract
+ * form per guard-patterns.md §2 — globals appear under EVERY active company
+ * by design, unlike activeTenantFilter().
+ *
+ * Returns ['', []] when dormant or un-migrated, so single-company and
+ * part-migrated installs are unaffected.
+ *
+ * @return array [sqlFragment, params]
+ */
+function slaRuleTenantFilter(PDO $conn, int $analystId, string $alias = 'r'): array {
+    if (!isMultiTenant($conn)) {
+        return ['', []];
+    }
+    if (!tenancyColumnExists($conn, 'sla_notification_rules', 'tenant_id')) {
+        return ['', []];
+    }
+    $qualified = $alias === '' ? 'tenant_id' : "$alias.tenant_id";
+    return [" AND ($qualified = ? OR $qualified IS NULL)", [getActiveTenantId($conn, $analystId)]];
+}
+
+/**
+ * May this analyst act on (change/delete) this *SLA notification rule* by id?
+ * Write-gate twin of analystCanAccessSlaRule(): reads the row's company and
+ * applies analystCanWriteSlaRule(), so globals need all-tenant reach.
+ * Existing by-id call sites (delete/save endpoints) keep calling this name;
+ * behavior is unchanged, only the contract-named primitives are new.
  */
 function analystCanAccessSlaNotificationRule(PDO $conn, int $analystId, $ruleId): bool {
     if (!isMultiTenant($conn)) {
@@ -642,34 +713,21 @@ function analystCanAccessSlaNotificationRule(PDO $conn, int $analystId, $ruleId)
         if (!$row) {
             return false;
         }
-        if ($row['tenant_id'] === null) {
-            return analystHasAllTenantAccess($conn, $analystId);
-        }
-        return analystCanAccessTenant($conn, $analystId, (int) $row['tenant_id']);
+        $tenant = ($row['tenant_id'] === null) ? null : (int)$row['tenant_id'];
+        return analystCanWriteSlaRule($conn, $analystId, $tenant);
     } catch (Exception $e) {
         return tenancyDegradeAllowed($e);
     }
 }
 
 /**
- * Scope an sla_notification_rules list query: the active company's rules plus
- * the global (NULL-tenant) ones, which fire for every company. F7.
- *
- * Returns ['', []] when dormant or un-migrated, so single-company and
- * part-migrated installs are unaffected.
+ * Alias of slaRuleTenantFilter() kept for the list call sites wired earlier
+ * in this sprint; new code should use the contract name.
  *
  * @return array [sqlFragment, params]
  */
 function slaNotificationRuleTenantFilter(PDO $conn, int $analystId, string $alias = 'r'): array {
-    if (!isMultiTenant($conn)) {
-        return ['', []];
-    }
-    if (!tenancyColumnExists($conn, 'sla_notification_rules', 'tenant_id')) {
-        return ['', []];
-    }
-    $active = getActiveTenantId($conn, $analystId);
-    $qualified = $alias === '' ? 'tenant_id' : "$alias.tenant_id";
-    return [" AND ($qualified = ? OR $qualified IS NULL)", [$active]];
+    return slaRuleTenantFilter($conn, $analystId, $alias);
 }
 
 /**
