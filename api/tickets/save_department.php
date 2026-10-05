@@ -33,9 +33,11 @@ try {
     $conn = connectToDatabase();
     $raised = 0;
 
-    // F8: departments are pure per-company rows (migration 003). An update
-    // touches only a reachable department; a create lands in the analyst's
-    // active company (server-derived, never the client). Pre-migration the
+    // F8/F13: departments are pure per-company rows (migration 003). An update
+    // touches only a reachable department (owner's tenant read + access
+    // check). A create honors an explicit company from the request body when
+    // one is given AND reachable (analystCanAssignTenant), else the analyst's
+    // active company — never an unvalidated client value. Pre-migration the
     // tenant column does not exist and this block is skipped, so the endpoint
     // keeps working before Database Verify runs.
     $deptTenantSupported = tenancyColumnExists($conn, 'departments', 'tenant_id');
@@ -45,6 +47,13 @@ try {
             throw new Exception('Department not found');
         }
         $deptTenantId = getActiveTenantId($conn, (int)$_SESSION['analyst_id']);
+        if (!$id && isset($data['tenant_id']) && $data['tenant_id'] !== '' && $data['tenant_id'] !== null) {
+            $wanted = (int)$data['tenant_id'];
+            if (!analystCanAssignTenant($conn, (int)$_SESSION['analyst_id'], $wanted) || $wanted <= 0) {
+                throw new Exception('Department not found');
+            }
+            $deptTenantId = $wanted;
+        }
     } elseif ($deptTenantSupported) {
         $deptTenantId = getDefaultTenantId($conn);
     }

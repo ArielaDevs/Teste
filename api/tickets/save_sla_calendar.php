@@ -103,7 +103,19 @@ try {
             $pTenant = $pStmt->fetchColumn();
             $calTenantId = ($pTenant !== false && $pTenant !== null) ? (int)$pTenant : getActiveTenantId($conn, $analystId);
         } else {
+            // F13: a create honors an explicit company from the request body
+            // when one is given AND reachable (analystCanAssignTenant), else
+            // the active company — never an unvalidated client value.
             $calTenantId = getActiveTenantId($conn, $analystId);
+            if (isset($data['tenant_id']) && $data['tenant_id'] !== '' && $data['tenant_id'] !== null) {
+                $wanted = (int)$data['tenant_id'];
+                if (!analystCanAssignTenant($conn, $analystId, $wanted) || $wanted <= 0) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Calendar not found']);
+                    exit;
+                }
+                $calTenantId = $wanted;
+            }
         }
     } elseif ($calTenantSupported) {
         $calTenantId = getDefaultTenantId($conn);

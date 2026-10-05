@@ -90,6 +90,10 @@ try {
         echo json_encode(['success' => false, 'error' => 'Rule not found']);
         exit;
     }
+    // F13: a rule filed under a department must live in the same company as
+    // that department — otherwise company A's rule could fire on (or be read
+    // through) company B's queue. Checked once the rule's own tenant is known
+    // below; see the $deptTenantOk assertion after scope resolution.
 
     // Company scope for the write. New rules land in the analyst's active
     // company (server-derived, never from the client). An UPDATE never moves
@@ -104,6 +108,24 @@ try {
         // wakes with every existing row correctly attributed.
         $ruleTenantId = getDefaultTenantId($conn);
     }
+    // F13: a create honors an explicit company from the request body when one
+    // is given AND reachable (analystCanAssignTenant). Absent tenant_id means
+    // "this company" (the active one); an explicit null means "global" and
+    // takes reach over every company. Never an unvalidated client value.
+    if (!$id && $ruleTenantSupported && isMultiTenant($conn)
+        && array_key_exists('tenant_id', $data) && $data['tenant_id'] !== '') {
+        $wantedRaw = $data['tenant_id'];
+        $wanted = ($wantedRaw === null) ? null : (int)$wantedRaw;
+        if (!analystCanAssignTenant($conn, $analystId, $wanted === null ? null : $wanted)
+            || ($wanted !== null && $wanted <= 0)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Rule not found']);
+            exit;
+        }
+        $bodyTenantId = $wanted;
+    } else {
+        $bodyTenantId = getActiveTenantId($conn, $analystId);
+    }
     if ($ruleTenantSupported && isMultiTenant($conn)) {
         if ($id) {
             $tStmt = $conn->prepare("SELECT tenant_id FROM sla_notification_rules WHERE id = ?");
@@ -111,7 +133,7 @@ try {
             $tRow = $tStmt->fetch(PDO::FETCH_ASSOC);
             $ruleTenantId = ($tRow && $tRow['tenant_id'] !== null) ? (int)$tRow['tenant_id'] : null;
         } else {
-            $ruleTenantId = getActiveTenantId($conn, $analystId);
+            $ruleTenantId = $bodyTenantId;
         }
         // A GLOBAL (NULL-tenant) rule fires for every company: writing one
         // takes reach over every company, never just the settings capability.
@@ -124,6 +146,21 @@ try {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Rule not found']);
             exit;
+        }
+        // Same-company invariant: a company rule filed under another company's
+        // department is refused rather than stored as drift for the
+        // consistency script to find later. Global rules and default (NULL
+        // department) rules are exempt — scoping by department is absent there.
+        if ($ruleTenantId !== null && $departmentId !== null
+            && tenancyColumnExists($conn, 'departments', 'tenant_id')) {
+            $dStmt = $conn->prepare("SELECT tenant_id FROM departments WHERE id = ?");
+            $dStmt->execute([$departmentId]);
+            $dTenant = $dStmt->fetchColumn();
+            if ($dTenant !== false && $dTenant !== null && (int)$dTenant !== $ruleTenantId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Rule not found']);
+                exit;
+            }
         }
     }
 
