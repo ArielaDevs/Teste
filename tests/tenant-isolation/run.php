@@ -147,16 +147,36 @@ if ($conn === null) {
         $st->execute([$probe . '_tenantB', strtolower($probe) . '-b']);
         $made['tenant'] = (int) $conn->lastInsertId();
 
-        $st = $conn->prepare("INSERT INTO sla_calendars (name, timezone, is_default, is_active) VALUES (?, 'Europe/London', 0, 1)");
-        $st->execute([$probe . '_calendar']);
+        // F12 probe stamping (Agente 2, pós-002/003/004): calendars/departments
+        // são NOT NULL tenant-scoped — sem carimbo o setup quebra (erro 1364).
+        // Packs carimbados com o tenant do probe (NULL = pessoal por desenho
+        // 004). Probes tenancyColumnExists mantêm compat pré-migração.
+        // Padrão igual às fixtures sla/departments já carimbadas.
+        if (tenancyColumnExists($conn, 'sla_calendars', 'tenant_id')) {
+            $st = $conn->prepare("INSERT INTO sla_calendars (name, timezone, is_default, is_active, tenant_id) VALUES (?, 'Europe/London', 0, 1, ?)");
+            $st->execute([$probe . '_calendar', $made['tenant']]);
+        } else {
+            $st = $conn->prepare("INSERT INTO sla_calendars (name, timezone, is_default, is_active) VALUES (?, 'Europe/London', 0, 1)");
+            $st->execute([$probe . '_calendar']);
+        }
         $made['sla'] = (int) $conn->lastInsertId();
 
-        $st = $conn->prepare("INSERT INTO departments (name, description, is_active, display_order) VALUES (?, ?, 1, 0)");
-        $st->execute([$probe . '_dept', 'sprint 1 probe']);
+        if (tenancyColumnExists($conn, 'departments', 'tenant_id')) {
+            $st = $conn->prepare("INSERT INTO departments (name, description, is_active, display_order, tenant_id) VALUES (?, ?, 1, 0, ?)");
+            $st->execute([$probe . '_dept', 'sprint 1 probe', $made['tenant']]);
+        } else {
+            $st = $conn->prepare("INSERT INTO departments (name, description, is_active, display_order) VALUES (?, ?, 1, 0)");
+            $st->execute([$probe . '_dept', 'sprint 1 probe']);
+        }
         $made['dept'] = (int) $conn->lastInsertId();
 
-        $st = $conn->prepare("INSERT INTO report_packs (name, description, design) VALUES (?, ?, '{}')");
-        $st->execute([$probe . '_pack', 'sprint 1 probe']);
+        if (tenancyColumnExists($conn, 'report_packs', 'tenant_id')) {
+            $st = $conn->prepare("INSERT INTO report_packs (name, description, design, tenant_id) VALUES (?, ?, '{}', ?)");
+            $st->execute([$probe . '_pack', 'sprint 1 probe', $made['tenant']]);
+        } else {
+            $st = $conn->prepare("INSERT INTO report_packs (name, description, design) VALUES (?, ?, '{}')");
+            $st->execute([$probe . '_pack', 'sprint 1 probe']);
+        }
         $made['pack'] = (int) $conn->lastInsertId();
 
         // The exact unscoped shapes the APIs use today (see docs matrix §2).
