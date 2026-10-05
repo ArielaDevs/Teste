@@ -40,6 +40,8 @@ try {
     // $ttParams within each execute() differs, because positional placeholders
     // bind in order of appearance — ON-clause placeholders precede WHERE ones.
     list($ttSql, $ttParams) = ticketTenantFilter($conn, $analystId, 't');
+    // F8: the department dimension obeys the same company scope. No-op at N=1.
+    list($deptScopeSql, $deptScopeParams) = departmentTenantFilter($conn, $analystId, 'd');
     // Hide trashed (soft-deleted) tickets from every count below. No placeholder,
     // so $ttParams is unchanged; appended wherever $ttSql is used (WHERE + ON).
     $ttSql .= " AND t.deleted_datetime IS NULL";
@@ -105,11 +107,11 @@ try {
                             COUNT(t.id) as count
                         FROM departments d
                         LEFT JOIN tickets t ON t.department_id = d.id$ttSql
-                        WHERE d.is_active = 1 AND d.id IN ($deptIdPlaceholders)
+                        WHERE d.is_active = 1 AND d.id IN ($deptIdPlaceholders)$deptScopeSql
                         GROUP BY d.id, d.name, d.display_order
                         ORDER BY d.display_order, d.name";
             $deptStmt = $conn->prepare($deptSql);
-            $deptStmt->execute(array_merge($ttParams, $accessibleDepts));
+            $deptStmt->execute(array_merge($ttParams, $accessibleDepts, $deptScopeParams));
             $departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
             $deptStmt->closeCursor();
 
@@ -121,10 +123,10 @@ try {
                               FROM departments d
                               LEFT JOIN tickets t ON t.department_id = d.id$ttSql
                               LEFT JOIN ticket_statuses ts ON ts.id = t.status_id
-                              WHERE d.is_active = 1 AND d.id IN ($deptIdPlaceholders)
+                              WHERE d.is_active = 1 AND d.id IN ($deptIdPlaceholders)$deptScopeSql
                               GROUP BY d.id, ts.name";
             $deptStatusStmt = $conn->prepare($deptStatusSql);
-            $deptStatusStmt->execute(array_merge($ttParams, $accessibleDepts));
+            $deptStatusStmt->execute(array_merge($ttParams, $accessibleDepts, $deptScopeParams));
             $deptStatusCounts = $deptStatusStmt->fetchAll(PDO::FETCH_ASSOC);
             $deptStatusStmt->closeCursor();
 
@@ -159,11 +161,11 @@ try {
                         COUNT(t.id) as count
                     FROM departments d
                     LEFT JOIN tickets t ON t.department_id = d.id$ttSql
-                    WHERE d.is_active = 1
+                    WHERE d.is_active = 1$deptScopeSql
                     GROUP BY d.id, d.name, d.display_order
                     ORDER BY d.display_order, d.name";
         $deptStmt = $conn->prepare($deptSql);
-        $deptStmt->execute($ttParams);
+        $deptStmt->execute(array_merge($ttParams, $deptScopeParams));
         $departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
         $deptStmt->closeCursor();
 
@@ -175,10 +177,10 @@ try {
                           FROM departments d
                           LEFT JOIN tickets t ON t.department_id = d.id$ttSql
                           LEFT JOIN ticket_statuses ts ON ts.id = t.status_id
-                          WHERE d.is_active = 1
+                          WHERE d.is_active = 1$deptScopeSql
                           GROUP BY d.id, ts.name";
         $deptStatusStmt = $conn->prepare($deptStatusSql);
-        $deptStatusStmt->execute($ttParams);
+        $deptStatusStmt->execute(array_merge($ttParams, $deptScopeParams));
         $deptStatusCounts = $deptStatusStmt->fetchAll(PDO::FETCH_ASSOC);
         $deptStatusStmt->closeCursor();
 

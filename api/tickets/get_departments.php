@@ -5,6 +5,7 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
 
 header('Content-Type: application/json');
 
@@ -21,12 +22,16 @@ try {
     // Guarded: this list is read all over Tickets, so it must still load before
     // Database Verification has added the column (discussion #62).
     $sensCol = ticketSensitivityReady($conn) ? 'default_sensitivity' : "'normal' AS default_sensitivity";
+    // F8: scoped to the analyst's active company. Dormant/un-migrated installs
+    // list everything, as before.
+    [$deptScope, $deptParams] = departmentTenantFilter($conn, (int)$_SESSION['analyst_id'], '');
     $sql = "SELECT id, name, description, is_active, display_order, $sensCol, created_datetime
             FROM departments
+            WHERE 1 = 1 $deptScope
             ORDER BY display_order, name";
 
     $stmt = $conn->prepare($sql);
-    $stmt->execute();
+    $stmt->execute($deptParams);
     $departments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($departments as &$dept) {

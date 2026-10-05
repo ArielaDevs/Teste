@@ -19,6 +19,8 @@
  * calendar's timezone for day-walking. The DB stores everything in UTC.
  */
 
+require_once __DIR__ . '/tenancy.php';
+
 /**
  * Compute the SLA state of a single ticket. Returns:
  *   [
@@ -56,6 +58,20 @@ function sla_get_state(PDO $conn, int $ticket_id): array {
         return $state;
     }
 
+    // F6: the ticket's company, when the schema knows it. The calendar picked
+    // below must belong to the same company — otherwise company B's working
+    // hours would compute company A's SLA targets. Null pre-migration, in
+    // which case every lookup below behaves exactly as before.
+    $ticketTenantId = null;
+    if (tenancyColumnExists($conn, 'tickets', 'tenant_id')) {
+        $tStmt = $conn->prepare("SELECT tenant_id FROM tickets WHERE id = ?");
+        $tStmt->execute([$ticket_id]);
+        $tTenant = $tStmt->fetchColumn();
+        if ($tTenant !== false && $tTenant !== null) {
+            $ticketTenantId = (int)$tTenant;
+        }
+    }
+
     // --- 2. Check global enforcement ---
     $settings = sla_load_settings($conn);
     if (empty($settings['sla_enforce_from'])) {
@@ -90,11 +106,31 @@ function sla_get_state(PDO $conn, int $ticket_id): array {
     }
 
     // --- 4. Load calendar (priority's calendar, or default if NULL) ---
+    // F6: the default fallback and the priority-linked calendar are both
+    // resolved within the ticket's company. A priority pointing at another
+    // company's calendar (possible only through pre-fix drift — the save
+    // endpoint now refuses it) falls back to this ticket's own default rather
+    // than computing against foreign working hours.
     $calId = $priority['sla_calendar_id'];
     if (!$calId) {
-        $defStmt = $conn->query("SELECT id FROM sla_calendars WHERE is_default = 1 AND is_active = 1 LIMIT 1");
-        $row = $defStmt->fetch(PDO::FETCH_ASSOC);
-        if ($row) $calId = (int)$row['id'];
+        if ($ticketTenantId !== null && tenancyColumnExists($conn, 'sla_calendars', 'tenant_id')) {
+            $defStmt = $conn->prepare("SELECT id FROM sla_calendars WHERE is_default = 1 AND is_active = 1 AND tenant_id = ? LIMIT 1");
+            $defStmt->execute([$ticketTenantId]);
+            $row = $defStmt->fetchColumn();
+        } else {
+            $row = $conn->query("SELECT id FROM sla_calendars WHERE is_default = 1 AND is_active = 1 LIMIT 1")->fetchColumn();
+        }
+        if ($row) $calId = (int)$row;
+    } elseif ($ticketTenantId !== null && tenancyColumnExists($conn, 'sla_calendars', 'tenant_id')) {
+        $ownStmt = $conn->prepare("SELECT COUNT(*) FROM sla_calendars WHERE id = ? AND tenant_id = ?");
+        $ownStmt->execute([(int)$calId, $ticketTenantId]);
+        if ((int)$ownStmt->fetchColumn() === 0) {
+            $calId = null;
+            $defStmt = $conn->prepare("SELECT id FROM sla_calendars WHERE is_default = 1 AND is_active = 1 AND tenant_id = ? LIMIT 1");
+            $defStmt->execute([$ticketTenantId]);
+            $row = $defStmt->fetchColumn();
+            if ($row) $calId = (int)$row;
+        }
     }
     if (!$calId) {
         $state['reason_disabled'] = 'No SLA calendar set on priority and no default calendar exists';

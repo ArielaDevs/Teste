@@ -6,6 +6,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
+require_once '../../includes/tenancy.php';
 
 header('Content-Type: application/json');
 
@@ -32,11 +33,44 @@ try {
     $conn = connectToDatabase();
     $raised = 0;
 
+    // F8/F13: departments are pure per-company rows (migration 003). An update
+    // touches only a reachable department (owner's tenant read + access
+    // check). A create honors an explicit company from the request body when
+    // one is given AND reachable (analystCanAssignTenant), else the analyst's
+    // active company — never an unvalidated client value. Pre-migration the
+    // tenant column does not exist and this block is skipped, so the endpoint
+    // keeps working before Database Verify runs.
+    $deptTenantSupported = tenancyColumnExists($conn, 'departments', 'tenant_id');
+    $deptTenantId = null;
+    if ($deptTenantSupported && isMultiTenant($conn)) {
+        if ($id && !analystCanAccessDepartment($conn, (int)$_SESSION['analyst_id'], $id)) {
+            throw new Exception('Department not found');
+        }
+        $deptTenantId = getActiveTenantId($conn, (int)$_SESSION['analyst_id']);
+        if (!$id && isset($data['tenant_id']) && $data['tenant_id'] !== '' && $data['tenant_id'] !== null) {
+            $wanted = (int)$data['tenant_id'];
+            if (!analystCanAssignTenant($conn, (int)$_SESSION['analyst_id'], $wanted) || $wanted <= 0) {
+                throw new Exception('Department not found');
+            }
+            $deptTenantId = $wanted;
+        }
+    } elseif ($deptTenantSupported) {
+        $deptTenantId = getDefaultTenantId($conn);
+    }
+
     if ($id) {
         // Update existing
         $sql = "UPDATE departments SET name = ?, description = ?, display_order = ?, is_active = ? WHERE id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->execute([$name, $description, $display_order, $is_active, $id]);
+    } elseif ($deptTenantSupported) {
+        // Create new
+        $sql = "INSERT INTO departments (tenant_id, name, description, display_order, is_active) VALUES (?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$deptTenantId, $name, $description, $display_order, $is_active]);
+        // Read NOW: lastInsertId() reports on the last query, and the sensitivity
+        // block below runs other queries first, after which it says 0.
+        $id = (int)$conn->lastInsertId();
     } else {
         // Create new
         $sql = "INSERT INTO departments (name, description, display_order, is_active) VALUES (?, ?, ?, ?)";

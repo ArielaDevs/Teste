@@ -17,6 +17,7 @@
 require_once __DIR__ . '/sla.php';
 require_once __DIR__ . '/template_email.php';
 require_once __DIR__ . '/encryption.php';
+require_once __DIR__ . '/tenancy.php';
 
 /**
  * Main cron entry. Returns a summary so the cron wrapper can log it.
@@ -209,17 +210,38 @@ function sla_find_matching_rule(PDO $conn, int $ticketId, string $trigger, strin
     $ticketDept = $stmt->fetchColumn();
     $ticketDept = $ticketDept ? (int)$ticketDept : null;
 
+    // F7: a breach in company A must only match A's rules and the global ones —
+    // never company B's. The tenant scope is skipped pre-migration so the cron
+    // keeps working before Database Verify adds the columns.
+    $ticketTenantId = null;
+    $tenantScoped = tenancyColumnExists($conn, 'tickets', 'tenant_id')
+        && tenancyColumnExists($conn, 'sla_notification_rules', 'tenant_id');
+    if ($tenantScoped) {
+        $tStmt = $conn->prepare("SELECT tenant_id FROM tickets WHERE id = ?");
+        $tStmt->execute([$ticketId]);
+        $tTenant = $tStmt->fetchColumn();
+        if ($tTenant !== false && $tTenant !== null) {
+            $ticketTenantId = (int)$tTenant;
+        }
+    }
+
     // Pull all matching candidate rules for this trigger, order them by specificity
     $sql = "SELECT *
               FROM sla_notification_rules
              WHERE is_active = 1
                AND trigger_type = ?
                AND target_type IN (?, 'both')
-               AND (department_id = ? OR department_id IS NULL)
-          ORDER BY (department_id IS NOT NULL) DESC,
-                   (target_type = ?) DESC";
+               AND (department_id = ? OR department_id IS NULL)";
+    $params = [$trigger, $targetType, $ticketDept];
+    if ($tenantScoped && $ticketTenantId !== null) {
+        $sql .= " AND (tenant_id = ? OR tenant_id IS NULL)";
+        $params[] = $ticketTenantId;
+    }
+    $sql .= " ORDER BY (department_id IS NOT NULL) DESC,
+                    (target_type = ?) DESC";
+    $params[] = $targetType;
     $stmt = $conn->prepare($sql);
-    $stmt->execute([$trigger, $targetType, $ticketDept, $targetType]);
+    $stmt->execute($params);
     $rule = $stmt->fetch(PDO::FETCH_ASSOC);
     return $rule ?: null;
 }
@@ -370,6 +392,21 @@ function sla_notification_already_sent(PDO $conn, int $ticketId, string $targetT
 }
 
 function sla_mark_notification_sent(PDO $conn, int $ticketId, string $targetType, string $trigger, array $recipients): void {
+    // F7: stamp the ticket's company on the log row so per-tenant reporting can
+    // scope it. Skipped pre-migration; NULL when the ticket itself is gone.
+    $ticketTenantId = null;
+    if (tenancyColumnExists($conn, 'sla_notifications_sent', 'tenant_id')
+        && tenancyColumnExists($conn, 'tickets', 'tenant_id')) {
+        $tStmt = $conn->prepare("SELECT tenant_id FROM tickets WHERE id = ?");
+        $tStmt->execute([$ticketId]);
+        $tTenant = $tStmt->fetchColumn();
+        if ($tTenant !== false && $tTenant !== null) {
+            $ticketTenantId = (int)$tTenant;
+        }
+        $stmt = $conn->prepare("INSERT IGNORE INTO sla_notifications_sent (ticket_id, tenant_id, target_type, trigger_type, recipients) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$ticketId, $ticketTenantId, $targetType, $trigger, implode(',', $recipients)]);
+        return;
+    }
     $stmt = $conn->prepare("INSERT IGNORE INTO sla_notifications_sent (ticket_id, target_type, trigger_type, recipients) VALUES (?, ?, ?, ?)");
     $stmt->execute([$ticketId, $targetType, $trigger, implode(',', $recipients)]);
 }

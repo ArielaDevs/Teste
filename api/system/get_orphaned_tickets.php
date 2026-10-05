@@ -55,10 +55,23 @@ try {
         ];
     }, $rows);
 
-    // Valid departments for the reassignment dropdown.
+    // Valid departments for the reassignment dropdown. F8: only companies the
+    // analyst may reach — the orphaned tickets themselves are triaged per row
+    // by the same rule when reassigned through assign_ticket_department.php.
+    // Dormant/un-migrated installs keep the full list, as before.
+    [$orphDeptScope, $orphDeptParams] = ['', []];
+    if (isMultiTenant($conn)) {
+        if (tenancyColumnExists($conn, 'departments', 'tenant_id')) {
+            [$orphDeptScope, $orphDeptParams] = allAccessibleTenantsFilter($conn, (int)$_SESSION['analyst_id'], 'tenant_id');
+        } else {
+            [$orphDeptScope, $orphDeptParams] = departmentTenantFilter($conn, (int)$_SESSION['analyst_id'], '');
+        }
+    }
+    $orphDeptStmt = $conn->prepare("SELECT id, name FROM departments WHERE is_active = 1 $orphDeptScope ORDER BY display_order, name");
+    $orphDeptStmt->execute($orphDeptParams);
     $departments = array_map(function ($d) {
         return ['id' => (int)$d['id'], 'name' => $d['name']];
-    }, $conn->query("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY display_order, name")->fetchAll(PDO::FETCH_ASSOC));
+    }, $orphDeptStmt->fetchAll(PDO::FETCH_ASSOC));
 
     echo json_encode([
         'success'      => true,

@@ -1750,11 +1750,36 @@ try {
     if ($tableExists('sla_calendars')) {
         $cnt = (int) $conn->query("SELECT COUNT(*) FROM sla_calendars")->fetchColumn();
         if ($cnt === 0) {
-            $conn->exec("INSERT INTO sla_calendars (name, timezone, is_default) VALUES ('Default Business Hours', 'Europe/London', 1)");
+            // F12 seed stamping: sla_calendars/sla_calendar_hours são NOT NULL
+            // tenant-scoped pós-002 — sem carimbo o install limpo quebra (erro 1364).
+            // Default tenant (igual a getDefaultTenantId() em includes/tenancy.php:132:
+            // is_default=1, senão menor id, senão fallback 1); probes $tableExists/
+            // $colExists cobrem pré-001 (tabela/coluna ainda ausentes).
+            $seedTenantId = 1;
+            try {
+                if ($tableExists('tenants') && $colExists('tenants', 'is_default')) {
+                    $v = $conn->query("SELECT id FROM tenants WHERE is_default = 1 ORDER BY id LIMIT 1")->fetchColumn();
+                    if ($v === false) {
+                        $v = $conn->query("SELECT id FROM tenants ORDER BY id LIMIT 1")->fetchColumn();
+                    }
+                    if ($v !== false && (int)$v > 0) { $seedTenantId = (int)$v; }
+                }
+            } catch (Exception $e) { /* mantém fallback 1 */ }
+            if ($colExists('sla_calendars', 'tenant_id')) {
+                $ins = $conn->prepare("INSERT INTO sla_calendars (name, timezone, is_default, tenant_id) VALUES ('Default Business Hours', 'Europe/London', 1, ?)");
+                $ins->execute([$seedTenantId]);
+            } else {
+                $conn->exec("INSERT INTO sla_calendars (name, timezone, is_default) VALUES ('Default Business Hours', 'Europe/London', 1)");
+            }
             $newCalId = (int)$conn->lastInsertId();
             if ($newCalId && $tableExists('sla_calendar_hours')) {
-                $stmt = $conn->prepare("INSERT INTO sla_calendar_hours (calendar_id, weekday, start_time, end_time) VALUES (?, ?, '09:00:00', '17:00:00')");
-                foreach ([1, 2, 3, 4, 5] as $wd) { $stmt->execute([$newCalId, $wd]); }
+                if ($colExists('sla_calendar_hours', 'tenant_id')) {
+                    $stmt = $conn->prepare("INSERT INTO sla_calendar_hours (calendar_id, tenant_id, weekday, start_time, end_time) VALUES (?, ?, ?, '09:00:00', '17:00:00')");
+                    foreach ([1, 2, 3, 4, 5] as $wd) { $stmt->execute([$newCalId, $seedTenantId, $wd]); }
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO sla_calendar_hours (calendar_id, weekday, start_time, end_time) VALUES (?, ?, '09:00:00', '17:00:00')");
+                    foreach ([1, 2, 3, 4, 5] as $wd) { $stmt->execute([$newCalId, $wd]); }
+                }
             }
             $results[] = ['table' => 'sla_calendars', 'status' => 'seeded', 'details' => ['Inserted default Mon-Fri 09:00-17:00 calendar (Europe/London)']];
         }

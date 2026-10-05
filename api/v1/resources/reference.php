@@ -98,11 +98,35 @@ function apiTenantConfigList(PDO $conn, array $apiKey, string $table, string $en
     }, $rows));
 }
 
-// GET /departments
+// GET /departments (?company_id= scopes to one company the key may reach)
 function apiDepartmentsList(PDO $conn, array $apiKey, array $params, array $body): void {
-    $rows = $conn->query(
-        "SELECT id, name, description, is_active FROM departments ORDER BY display_order, name"
-    )->fetchAll(PDO::FETCH_ASSOC);
+    // F8: departments are per-company rows. A ?company_id= the key cannot
+    // reach is refused; a scoped key without one sees its own companies; a
+    // global key (or a dormant install) sees everything, as before.
+    $deptSql = "SELECT id, name, description, is_active FROM departments";
+    $deptParams = [];
+    if (isMultiTenant($conn) && tenancyColumnExists($conn, 'departments', 'tenant_id')) {
+        if (isset($_GET['company_id']) && $_GET['company_id'] !== '') {
+            $cid = (int)$_GET['company_id'];
+            if (!apiKeyCanAccessTenant($conn, $apiKey, $cid)) {
+                apiError(403, 'forbidden', 'This API key is not scoped to that company.');
+            }
+            $deptSql .= " WHERE tenant_id = ?";
+            $deptParams[] = $cid;
+        } elseif ($apiKey['company_scope'] !== null) {
+            $scope = array_values(array_map('intval', $apiKey['company_scope']));
+            if ($scope === []) {
+                apiRespond([]);
+            }
+            $ph = implode(',', array_fill(0, count($scope), '?'));
+            $deptSql .= " WHERE tenant_id IN ($ph)";
+            $deptParams = $scope;
+        }
+    }
+    $deptSql .= " ORDER BY display_order, name";
+    $deptStmt = $conn->prepare($deptSql);
+    $deptStmt->execute($deptParams);
+    $rows = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
     apiRespond(array_map(function ($d) {
         return [
             'id'          => (int)$d['id'],

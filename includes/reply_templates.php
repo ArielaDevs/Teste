@@ -130,7 +130,7 @@ function replyTemplatesVisibleTo(PDO $conn, int $analystId, bool $activeOnly = t
 }
 
 /**
- * May this analyst write to this template?
+ * May this analyst write to this template? F10.
  *
  * Returns one of: 'shared' (needs the capability), 'mine' (owns it), or null (must be
  * refused). Kept as a lookup rather than a boolean so the caller can tell "you may not
@@ -138,18 +138,49 @@ function replyTemplatesVisibleTo(PDO $conn, int $analystId, bool $activeOnly = t
  * privilege-escalation case has a single home: a template you own is yours to edit,
  * but turning it INTO a shared one is a settings action and re-checks the capability
  * at the call site.
+ *
+ * A PRIVATE template (analyst_id set) is one person's own text and follows the
+ * owner only — unchanged. A SHARED template additionally requires the analyst to
+ * reach the template's company: tenant X needs analystCanAccessTenant(X), and a
+ * GLOBAL template (tenant_id NULL, served to every company) needs reach over
+ * every company. On a single-company install everything answers as before.
  */
 function replyTemplateWriteScope(PDO $conn, int $analystId, int $templateId): ?string {
     try {
-        $stmt = $conn->prepare("SELECT analyst_id FROM ticket_reply_templates WHERE id = ?");
+        $stmt = $conn->prepare("SELECT analyst_id, tenant_id FROM ticket_reply_templates WHERE id = ?");
         $stmt->execute([$templateId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
+        if (!tenancyDegradeAllowed($e)) {
+            return null;
+        }
+        // Part-migrated install (no tenant_id column yet): the pre-tenancy
+        // owner-only rule, so settings keep working until Database Verify runs.
+        try {
+            $stmt = $conn->prepare("SELECT analyst_id FROM ticket_reply_templates WHERE id = ?");
+            $stmt->execute([$templateId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return null;
+        }
+        if (!$row) return null;
+        if ($row['analyst_id'] === null)              return 'shared';
+        if ((int)$row['analyst_id'] === $analystId)   return 'mine';
         return null;
     }
     if (!$row) return null;
 
-    if ($row['analyst_id'] === null)              return 'shared';
-    if ((int)$row['analyst_id'] === $analystId)   return 'mine';
-    return null;   // somebody else's private template — invisible AND untouchable
+    if ($row['analyst_id'] !== null) {
+        if ((int)$row['analyst_id'] === $analystId)   return 'mine';
+        return null;   // somebody else's private template — invisible AND untouchable
+    }
+
+    // Shared template: the writer must reach the owning company. Unknown ids
+    // and unreachable companies share the same null answer as "not found", so
+    // the gate creates no existence oracle.
+    if (!isMultiTenant($conn)) return 'shared';
+    if ($row['tenant_id'] === null) {
+        return analystHasAllTenantAccess($conn, $analystId) ? 'shared' : null;
+    }
+    return analystCanAccessTenant($conn, $analystId, (int)$row['tenant_id']) ? 'shared' : null;
 }

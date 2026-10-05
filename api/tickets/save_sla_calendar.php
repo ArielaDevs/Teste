@@ -19,6 +19,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
+require_once '../../includes/tenancy.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['analyst_id'])) {
@@ -79,37 +80,104 @@ try {
     }
 
     $conn = connectToDatabase();
+    $analystId = (int)$_SESSION['analyst_id'];
+
+    // F6: an update rewrites another company's calendar otherwise. New rows
+    // land in the analyst's active company (server-derived, never the client).
+    // Pre-migration the tenant columns do not exist and this block is skipped,
+    // so the endpoint keeps working before Database Verify runs.
+    $calTenantSupported = tenancyColumnExists($conn, 'sla_calendars', 'tenant_id');
+    $calTenantId = null;
+    if ($calTenantSupported && isMultiTenant($conn)) {
+        if ($id) {
+            if (!analystCanAccessSlaCalendar($conn, $analystId, $id)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Calendar not found']);
+                exit;
+            }
+            // An update never moves a calendar between companies: the replacement
+            // hours/holidays inherit the PARENT's tenant, not the active one, so
+            // an all-access analyst working in A cannot silently refile B's rows.
+            $pStmt = $conn->prepare("SELECT tenant_id FROM sla_calendars WHERE id = ?");
+            $pStmt->execute([$id]);
+            $pTenant = $pStmt->fetchColumn();
+            $calTenantId = ($pTenant !== false && $pTenant !== null) ? (int)$pTenant : getActiveTenantId($conn, $analystId);
+        } else {
+            // F13: a create honors an explicit company from the request body
+            // when one is given AND reachable (analystCanAssignTenant), else
+            // the active company — never an unvalidated client value.
+            $calTenantId = getActiveTenantId($conn, $analystId);
+            if (isset($data['tenant_id']) && $data['tenant_id'] !== '' && $data['tenant_id'] !== null) {
+                $wanted = (int)$data['tenant_id'];
+                if (!analystCanAssignTenant($conn, $analystId, $wanted) || $wanted <= 0) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Calendar not found']);
+                    exit;
+                }
+                $calTenantId = $wanted;
+            }
+        }
+    } elseif ($calTenantSupported) {
+        $calTenantId = getDefaultTenantId($conn);
+    }
+
     $conn->beginTransaction();
 
-    // If this is being set as default, clear default from others first
+    // If this is being set as default, clear default from others first —
+    // scoped to the same company, so company A's default never clears B's.
     if ($isDefault) {
-        $conn->exec("UPDATE sla_calendars SET is_default = 0");
+        if ($calTenantSupported && isMultiTenant($conn)) {
+            $clearStmt = $conn->prepare("UPDATE sla_calendars SET is_default = 0 WHERE tenant_id = ?");
+            $clearStmt->execute([$calTenantId]);
+        } else {
+            $conn->exec("UPDATE sla_calendars SET is_default = 0");
+        }
     }
 
     if ($id) {
         $stmt = $conn->prepare("UPDATE sla_calendars SET name = ?, timezone = ?, is_default = ? WHERE id = ?");
         $stmt->execute([$name, $timezone, $isDefault, $id]);
+    } elseif ($calTenantSupported) {
+        $stmt = $conn->prepare("INSERT INTO sla_calendars (name, timezone, is_default, tenant_id) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$name, $timezone, $isDefault, $calTenantId]);
+        $id = (int)$conn->lastInsertId();
     } else {
         $stmt = $conn->prepare("INSERT INTO sla_calendars (name, timezone, is_default) VALUES (?, ?, ?)");
         $stmt->execute([$name, $timezone, $isDefault]);
         $id = (int)$conn->lastInsertId();
     }
 
-    // Replace hours wholesale
+    // Replace hours wholesale. The child rows inherit the calendar's company
+    // (denormalised tenant_id, migration 002) so tenant-scoped reads never
+    // need a JOIN back to the parent.
     $conn->prepare("DELETE FROM sla_calendar_hours WHERE calendar_id = ?")->execute([$id]);
     if (!empty($cleanHours)) {
-        $hStmt = $conn->prepare("INSERT INTO sla_calendar_hours (calendar_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)");
-        foreach ($cleanHours as $h) {
-            $hStmt->execute([$id, $h['weekday'], $h['start'], $h['end']]);
+        if ($calTenantSupported) {
+            $hStmt = $conn->prepare("INSERT INTO sla_calendar_hours (calendar_id, tenant_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?, ?)");
+            foreach ($cleanHours as $h) {
+                $hStmt->execute([$id, $calTenantId, $h['weekday'], $h['start'], $h['end']]);
+            }
+        } else {
+            $hStmt = $conn->prepare("INSERT INTO sla_calendar_hours (calendar_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)");
+            foreach ($cleanHours as $h) {
+                $hStmt->execute([$id, $h['weekday'], $h['start'], $h['end']]);
+            }
         }
     }
 
-    // Replace holidays wholesale
+    // Replace holidays wholesale (same inheritance as hours).
     $conn->prepare("DELETE FROM sla_calendar_holidays WHERE calendar_id = ?")->execute([$id]);
     if (!empty($cleanHolidays)) {
-        $holStmt = $conn->prepare("INSERT INTO sla_calendar_holidays (calendar_id, holiday_date, name) VALUES (?, ?, ?)");
-        foreach ($cleanHolidays as $h) {
-            $holStmt->execute([$id, $h['date'], $h['name'] !== '' ? $h['name'] : null]);
+        if ($calTenantSupported) {
+            $holStmt = $conn->prepare("INSERT INTO sla_calendar_holidays (calendar_id, tenant_id, holiday_date, name) VALUES (?, ?, ?, ?)");
+            foreach ($cleanHolidays as $h) {
+                $holStmt->execute([$id, $calTenantId, $h['date'], $h['name'] !== '' ? $h['name'] : null]);
+            }
+        } else {
+            $holStmt = $conn->prepare("INSERT INTO sla_calendar_holidays (calendar_id, holiday_date, name) VALUES (?, ?, ?)");
+            foreach ($cleanHolidays as $h) {
+                $holStmt->execute([$id, $h['date'], $h['name'] !== '' ? $h['name'] : null]);
+            }
         }
     }
 

@@ -11,6 +11,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
+require_once '../../includes/tenancy.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['analyst_id'])) {
@@ -26,6 +27,14 @@ try {
     if (!$id) throw new Exception('Calendar id required');
 
     $conn = connectToDatabase();
+
+    // F6: a calendar belongs to one company. Same 403 answer as "not found"
+    // so the gate creates no existence oracle.
+    if (!analystCanAccessSlaCalendar($conn, (int)$_SESSION['analyst_id'], $id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Calendar not found']);
+        exit;
+    }
 
     // Block delete if any priority references this calendar
     $check = $conn->prepare("SELECT COUNT(*) FROM ticket_priorities WHERE sla_calendar_id = ?");

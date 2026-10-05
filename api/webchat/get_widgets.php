@@ -11,6 +11,7 @@ require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
 require_once '../../includes/webchat/webchat.php';
+require_once '../../includes/tenancy.php';
 
 header('Content-Type: application/json');
 
@@ -39,11 +40,15 @@ try {
     )->fetchAll(PDO::FETCH_ASSOC);
 
     // Business-hours calendars offered in the widget's Availability dropdown.
+    // F6: scoped to the analyst's active company.
     $calendars = [];
     try {
-        $calendars = $conn->query(
-            "SELECT id, name FROM sla_calendars WHERE is_active = 1 ORDER BY is_default DESC, name ASC"
-        )->fetchAll(PDO::FETCH_ASSOC);
+        [$wCalScope, $wCalParams] = slaCalendarTenantFilter($conn, (int)$_SESSION['analyst_id'], '');
+        $wCalStmt = $conn->prepare(
+            "SELECT id, name FROM sla_calendars WHERE is_active = 1 $wCalScope ORDER BY is_default DESC, name ASC"
+        );
+        $wCalStmt->execute($wCalParams);
+        $calendars = $wCalStmt->fetchAll(PDO::FETCH_ASSOC);
         $calendars = array_map(function ($c) {
             return ['id' => (int) $c['id'], 'name' => $c['name']];
         }, $calendars);

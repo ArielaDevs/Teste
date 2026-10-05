@@ -11,6 +11,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/admin_api_guard.php'; // System admins only (issue #34)
 require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
 
 header('Content-Type: application/json');
 
@@ -35,12 +36,15 @@ try {
     $conn = connectToDatabase();
 
     // Validate the target department exists (null = clear, always allowed).
+    // F8: it must also belong to a company the analyst may reach — otherwise
+    // tickets could be filed under another company's department.
     $deptName = '(none)';
     if ($departmentId !== null) {
         $ds = $conn->prepare("SELECT name FROM departments WHERE id = ?");
         $ds->execute([$departmentId]);
         $deptName = $ds->fetchColumn();
-        if ($deptName === false) {
+        if ($deptName === false
+            || !analystCanAccessDepartment($conn, $analystId, $departmentId)) {
             echo json_encode(['success' => false, 'error' => 'That department does not exist']);
             exit;
         }

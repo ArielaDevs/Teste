@@ -443,4 +443,29 @@ return [
     ['cost_centres', 'uq_cost_centres_code', 'unique', '(`tenant_id`,`code`)'],
     ['cost_centres', 'ix_cost_centres_parent', 'key', '(`parent_id`)'],
     ['photo_album', 'ix_photo_album_analyst', 'key', '(`analyst_id`,`created_datetime`)'],
+    // --- Tenant migrations 002-004 (2026-10-05). Migration-owned entries: they are
+    // applied by the versioned migrations AND declared here so Database Verify keeps
+    // them. NOTE to maintainers: this file is otherwise generated from
+    // database/freeitsm.sql via scripts/gen_db_verify_indexes.php — re-running the
+    // generator will keep these rows only if freeitsm.sql gains the same indexes.
+    // Until the seed is updated through its own process, do NOT delete these lines.
+    ['sla_calendars', 'uq_sla_calendars_tenant_name', 'unique', '(`tenant_id`,`name`)'],
+    ['sla_calendars', 'ix_sla_calendars_tenant_active', 'key', '(`tenant_id`,`is_active`)'],
+    ['sla_calendars', 'ix_sla_calendars_tenant', 'key', '(`tenant_id`,`id`)'],
+    ['sla_calendar_hours', 'ix_sla_hours_tenant_calendar', 'key', '(`tenant_id`,`calendar_id`)'],
+    ['sla_calendar_hours', 'ix_sla_hours_tenant', 'key', '(`tenant_id`,`id`)'],
+    ['sla_calendar_holidays', 'ix_sla_holidays_tenant_calendar', 'key', '(`tenant_id`,`calendar_id`)'],
+    ['sla_calendar_holidays', 'ix_sla_holidays_tenant', 'key', '(`tenant_id`,`id`)'],
+    ['sla_notification_rules', 'ix_sla_rules_tenant_active', 'key', '(`tenant_id`,`is_active`)'],
+    ['sla_notification_rules', 'ix_sla_rules_tenant_dept', 'key', '(`tenant_id`,`department_id`)'],
+    ['sla_notifications_sent', 'ix_sla_sent_tenant_ticket', 'key', '(`tenant_id`,`ticket_id`)'],
+    ['sla_notifications_sent', 'ix_sla_sent_tenant', 'key', '(`tenant_id`,`id`)'],
+    // Migration 003 replaces the global name unique with a per-tenant one, so two
+    // companies can each have "HR". The generator input (freeitsm.sql) still
+    // carries uq_departments_name until the seed process updates it — db_verify
+    // reconciliation for that swap is owned by migration 003's drop/re-add logic.
+    ['departments', 'uq_departments_tenant_name', 'unique', '(`tenant_id`,`name`)'],
+    ['departments', 'ix_departments_tenant', 'key', '(`tenant_id`,`id`)'],
+    ['report_packs', 'ix_report_packs_tenant', 'key', '(`tenant_id`,`id`)'],
+    ['report_pack_shares', 'ix_pack_shares_tenant_pack', 'key', '(`tenant_id`,`pack_id`)'],
 ];

@@ -7,6 +7,7 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['analyst_id'])) {
@@ -20,6 +21,12 @@ try {
     if (!$id) throw new Exception('Calendar id required');
 
     $conn = connectToDatabase();
+
+    // F6: the parent gate covers the hours/holidays below — they inherit the
+    // calendar's company (migration 002), so one check guards all three reads.
+    if (!analystCanAccessSlaCalendar($conn, (int)$_SESSION['analyst_id'], $id)) {
+        throw new Exception('Calendar not found');
+    }
 
     $stmt = $conn->prepare("SELECT id, name, timezone, is_default, is_active FROM sla_calendars WHERE id = ?");
     $stmt->execute([$id]);

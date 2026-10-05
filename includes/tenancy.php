@@ -559,6 +559,236 @@ function analystCanAccessTask(PDO $conn, int $analystId, $taskId): bool {
 }
 
 /**
+ * May this analyst access this *SLA calendar* (by its owning company)? F6.
+ *
+ * Pure scoped data post-migration 002 (tenant_id NOT NULL): no NULL branch.
+ * A NULL tenant can still appear mid-rollout (column added, backfill pending)
+ * and is treated as Default-owned so nothing is hidden from Default while the
+ * migration runs. Same defensive shape as analystCanAccessAsset(): single
+ * company → true; unknown id → false; unexpected error → deny via
+ * tenancyDegradeAllowed().
+ */
+function analystCanAccessSlaCalendar(PDO $conn, int $analystId, $calendarId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    $calendarId = (int) $calendarId;
+    if ($calendarId <= 0) {
+        return false;
+    }
+    try {
+        $stmt = $conn->prepare("SELECT tenant_id FROM sla_calendars WHERE id = ?");
+        $stmt->execute([$calendarId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        $tid = ($row['tenant_id'] === null) ? getDefaultTenantId($conn) : (int) $row['tenant_id'];
+        return analystCanAccessTenant($conn, $analystId, $tid);
+    } catch (Exception $e) {
+        return tenancyDegradeAllowed($e);
+    }
+}
+
+/**
+ * Scope an sla_calendars list query to the analyst's active company. F6.
+ *
+ * Contract form per docs/migrations/guard-patterns.md §3 (Default-owns-NULL
+ * branch included): post-migration the column is NOT NULL so the NULL arm
+ * matches nothing, but part-migrated installs stay readable from Default.
+ * Returns ['', []] when dormant or the column does not exist yet, so
+ * single-company and part-migrated installs are unaffected.
+ *
+ * @return array [sqlFragment, params]
+ */
+function slaCalendarTenantFilter(PDO $conn, int $analystId, string $alias = 'c'): array {
+    if (!isMultiTenant($conn)) {
+        return ['', []];
+    }
+    if (!tenancyColumnExists($conn, 'sla_calendars', 'tenant_id')) {
+        return ['', []];
+    }
+    $active = getActiveTenantId($conn, $analystId);
+    $default = getDefaultTenantId($conn);
+    $qualified = $alias === '' ? 'tenant_id' : "$alias.tenant_id";
+    if ($active === $default) {
+        return [" AND ($qualified = ? OR $qualified IS NULL)", [$active]];
+    }
+    return [" AND $qualified = ?", [$active]];
+}
+
+/**
+ * May this analyst READ this *SLA notification rule*? F7.
+ *
+ * Contract form per docs/migrations/guard-patterns.md §2: a GLOBAL rule
+ * (tenant_id NULL) fires for every company, so every analyst may read it —
+ * the gate on globals is the settings capability, not the tenant. A set
+ * tenant follows analystCanAccessTenant(). Unknown id → false. This is the
+ * READ gate only; writing takes analystCanWriteSlaRule().
+ */
+function analystCanAccessSlaRule(PDO $conn, int $analystId, $ruleId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    $ruleId = (int) $ruleId;
+    if ($ruleId <= 0) {
+        return false;
+    }
+    try {
+        $stmt = $conn->prepare("SELECT tenant_id FROM sla_notification_rules WHERE id = ?");
+        $stmt->execute([$ruleId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        if ($row['tenant_id'] === null) {
+            return true;
+        }
+        return analystCanAccessTenant($conn, $analystId, (int) $row['tenant_id']);
+    } catch (Exception $e) {
+        return tenancyDegradeAllowed($e);
+    }
+}
+
+/**
+ * May this analyst WRITE (create/update/delete) an SLA notification rule for
+ * this company? F7, contract form per guard-patterns.md §2.
+ *
+ * Writing a GLOBAL rule (NULL) affects every company, so it takes reach over
+ * every company (analystHasAllTenantAccess), never just the settings
+ * capability. A set company follows analystCanAccessTenant(). Dormant
+ * installs always pass.
+ */
+function analystCanWriteSlaRule(PDO $conn, int $analystId, $tenantId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    if ($tenantId === null || $tenantId === '' || (int)$tenantId <= 0) {
+        return analystHasAllTenantAccess($conn, $analystId);
+    }
+    return analystCanAccessTenant($conn, $analystId, (int)$tenantId);
+}
+
+/**
+ * Scope an sla_notification_rules list query: the active company's rules plus
+ * the global (NULL-tenant) ones, which fire for every company. F7, contract
+ * form per guard-patterns.md §2 — globals appear under EVERY active company
+ * by design, unlike activeTenantFilter().
+ *
+ * Returns ['', []] when dormant or un-migrated, so single-company and
+ * part-migrated installs are unaffected.
+ *
+ * @return array [sqlFragment, params]
+ */
+function slaRuleTenantFilter(PDO $conn, int $analystId, string $alias = 'r'): array {
+    if (!isMultiTenant($conn)) {
+        return ['', []];
+    }
+    if (!tenancyColumnExists($conn, 'sla_notification_rules', 'tenant_id')) {
+        return ['', []];
+    }
+    $qualified = $alias === '' ? 'tenant_id' : "$alias.tenant_id";
+    return [" AND ($qualified = ? OR $qualified IS NULL)", [getActiveTenantId($conn, $analystId)]];
+}
+
+/**
+ * May this analyst act on (change/delete) this *SLA notification rule* by id?
+ * Write-gate twin of analystCanAccessSlaRule(): reads the row's company and
+ * applies analystCanWriteSlaRule(), so globals need all-tenant reach.
+ * Existing by-id call sites (delete/save endpoints) keep calling this name;
+ * behavior is unchanged, only the contract-named primitives are new.
+ */
+function analystCanAccessSlaNotificationRule(PDO $conn, int $analystId, $ruleId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    $ruleId = (int) $ruleId;
+    if ($ruleId <= 0) {
+        return false;
+    }
+    try {
+        $stmt = $conn->prepare("SELECT tenant_id FROM sla_notification_rules WHERE id = ?");
+        $stmt->execute([$ruleId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        $tenant = ($row['tenant_id'] === null) ? null : (int)$row['tenant_id'];
+        return analystCanWriteSlaRule($conn, $analystId, $tenant);
+    } catch (Exception $e) {
+        return tenancyDegradeAllowed($e);
+    }
+}
+
+/**
+ * Alias of slaRuleTenantFilter() kept for the list call sites wired earlier
+ * in this sprint; new code should use the contract name.
+ *
+ * @return array [sqlFragment, params]
+ */
+function slaNotificationRuleTenantFilter(PDO $conn, int $analystId, string $alias = 'r'): array {
+    return slaRuleTenantFilter($conn, $analystId, $alias);
+}
+
+/**
+ * May this analyst access this *department* (by its owning company)? F8.
+ *
+ * Pure scoped data post-migration 003 (tenant_id NOT NULL): no NULL branch.
+ * Transitional NULLs (column added, backfill pending) read as Default-owned.
+ * Same defensive shape as analystCanAccessAsset(): single company → true;
+ * unknown id → false; unexpected error → deny via tenancyDegradeAllowed().
+ */
+function analystCanAccessDepartment(PDO $conn, int $analystId, $departmentId): bool {
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    $departmentId = (int) $departmentId;
+    if ($departmentId <= 0) {
+        return false;
+    }
+    try {
+        $stmt = $conn->prepare("SELECT tenant_id FROM departments WHERE id = ?");
+        $stmt->execute([$departmentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        $tid = ($row['tenant_id'] === null) ? getDefaultTenantId($conn) : (int) $row['tenant_id'];
+        return analystCanAccessTenant($conn, $analystId, $tid);
+    } catch (Exception $e) {
+        return tenancyDegradeAllowed($e);
+    }
+}
+
+/**
+ * Scope a departments list query to the analyst's active company. F8.
+ *
+ * Contract form per docs/migrations/guard-patterns.md §1 (Default-owns-NULL
+ * branch included): post-migration the column is NOT NULL so the NULL arm
+ * matches nothing, but it keeps part-migrated installs (column added,
+ * backfill pending) readable from Default instead of silently empty. Returns
+ * ['', []] when dormant or the column does not exist yet, so single-company
+ * and part-migrated installs are unaffected.
+ *
+ * @return array [sqlFragment, params]
+ */
+function departmentTenantFilter(PDO $conn, int $analystId, string $alias = 'd'): array {
+    if (!isMultiTenant($conn)) {
+        return ['', []];
+    }
+    if (!tenancyColumnExists($conn, 'departments', 'tenant_id')) {
+        return ['', []];
+    }
+    $active = getActiveTenantId($conn, $analystId);
+    $default = getDefaultTenantId($conn);
+    $qualified = $alias === '' ? 'tenant_id' : "$alias.tenant_id";
+    if ($active === $default) {
+        return [" AND ($qualified = ? OR $qualified IS NULL)", [$active]];
+    }
+    return [" AND $qualified = ?", [$active]];
+}
+
+/**
  * The analyst's current working company context.
  *
  * - Single-company install → always the Default tenant.
@@ -1326,7 +1556,15 @@ function getTenantConfigRows(PDO $conn, string $table, string $entityType, int $
         $stmt->execute([$tenantId, $entityType, $tenantId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
-        // Part-migrated (no tenant_id column / no hidden table) → fall back to all.
+        // F4: only a genuinely missing schema falls back to "all rows" (the
+        // part-migrated install). A transient failure — lock-wait timeout,
+        // deadlock, dropped connection — must NOT widen every config list to
+        // every company's rows; it returns nothing and is logged, so the UI
+        // shows less rather than leaking more.
+        if (!($e instanceof PDOException && dbErrorIsMissingSchema($e))) {
+            error_log('tenancy: getTenantConfigRows denied after an unexpected database error: ' . $e->getMessage());
+            return [];
+        }
         try {
             return $conn->query("SELECT $cols FROM $table$tail")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e2) {
