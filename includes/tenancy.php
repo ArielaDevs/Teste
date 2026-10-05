@@ -700,9 +700,12 @@ function analystCanAccessDepartment(PDO $conn, int $analystId, $departmentId): b
 /**
  * Scope a departments list query to the analyst's active company. F8.
  *
- * Pure isolation (tenant_id NOT NULL): no NULL branch. Returns ['', []] when
- * dormant or un-migrated, so single-company and part-migrated installs are
- * unaffected.
+ * Contract form per docs/migrations/guard-patterns.md §1 (Default-owns-NULL
+ * branch included): post-migration the column is NOT NULL so the NULL arm
+ * matches nothing, but it keeps part-migrated installs (column added,
+ * backfill pending) readable from Default instead of silently empty. Returns
+ * ['', []] when dormant or the column does not exist yet, so single-company
+ * and part-migrated installs are unaffected.
  *
  * @return array [sqlFragment, params]
  */
@@ -714,7 +717,11 @@ function departmentTenantFilter(PDO $conn, int $analystId, string $alias = 'd'):
         return ['', []];
     }
     $active = getActiveTenantId($conn, $analystId);
+    $default = getDefaultTenantId($conn);
     $qualified = $alias === '' ? 'tenant_id' : "$alias.tenant_id";
+    if ($active === $default) {
+        return [" AND ($qualified = ? OR $qualified IS NULL)", [$active]];
+    }
     return [" AND $qualified = ?", [$active]];
 }
 
