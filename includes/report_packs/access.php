@@ -246,12 +246,38 @@ function rpSaveShares(PDO $conn, int $packId, int $ownerId, array $shares): void
         }
     }
 
+    // F12c: shares carry the pack's company denormalised (migration 004), so
+    // tenant-scoped reads never JOIN back. Looked up from the pack itself —
+    // never from the request — and NULL for personal drafts, exactly like the
+    // pack. Skipped pre-migration so sharing keeps working before Database
+    // Verify adds the column.
+    $shareTenantSupported = tenancyColumnExists($conn, 'report_pack_shares', 'tenant_id');
+    $shareTenantId = null;
+    if ($shareTenantSupported) {
+        try {
+            $tStmt = $conn->prepare("SELECT tenant_id FROM report_packs WHERE id = ?");
+            $tStmt->execute([$packId]);
+            $tTenant = $tStmt->fetchColumn();
+            if ($tTenant !== false && $tTenant !== null) $shareTenantId = (int)$tTenant;
+        } catch (Exception $e) {
+            if (!tenancyDegradeAllowed($e)) throw $e;
+            $shareTenantSupported = false;
+        }
+    }
+
     $conn->beginTransaction();
     try {
         $conn->prepare("DELETE FROM report_pack_shares WHERE pack_id = ?")->execute([$packId]);
-        $ins = $conn->prepare("INSERT INTO report_pack_shares (pack_id, target_type, target_id, target_value, can_edit) VALUES (?, ?, ?, ?, ?)");
-        foreach ($clean as [$type, $id, $value, $edit]) {
-            $ins->execute([$packId, $type, $id, $value, $edit]);
+        if ($shareTenantSupported) {
+            $ins = $conn->prepare("INSERT INTO report_pack_shares (pack_id, tenant_id, target_type, target_id, target_value, can_edit) VALUES (?, ?, ?, ?, ?, ?)");
+            foreach ($clean as [$type, $id, $value, $edit]) {
+                $ins->execute([$packId, $shareTenantId, $type, $id, $value, $edit]);
+            }
+        } else {
+            $ins = $conn->prepare("INSERT INTO report_pack_shares (pack_id, target_type, target_id, target_value, can_edit) VALUES (?, ?, ?, ?, ?)");
+            foreach ($clean as [$type, $id, $value, $edit]) {
+                $ins->execute([$packId, $type, $id, $value, $edit]);
+            }
         }
         $conn->commit();
     } catch (Throwable $e) {
