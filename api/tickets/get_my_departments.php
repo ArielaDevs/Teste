@@ -8,6 +8,7 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
 
 header('Content-Type: application/json');
 
@@ -30,14 +31,18 @@ try {
     $teamCount = $teamCheckStmt->fetch(PDO::FETCH_ASSOC)['team_count'];
     $teamCheckStmt->closeCursor();
 
+    // F8: every branch below is additionally scoped to the analyst's active
+    // company — a team link must not leak another company's department into a
+    // picker. Dormant/un-migrated installs list everything, as before.
+    [$myDeptScope, $myDeptParams] = departmentTenantFilter($conn, $analystId, '');
     if ($teamCount == 0) {
         // No team assignments - return all active departments
         $sql = "SELECT id, name, description, display_order
                 FROM departments
-                WHERE is_active = 1
+                WHERE is_active = 1 $myDeptScope
                 ORDER BY display_order, name";
         $stmt = $conn->prepare($sql);
-        $stmt->execute();
+        $stmt->execute($myDeptParams);
         $departments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } else {
         // User has team assignments - first get accessible department IDs
@@ -57,10 +62,10 @@ try {
             $deptIdPlaceholders = implode(',', array_fill(0, count($accessibleDepts), '?'));
             $sql = "SELECT id, name, description, display_order
                     FROM departments
-                    WHERE is_active = 1 AND id IN ($deptIdPlaceholders)
+                    WHERE is_active = 1 AND id IN ($deptIdPlaceholders) $myDeptScope
                     ORDER BY display_order, name";
             $stmt = $conn->prepare($sql);
-            $stmt->execute($accessibleDepts);
+            $stmt->execute(array_merge($accessibleDepts, $myDeptParams));
             $departments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     }

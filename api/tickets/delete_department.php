@@ -6,6 +6,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
+require_once '../../includes/tenancy.php';
 
 header('Content-Type: application/json');
 
@@ -25,6 +26,13 @@ try {
     }
 
     $conn = connectToDatabase();
+
+    // F8: a department belongs to one company. Same message as "not found"
+    // would give would confirm nothing — the id check below throws the same
+    // generic error either way, so no existence oracle is created.
+    if (!analystCanAccessDepartment($conn, (int)$_SESSION['analyst_id'], $id)) {
+        throw new Exception('Department not found');
+    }
 
     $sql = "DELETE FROM departments WHERE id = ?";
     $stmt = $conn->prepare($sql);

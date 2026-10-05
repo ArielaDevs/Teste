@@ -10,6 +10,7 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['analyst_id'])) {
@@ -21,7 +22,10 @@ requireModuleAccessJson('tickets');
 try {
     $conn = connectToDatabase();
 
-    $rules = $conn->query("
+    // F7: the active company's rules plus the global ones (which fire for
+    // every company). Dormant/un-migrated installs list everything, as before.
+    [$ruleScope, $ruleParams] = slaNotificationRuleTenantFilter($conn, (int)$_SESSION['analyst_id'], 'r');
+    $ruleStmt = $conn->prepare("
         SELECT r.id, r.department_id, d.name AS department_name,
                r.trigger_type, r.target_type,
                r.notify_assignee, r.notify_department_teams,
@@ -30,8 +34,11 @@ try {
           FROM sla_notification_rules r
      LEFT JOIN departments d ON d.id = r.department_id
      LEFT JOIN analysts a    ON a.id = r.notify_analyst_id
+         WHERE 1 = 1 $ruleScope
       ORDER BY (r.department_id IS NULL) DESC, d.name ASC, r.trigger_type ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ");
+    $ruleStmt->execute($ruleParams);
+    $rules = $ruleStmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($rules as &$r) {
         $r['notify_assignee']         = (bool)$r['notify_assignee'];
@@ -39,7 +46,11 @@ try {
         $r['is_active']               = (bool)$r['is_active'];
     }
 
-    $departments = $conn->query("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    // F8: the department picker offers the active company's departments only.
+    [$deptScope, $deptParams] = departmentTenantFilter($conn, (int)$_SESSION['analyst_id'], '');
+    $deptStmt = $conn->prepare("SELECT id, name FROM departments WHERE is_active = 1 $deptScope ORDER BY name");
+    $deptStmt->execute($deptParams);
+    $departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
     $analysts    = $conn->query("SELECT id, full_name FROM analysts WHERE is_active = 1 ORDER BY full_name")->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([

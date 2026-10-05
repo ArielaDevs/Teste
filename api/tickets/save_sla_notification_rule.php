@@ -23,6 +23,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
+require_once '../../includes/tenancy.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['analyst_id'])) {
@@ -73,14 +74,73 @@ try {
     }
 
     $conn = connectToDatabase();
+    $analystId = (int)$_SESSION['analyst_id'];
+
+    // F7: the rule being overwritten must be one the analyst may reach, and
+    // the department it is filed under must be reachable too — otherwise a
+    // rule for company B could be retargeted at (or read through) company A.
+    // Same 403 answer as "not found" so the gate creates no existence oracle.
+    if ($id && !analystCanAccessSlaNotificationRule($conn, $analystId, $id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Rule not found']);
+        exit;
+    }
+    if ($departmentId !== null && !analystCanAccessDepartment($conn, $analystId, $departmentId)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Rule not found']);
+        exit;
+    }
+
+    // Company scope for the write. New rules land in the analyst's active
+    // company (server-derived, never from the client). An UPDATE never moves
+    // a rule between companies — it keeps its existing tenant, so an
+    // all-access analyst editing company B's rule while working in A does not
+    // silently refile it. Skipped entirely pre-migration so the endpoint keeps
+    // working before Database Verify adds the column.
+    $ruleTenantSupported = tenancyColumnExists($conn, 'sla_notification_rules', 'tenant_id');
+    $ruleTenantId = null;
+    if ($ruleTenantSupported && !isMultiTenant($conn)) {
+        // Dormant install: stamp the Default company so a later second tenant
+        // wakes with every existing row correctly attributed.
+        $ruleTenantId = getDefaultTenantId($conn);
+    }
+    if ($ruleTenantSupported && isMultiTenant($conn)) {
+        if ($id) {
+            $tStmt = $conn->prepare("SELECT tenant_id FROM sla_notification_rules WHERE id = ?");
+            $tStmt->execute([$id]);
+            $tRow = $tStmt->fetch(PDO::FETCH_ASSOC);
+            $ruleTenantId = ($tRow && $tRow['tenant_id'] !== null) ? (int)$tRow['tenant_id'] : null;
+        } else {
+            $ruleTenantId = getActiveTenantId($conn, $analystId);
+        }
+        // A GLOBAL (NULL-tenant) rule fires for every company: writing one
+        // takes reach over every company, never just the settings capability.
+        if ($ruleTenantId === null && !analystHasAllTenantAccess($conn, $analystId)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Rule not found']);
+            exit;
+        }
+        if ($ruleTenantId !== null && !analystCanAccessTenant($conn, $analystId, $ruleTenantId)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Rule not found']);
+            exit;
+        }
+    }
 
     // Conflict detection: refuse to create overlapping rules for the same
-    // dept + trigger. NULL dept matches NULL dept; 'both' shadows the single
-    // targets and vice-versa.
+    // dept + trigger within the same company scope. NULL dept matches NULL
+    // dept; 'both' shadows the single targets and vice-versa. Scoped to the
+    // rule's own tenant (NULL matches NULL) so company A's rules never block
+    // company B's, and global rules never collide with company ones.
     $conflictSql = "SELECT id, target_type FROM sla_notification_rules
                      WHERE trigger_type = ?
                        AND ((? IS NULL AND department_id IS NULL) OR department_id = ?)";
     $params = [$trigger, $departmentId, $departmentId];
+    if ($ruleTenantSupported && isMultiTenant($conn)) {
+        $conflictSql .= " AND ((? IS NULL AND tenant_id IS NULL) OR tenant_id = ?)";
+        $params[] = $ruleTenantId;
+        $params[] = $ruleTenantId;
+    }
     if ($id) {
         $conflictSql .= " AND id <> ?";
         $params[] = $id;
@@ -110,16 +170,29 @@ try {
             $id,
         ]);
     } else {
-        $sql = "INSERT INTO sla_notification_rules
-                    (department_id, trigger_type, target_type,
-                     notify_assignee, notify_department_teams,
-                     notify_analyst_id, notify_emails, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        $conn->prepare($sql)->execute([
-            $departmentId, $trigger, $target,
-            $notifyAssign, $notifyTeams,
-            $notifyAnalyst, $emailsCsv, $isActive,
-        ]);
+        if ($ruleTenantSupported) {
+            $sql = "INSERT INTO sla_notification_rules
+                        (department_id, tenant_id, trigger_type, target_type,
+                         notify_assignee, notify_department_teams,
+                         notify_analyst_id, notify_emails, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $conn->prepare($sql)->execute([
+                $departmentId, $ruleTenantId, $trigger, $target,
+                $notifyAssign, $notifyTeams,
+                $notifyAnalyst, $emailsCsv, $isActive,
+            ]);
+        } else {
+            $sql = "INSERT INTO sla_notification_rules
+                        (department_id, trigger_type, target_type,
+                         notify_assignee, notify_department_teams,
+                         notify_analyst_id, notify_emails, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $conn->prepare($sql)->execute([
+                $departmentId, $trigger, $target,
+                $notifyAssign, $notifyTeams,
+                $notifyAnalyst, $emailsCsv, $isActive,
+            ]);
+        }
         $id = (int)$conn->lastInsertId();
     }
 

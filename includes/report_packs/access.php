@@ -25,6 +25,8 @@
  * sharing a pack never shows anybody a figure they could not already see.
  */
 
+require_once __DIR__ . '/../tenancy.php';
+
 const RP_ROLE_RANK = ['view' => 1, 'edit' => 2, 'owner' => 3];
 
 /** The teams and department this analyst counts as, for matching shares. */
@@ -80,13 +82,32 @@ function rpShareMatchSql(array $viewer): array
 /**
  * This viewer's role on a pack: 'owner', 'edit', 'view', or null (no access, or no
  * such pack - the caller says "not found" for both, so ids cannot be probed).
+ *
+ * F11: a pack pinned to a company (tenant_id set, migration 004) additionally
+ * requires the viewer to reach that company — a share to a cross-company team
+ * must not open another company's pack. Personal drafts (tenant_id NULL) keep
+ * the owner/share rule only. Dormant and part-migrated installs behave as
+ * before.
  */
 function rpRole(PDO $conn, int $analystId, int $packId): ?string
 {
-    $s = $conn->prepare("SELECT owner_id FROM report_packs WHERE id = ?");
-    $s->execute([$packId]);
-    $pack = $s->fetch(PDO::FETCH_ASSOC);
+    try {
+        $s = $conn->prepare("SELECT owner_id, tenant_id FROM report_packs WHERE id = ?");
+        $s->execute([$packId]);
+        $pack = $s->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        if (!tenancyDegradeAllowed($e)) return null;
+        $s = $conn->prepare("SELECT owner_id FROM report_packs WHERE id = ?");
+        $s->execute([$packId]);
+        $pack = $s->fetch(PDO::FETCH_ASSOC);
+        $pack['tenant_id'] = null;
+    }
     if (!$pack) return null;
+
+    if (isMultiTenant($conn) && ($pack['tenant_id'] ?? null) !== null
+        && !analystCanAccessTenant($conn, $analystId, (int)$pack['tenant_id'])) {
+        return null;
+    }
 
     if ((int)$pack['owner_id'] === $analystId) return 'owner';
 
@@ -117,6 +138,21 @@ function rpListPacks(PDO $conn, int $analystId): array
     [$match, $params] = rpShareMatchSql($viewer);
     $orphan = $viewer['is_admin'] ? ' OR p.owner_id IS NULL' : '';
 
+    // F11: packs pinned to an unreachable company are not listed. Personal
+    // drafts (tenant_id NULL) and dormant/un-migrated installs list as before.
+    $packScope = '';
+    $packScopeParams = [];
+    if (isMultiTenant($conn) && tenancyColumnExists($conn, 'report_packs', 'tenant_id')) {
+        $reachable = array_values(array_unique(array_map('intval', getAccessibleTenantIds($conn, $analystId))));
+        if ($reachable === []) {
+            $packScope = ' AND 1 = 0';
+        } else {
+            $ph = implode(',', array_fill(0, count($reachable), '?'));
+            $packScope = " AND (p.tenant_id IS NULL OR p.tenant_id IN ($ph))";
+            $packScopeParams = $reachable;
+        }
+    }
+
     $sql = "SELECT p.id, p.name, p.description, p.owner_id, p.created_datetime, p.updated_datetime,
                    o.full_name AS owner_name, u.full_name AS updated_by_name,
                    (SELECT MAX(s.can_edit) FROM report_pack_shares s WHERE s.pack_id = p.id AND $match) AS share_edit,
@@ -124,11 +160,11 @@ function rpListPacks(PDO $conn, int $analystId): array
               FROM report_packs p
               LEFT JOIN analysts o ON o.id = p.owner_id
               LEFT JOIN analysts u ON u.id = p.updated_by
-             WHERE p.owner_id = ?$orphan
-                OR EXISTS (SELECT 1 FROM report_pack_shares s WHERE s.pack_id = p.id AND $match)
+             WHERE (p.owner_id = ?$orphan
+                OR EXISTS (SELECT 1 FROM report_pack_shares s WHERE s.pack_id = p.id AND $match))$packScope
              ORDER BY COALESCE(p.updated_datetime, p.created_datetime) DESC, p.id DESC";
     $s = $conn->prepare($sql);
-    $s->execute(array_merge($params, [$analystId], $params));
+    $s->execute(array_merge($params, [$analystId], $params, $packScopeParams));
 
     $out = [];
     foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) {

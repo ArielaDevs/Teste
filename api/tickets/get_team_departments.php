@@ -5,6 +5,7 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
 
 header('Content-Type: application/json');
 
@@ -25,13 +26,15 @@ if (!$teamId) {
 try {
     $conn = connectToDatabase();
 
+    // F8: scoped to the analyst's active company.
+    [$teamDeptScope, $teamDeptParams] = departmentTenantFilter($conn, (int)$_SESSION['analyst_id'], 'd');
     $sql = "SELECT d.id, d.name, d.description, d.display_order, d.is_active
             FROM departments d
             INNER JOIN department_teams dt ON d.id = dt.department_id
-            WHERE dt.team_id = ?
+            WHERE dt.team_id = ? $teamDeptScope
             ORDER BY d.display_order, d.name";
     $stmt = $conn->prepare($sql);
-    $stmt->execute([$teamId]);
+    $stmt->execute(array_merge([$teamId], $teamDeptParams));
     $departments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Convert bit fields to boolean

@@ -10,6 +10,7 @@
 session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['analyst_id'])) {
@@ -45,9 +46,12 @@ try {
                           FROM ticket_priorities WHERE is_active = 1 ORDER BY display_order, id");
     $priorities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Calendars with their hours + holiday count
-    $stmt = $conn->query("SELECT id, name, timezone, is_default, is_active FROM sla_calendars WHERE is_active = 1 ORDER BY is_default DESC, name");
-    $calendars = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Calendars with their hours + holiday count. F6: scoped to the active
+    // company — hours/holidays below follow these ids, so one filter covers all.
+    [$calScope, $calParams] = slaCalendarTenantFilter($conn, (int)$_SESSION['analyst_id'], '');
+    $calStmt = $conn->prepare("SELECT id, name, timezone, is_default, is_active FROM sla_calendars WHERE is_active = 1 $calScope ORDER BY is_default DESC, name");
+    $calStmt->execute($calParams);
+    $calendars = $calStmt->fetchAll(PDO::FETCH_ASSOC);
 
     if (!empty($calendars)) {
         $calIds = array_column($calendars, 'id');

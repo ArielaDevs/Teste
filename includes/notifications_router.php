@@ -17,6 +17,7 @@
  */
 
 require_once __DIR__ . '/services/notifications.php';
+require_once __DIR__ . '/tenancy.php';
 
 /**
  * Who caused this? Resolved centrally from the session rather than threaded
@@ -68,6 +69,19 @@ function notificationsHandleEvent(string $event, array $payload): void
         $entityType = $types[$event]['entity'];
         $entity     = notificationsEntityFor($event, $payload, $entityType);
         if ($entity === null) {
+            return;
+        }
+
+        // F9: a forged (or replayed, or stale) event must not become a
+        // cross-tenant read primitive. The audience above is resolved from the
+        // payload alone, so an event naming company A's ticket with a company-B
+        // assignee would otherwise write A's subject into B's bell. Drop every
+        // recipient who cannot reach the entity's company. Dormant installs are
+        // unaffected (the check answers true at N=1).
+        $recipients = array_values(array_filter($recipients, function ($recipientId) use ($conn, $entityType, $entity) {
+            return notificationsRecipientMaySeeEntity($conn, (int)$recipientId, $entityType, (int)$entity['id']);
+        }));
+        if (!$recipients) {
             return;
         }
 
@@ -235,6 +249,39 @@ function notificationsRecipientFor(string $event, array $payload): int
         return (int)$payload['domain']['owner_analyst_id'];
     }
     return 0;
+}
+
+/**
+ * May this analyst be told about this entity? F9.
+ *
+ * The recipient-side company check for notificationsHandleEvent(): ticket,
+ * task and domain events are delivered only to analysts who can reach the
+ * entity's owning company. Unknown entity kinds carry no company and pass;
+ * anything undecidable fails closed. Dormant installs always pass.
+ */
+function notificationsRecipientMaySeeEntity(PDO $conn, int $analystId, string $entityType, int $entityId): bool
+{
+    if ($analystId <= 0 || $entityId <= 0) {
+        return false;
+    }
+    if (!isMultiTenant($conn)) {
+        return true;
+    }
+    try {
+        if ($entityType === 'ticket') {
+            return analystCanAccessTicket($conn, $analystId, $entityId);
+        }
+        if ($entityType === 'task') {
+            return analystCanAccessTask($conn, $analystId, $entityId);
+        }
+        if ($entityType === 'domain') {
+            return analystCanAccessDomain($conn, $analystId, $entityId);
+        }
+        return true;
+    } catch (Throwable $e) {
+        error_log('[notificationsRecipientMaySeeEntity] denying after error: ' . $e->getMessage());
+        return false;
+    }
 }
 
 /** Display data for the row: id, human reference, and what it is about. */

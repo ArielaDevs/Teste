@@ -13,6 +13,7 @@ session_start(['read_and_close' => true]);
 require_once '../../config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/rbac.php';
+require_once '../../includes/tenancy.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['analyst_id'])) {
@@ -33,11 +34,16 @@ try {
 
     $conn = connectToDatabase();
 
-    // Validate calendar exists if one was passed (FK will catch it too but a friendly error reads better)
+    // Validate calendar exists if one was passed (FK will catch it too but a friendly error reads better).
+    // F6: it must also belong to a company the analyst may reach — otherwise a
+    // global priority row could be pointed at another company's calendar.
     if ($calendarId !== null) {
         $check = $conn->prepare("SELECT COUNT(*) FROM sla_calendars WHERE id = ? AND is_active = 1");
         $check->execute([$calendarId]);
         if ((int)$check->fetchColumn() === 0) throw new Exception('Calendar not found');
+        if (!analystCanAccessSlaCalendar($conn, (int)$_SESSION['analyst_id'], $calendarId)) {
+            throw new Exception('Calendar not found');
+        }
     }
 
     $stmt = $conn->prepare("UPDATE ticket_priorities

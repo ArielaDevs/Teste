@@ -84,11 +84,19 @@ try {
     // (design §7): the MSP/Default context authors global defaults (tenant_id NULL);
     // a client context authors that company's own. A PRIVATE template is never
     // tenant-scoped — it is one person's text and follows them everywhere.
+    // F10: the destination is server-derived (active context, never the client)
+    // and re-checked — writing a GLOBAL template takes reach over every company.
     $multi        = isMultiTenant($conn);
     $activeId     = getActiveTenantId($conn, $analystId);
     $isDefaultCtx = (!$multi || $activeId === getDefaultTenantId($conn));
     $tenantId     = ($scope === 'shared' && !$isDefaultCtx) ? $activeId : null;
     $ownerId      = ($scope === 'mine') ? $analystId : null;
+    if ($scope === 'shared' && $multi && $tenantId === null
+        && !analystHasAllTenantAccess($conn, $analystId)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Template not found']);
+        exit;
+    }
 
     if ($id) {
         $stmt = $conn->prepare(

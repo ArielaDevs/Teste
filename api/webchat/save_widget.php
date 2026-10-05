@@ -71,11 +71,16 @@ try {
     $conn = connectToDatabase();
 
     // Validate the chosen business-hours calendar actually exists (else treat as none).
+    // F6: it must also belong to a company this analyst may reach — otherwise a
+    // widget for company A could run on company B's working hours.
     if ($calendarId !== null) {
         try {
             $ck = $conn->prepare("SELECT COUNT(*) FROM sla_calendars WHERE id = ?");
             $ck->execute([$calendarId]);
             if ((int) $ck->fetchColumn() === 0) {
+                $calendarId = null;
+            } elseif (isset($_SESSION['analyst_id'])
+                && !analystCanAccessSlaCalendar($conn, (int)$_SESSION['analyst_id'], $calendarId)) {
                 $calendarId = null;
             }
         } catch (Exception $e) { $calendarId = null; }

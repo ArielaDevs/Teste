@@ -40,6 +40,33 @@ function mappingList(PDO $conn, string $sql): array
 }
 
 try {
+    // F8: the departments list follows the connection's company when pinned,
+    // else the analyst's reachable companies. Dormant/un-migrated installs
+    // list everything, as before. (The mapping SAVE path needs the same rule
+    // before this is watertight — flagged for re-audit.)
+    // NOTE: mappingList() below takes raw SQL (no bound params), so the ids
+    // are inlined as (int) casts — every value here is server-derived (the
+    // connection row, the analyst's grant list), never client input.
+    $mapDeptScope = '';
+    if (isMultiTenant($conn) && tenancyColumnExists($conn, 'departments', 'tenant_id')) {
+        $connTenant = null;
+        try {
+            $cStmt = $conn->prepare("SELECT tenant_id FROM integration_connections WHERE id = ?");
+            $cStmt->execute([$connectionId]);
+            $cTenant = $cStmt->fetchColumn();
+            if ($cTenant !== false && $cTenant !== null) $connTenant = (int)$cTenant;
+        } catch (Exception $e) { $connTenant = null; }
+        if ($connTenant !== null) {
+            $mapDeptScope = " AND tenant_id = " . ((int)$connTenant);
+        } else {
+            $allowedIds = array_values(array_unique(array_map('intval', getAccessibleTenantIds($conn, (int)$_SESSION['analyst_id']))));
+            if ($allowedIds === []) {
+                $mapDeptScope = " AND 1 = 0";
+            } else {
+                $mapDeptScope = " AND tenant_id IN (" . implode(',', $allowedIds) . ")";
+            }
+        }
+    }
     echo json_encode([
         'success' => true,
         // False when the install has not run Database Verification since this
@@ -51,7 +78,7 @@ try {
         // Tickets → Settings should see the same things in the same order.
         'local'        => [
             'companies'    => mappingList($conn, "SELECT id, name FROM tenants WHERE is_active = 1 ORDER BY name"),
-            'departments'  => mappingList($conn, "SELECT id, name FROM departments WHERE is_active = 1 ORDER BY display_order, name"),
+            'departments'  => mappingList($conn, "SELECT id, name FROM departments WHERE is_active = 1 $mapDeptScope ORDER BY display_order, name"),
             // ⚠️ ticket_types is the only one of these that is COMPANY-SCOPED
             // (tenant_id NULL = available to every company). Both kinds are
             // offered — a company-specific type is a perfectly good thing to
