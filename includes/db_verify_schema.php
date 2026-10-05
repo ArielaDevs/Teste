@@ -231,6 +231,11 @@ return [
 
     'departments' => [
         'id'                => 'INT NOT NULL AUTO_INCREMENT',
+        // Owning company, pure isolation (migration 003): no global departments —
+        // a cross-company row would leak through ticket confidentiality, SLA rules
+        // and team scoping at once. Unique per (tenant_id, name), so each company
+        // can have its own "HR".
+        'tenant_id'         => 'INT NOT NULL',
         'name'              => 'VARCHAR(100) NOT NULL',
         'description'       => 'VARCHAR(255) NULL',
         'is_active'         => 'TINYINT(1) NULL DEFAULT 1',
@@ -619,6 +624,9 @@ return [
 
     'sla_calendars' => [
         'id'                => 'INT NOT NULL AUTO_INCREMENT',
+        // Owning company (migration 002, pure scoped data — NOT NULL after backfill).
+        // Unique per (tenant_id, name): each company names its own calendars.
+        'tenant_id'         => 'INT NOT NULL',
         'name'              => 'VARCHAR(100) NOT NULL',
         'timezone'          => "VARCHAR(50) NOT NULL DEFAULT 'Europe/London'",
         'is_default'        => 'TINYINT(1) NOT NULL DEFAULT 0',
@@ -630,6 +638,9 @@ return [
     'sla_calendar_hours' => [
         'id'           => 'INT NOT NULL AUTO_INCREMENT',
         'calendar_id'  => 'INT NOT NULL',
+        // Denormalised from the parent calendar (migration 002) so reads filter by
+        // tenant without a JOIN; drift is checked by verify-tenant-consistency.php.
+        'tenant_id'    => 'INT NOT NULL',
         'weekday'      => 'TINYINT NOT NULL',
         'start_time'   => 'TIME NOT NULL',
         'end_time'     => 'TIME NOT NULL',
@@ -638,12 +649,17 @@ return [
     'sla_calendar_holidays' => [
         'id'            => 'INT NOT NULL AUTO_INCREMENT',
         'calendar_id'   => 'INT NOT NULL',
+        // Denormalised from the parent calendar (migration 002); see hours above.
+        'tenant_id'     => 'INT NOT NULL',
         'holiday_date'  => 'DATE NOT NULL',
         'name'          => 'VARCHAR(100) NULL',
     ],
 
     'sla_notification_rules' => [
         'id'                       => 'INT NOT NULL AUTO_INCREMENT',
+        // Owning company (migration 002). NULL = GLOBAL rule firing for every
+        // company — extends the department_id-NULL = "no department scope" convention.
+        'tenant_id'                => 'INT NULL',
         'department_id'            => 'INT NULL',
         'trigger_type'             => "ENUM('warning','breach') NOT NULL",
         'target_type'              => "ENUM('response','resolution','both') NOT NULL DEFAULT 'both'",
@@ -659,6 +675,10 @@ return [
     'sla_notifications_sent' => [
         'id'             => 'INT NOT NULL AUTO_INCREMENT',
         'ticket_id'      => 'INT NOT NULL',
+        // Inherited from the ticket (migration 002). Stays nullable: log rows must
+        // never block deletes (FK SET NULL), and pre-migration rows whose ticket is
+        // gone have no company to inherit.
+        'tenant_id'      => 'INT NULL',
         'target_type'    => "ENUM('response','resolution') NOT NULL",
         'trigger_type'   => "ENUM('warning','breach') NOT NULL",
         'sent_datetime'  => 'DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
@@ -4571,6 +4591,9 @@ return [
     // with a starter design.
     'report_packs' => [
         'id'               => 'INT NOT NULL AUTO_INCREMENT',
+        // Owning company (migration 004). NULL = PERSONAL owner-only draft, the
+        // report twin of reply-template privates — visible to nobody else.
+        'tenant_id'        => 'INT NULL',
         'name'             => 'VARCHAR(200) NOT NULL',
         'description'      => 'VARCHAR(500) NULL',
         'owner_id'         => 'INT NULL',
@@ -4585,6 +4608,9 @@ return [
     'report_pack_shares' => [
         'id'               => 'INT NOT NULL AUTO_INCREMENT',
         'pack_id'          => 'INT NOT NULL',
+        // Denormalised from the parent pack (migration 004) for direct tenant
+        // filtering; drift is checked by verify-tenant-consistency.php.
+        'tenant_id'        => 'INT NULL',
         'target_type'      => 'VARCHAR(20) NOT NULL',
         'target_id'        => 'INT NULL',
         'target_value'     => 'VARCHAR(255) NULL',
