@@ -593,10 +593,11 @@ function analystCanAccessSlaCalendar(PDO $conn, int $analystId, $calendarId): bo
 /**
  * Scope an sla_calendars list query to the analyst's active company. F6.
  *
- * Pure isolation (tenant_id NOT NULL): no NULL branch, unlike
- * activeTenantFilter(). Returns ['', []] when multi-tenancy is dormant or the
- * column does not exist yet, so single-company and part-migrated installs are
- * unaffected.
+ * Contract form per docs/migrations/guard-patterns.md §3 (Default-owns-NULL
+ * branch included): post-migration the column is NOT NULL so the NULL arm
+ * matches nothing, but part-migrated installs stay readable from Default.
+ * Returns ['', []] when dormant or the column does not exist yet, so
+ * single-company and part-migrated installs are unaffected.
  *
  * @return array [sqlFragment, params]
  */
@@ -608,7 +609,11 @@ function slaCalendarTenantFilter(PDO $conn, int $analystId, string $alias = 'c')
         return ['', []];
     }
     $active = getActiveTenantId($conn, $analystId);
+    $default = getDefaultTenantId($conn);
     $qualified = $alias === '' ? 'tenant_id' : "$alias.tenant_id";
+    if ($active === $default) {
+        return [" AND ($qualified = ? OR $qualified IS NULL)", [$active]];
+    }
     return [" AND $qualified = ?", [$active]];
 }
 
