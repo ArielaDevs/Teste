@@ -26,6 +26,7 @@ return [
         'war-room',
         'lms',
         'system',
+        'system-wiki',
         'watchtower',
         'self-service',
         'software',

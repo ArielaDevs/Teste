@@ -1,4 +1,4 @@
-# Laravel Migration Scaffold (Phase 2)
+# Laravel Migration Scaffold (Phase 3)
 
 Este diretório contém a base Laravel para migração gradual do FreeITSM sem remover o sistema legado.
 
@@ -12,6 +12,11 @@ Este diretório contém a base Laravel para migração gradual do FreeITSM sem r
   - `/laravel/legacy/{module}/{path?}` (redirecionamento para módulos legados)
   - `/laravel/legacy/context` (diagnóstico de autenticação por sessão legada)
   - `/laravel/legacy/modules` (módulos canônicos e aliases iniciais)
+- Catálogo modular da fase 3:
+  - `/laravel/modules` (lista de módulos mapeados no catálogo Laravel)
+  - `/laravel/modules/{module}` (detalhe de módulo com validação de acesso por `allowed_modules`)
+  - Middleware de acesso: `app/Http/Middleware/EnsureLegacyModuleAccess.php`
+  - Catálogo: `app/Support/ModuleCatalog.php` + `config/modules.php`
 
 ## Como instalar dependências
 
