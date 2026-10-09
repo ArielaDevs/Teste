@@ -2,6 +2,11 @@
 
 return [
     'root' => dirname(__DIR__, 2),
+    'session' => [
+        'cookie' => env('LEGACY_SESSION_COOKIE', 'PHPSESSID'),
+        'path' => env('LEGACY_SESSION_PATH'),
+        'file_prefix' => env('LEGACY_SESSION_FILE_PREFIX', 'sess_'),
+    ],
     'modules' => [
         'tickets',
         'asset-management',
@@ -29,6 +34,14 @@ return [
         'process-mapper',
         'morning-checks',
         'auth',
+    ],
+    'aliases' => [
+        'assets' => 'asset-management',
+        'changes' => 'change-management',
+        'problems' => 'problem-management',
+        'status' => 'service-status',
+        'kb' => 'knowledge',
+        'wiki' => 'system-wiki',
     ],
     'default_entrypoint' => 'index.php',
 ];

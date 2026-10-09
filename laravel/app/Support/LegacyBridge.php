@@ -4,8 +4,26 @@ namespace App\Support;
 
 class LegacyBridge
 {
+    public static function normalizeModule(string $module): ?string
+    {
+        $module = trim($module);
+        if ($module === '') {
+            return null;
+        }
+
+        $aliases = (array) config('legacy.aliases', []);
+        $resolved = $aliases[$module] ?? $module;
+
+        return is_string($resolved) ? $resolved : null;
+    }
+
     public static function modulePath(string $module, ?string $path = null): ?string
     {
+        $module = (string) self::normalizeModule($module);
+        if ($module === '') {
+            return null;
+        }
+
         $allowedModules = (array) config('legacy.modules', []);
         if (!in_array($module, $allowedModules, true)) {
             return null;
