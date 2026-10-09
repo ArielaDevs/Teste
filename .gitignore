@@ -68,6 +68,8 @@ $RECYCLE.BIN/
 
 # Composer dependencies (if you add them later)
 /vendor/
+/laravel/vendor/
+/laravel/node_modules/
 
 # PHP error logs
 error_log
