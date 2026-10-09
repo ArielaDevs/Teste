@@ -73,6 +73,10 @@ Options -MultiViews -Indexes
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
+# --- Laravel migration bridge (phase 1).
+#     Keeps legacy root routes untouched, while exposing Laravel under /laravel.
+RewriteRule ^laravel(?:/.*)?$ laravel/public/index.php [L,QSA]
+
 # --- Canonical pretty URLs (internal rewrites — URL bar keeps the pretty form)
 RewriteRule ^login$              auth/login.php                 [L]
 RewriteRule ^logout$             auth/analyst_logout.php        [L]
