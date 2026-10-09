@@ -199,16 +199,70 @@ function isSecretSettingName($key) {
  */
 function getEncryptionKey() {
     static $key = null;
-    if ($key === null) {
-        if (!file_exists(ENCRYPTION_KEY_PATH)) {
-            throw new Exception('Encryption key file not found at ' . ENCRYPTION_KEY_PATH);
-        }
-        $hex = trim(file_get_contents(ENCRYPTION_KEY_PATH));
-        $key = hex2bin($hex);
-        if ($key === false || strlen($key) !== 32) {
-            throw new Exception('Invalid encryption key - must be 64 hex characters (256 bits)');
+
+    if ($key !== null) {
+        return $key;
+    }
+
+    if (!file_exists(ENCRYPTION_KEY_PATH)) {
+        throw new Exception(
+            'Encryption key file not found at ' . ENCRYPTION_KEY_PATH
+        );
+    }
+
+    $content = file_get_contents(ENCRYPTION_KEY_PATH);
+
+    if ($content === false) {
+        throw new Exception('Unable to read encryption key file.');
+    }
+
+    // Remove BOM UTF-8, se presente.
+    $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+
+    // Detecta arquivos UTF-16 com BOM.
+    if (substr($content, 0, 2) === "\xFF\xFE") {
+        $content = mb_convert_encoding(
+            substr($content, 2),
+            'UTF-8',
+            'UTF-16LE'
+        );
+    } elseif (substr($content, 0, 2) === "\xFE\xFF") {
+        $content = mb_convert_encoding(
+            substr($content, 2),
+            'UTF-8',
+            'UTF-16BE'
+        );
+    } elseif (
+        strlen($content) >= 2 &&
+        strpos(substr($content, 0, 20), "\x00") !== false
+    ) {
+        // Detecta UTF-16 sem BOM pela presença de bytes nulos.
+        if (preg_match('/^(?:[\x00-\x7F]\x00){4,}/', $content)) {
+            $content = mb_convert_encoding($content, 'UTF-8', 'UTF-16LE');
+        } elseif (preg_match('/^(?:\x00[\x00-\x7F]){4,}/', $content)) {
+            $content = mb_convert_encoding($content, 'UTF-8', 'UTF-16BE');
         }
     }
+
+    $hex = trim($content);
+
+    if (!preg_match('/\A[0-9a-fA-F]{64}\z/', $hex)) {
+        throw new Exception(
+            'Invalid encryption key file encoding or content. ' .
+            'Expected exactly 64 hexadecimal characters.'
+        );
+    }
+
+    $decodedKey = hex2bin($hex);
+
+    if ($decodedKey === false || strlen($decodedKey) !== 32) {
+        throw new Exception(
+            'Invalid encryption key - must represent 256 bits (32 bytes).'
+        );
+    }
+
+    $key = $decodedKey;
+
     return $key;
 }
 
